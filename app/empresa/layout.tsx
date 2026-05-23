@@ -17,7 +17,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
         </Link>
         <nav className="flex gap-1 items-center text-sm font-medium">
           <Link
-            href="/empresa/publicar"
+            href="/empresa/chat"
             className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             Publicar necesidad

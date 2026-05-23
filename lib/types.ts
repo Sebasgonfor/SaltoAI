@@ -119,6 +119,18 @@ export interface OpportunityMatch {
   reason: string;
 }
 
+export interface CompanyLegal {
+  /** Razón social o nombre comercial declarado. */
+  companyName: string;
+  /** NIT (CO) / CIF (ES) / RFC (MX) / RUT (CL) — texto libre, validado por jurisdicción aparte. */
+  taxId: string;
+  legalRepName: string;
+  legalRepDocId: string;
+  acceptedTerms: boolean;
+  /** ISO timestamp del momento en que el founder aceptó TyC. */
+  acceptedAt: string;
+}
+
 export interface CompanyNeed {
   id?: string;
   companyName: string;
@@ -130,6 +142,8 @@ export interface CompanyNeed {
   hardConstraints: string[];
   embedding: number[];
   createdAt: number;
+  /** Solo presente cuando la necesidad vino del chat con gating legal. */
+  legal?: CompanyLegal;
 }
 
 export interface ICSBreakdown {

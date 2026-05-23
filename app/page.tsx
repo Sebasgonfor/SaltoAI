@@ -28,7 +28,7 @@ export default function LandingPage() {
           >
             Soy joven
           </RoleCTA>
-          <RoleCTA role="empresa" href="/empresa/publicar" className="h-9 px-3 text-sm">
+          <RoleCTA role="empresa" href="/empresa/chat" className="h-9 px-3 text-sm">
             Soy empresa
           </RoleCTA>
           <div className="h-5 w-px bg-slate-200 mx-2" />
@@ -69,7 +69,7 @@ export default function LandingPage() {
                   </RoleCTA>
                   <RoleCTA
                     role="empresa"
-                    href="/empresa/publicar"
+                    href="/empresa/chat"
                     variant="outline"
                     className="h-14 px-7 text-base border-2 border-emerald-500 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-50 gap-3 transition-all"
                   >
@@ -336,7 +336,7 @@ export default function LandingPage() {
               </RoleCTA>
               <RoleCTA
                 role="empresa"
-                href="/empresa/publicar"
+                href="/empresa/chat"
                 variant="outline"
                 className="h-14 px-8 text-base bg-transparent border-2 border-emerald-400/40 text-emerald-50 hover:bg-emerald-900/40 hover:border-emerald-400 gap-3"
               >

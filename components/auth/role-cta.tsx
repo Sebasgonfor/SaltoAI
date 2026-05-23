@@ -54,7 +54,7 @@ export function RoleCTA({ role, href, children, variant = 'default', className }
     if (account.role === role) {
       router.push(href);
     } else {
-      const otherHref = account.role === 'joven' ? '/joven/chat' : '/empresa/publicar';
+      const otherHref = account.role === 'joven' ? '/joven/chat' : '/empresa/chat';
       router.push(otherHref);
     }
   };

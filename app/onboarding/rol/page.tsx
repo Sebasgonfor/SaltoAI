@@ -15,7 +15,7 @@ function isSafeNext(value: string | null): string {
 }
 
 function defaultDestination(role: UserRole): string {
-  return role === 'joven' ? '/joven/chat' : '/empresa/publicar';
+  return role === 'joven' ? '/joven/chat' : '/empresa/chat';
 }
 
 /**

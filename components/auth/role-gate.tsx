@@ -99,7 +99,7 @@ export function RoleGate({ role, children }: Props) {
   // 4. Sesión con rol equivocado → muro explícito (sin redirección sigilosa)
   if (account.role !== role) {
     const other = account.role;
-    const otherHref = other === 'joven' ? '/joven/chat' : '/empresa/publicar';
+    const otherHref = other === 'joven' ? '/joven/chat' : '/empresa/chat';
     const OtherIcon = other === 'joven' ? GraduationCap : Building2;
     return (
       <div className="max-w-2xl mx-auto px-6 py-16 lg:py-24 w-full">

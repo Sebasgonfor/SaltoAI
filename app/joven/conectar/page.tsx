@@ -147,7 +147,7 @@ function ConectarContent() {
             <Link href={`/joven/perfil/${profileId}`}>
               <Button variant="outline">Mi perfil y CV</Button>
             </Link>
-            <Link href="/empresa/publicar">
+            <Link href="/empresa/chat">
               <Button variant="ghost" className="text-slate-600">
                 ¿Conoces una empresa? Invítala
               </Button>
