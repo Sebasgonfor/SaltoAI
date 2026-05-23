@@ -3,18 +3,32 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote } from 'lucide-react';
-import type { ChatMessage } from '@/lib/types';
-
-const INITIAL_MESSAGE: ChatMessage = {
-  role: 'agent',
-  content:
-    'Hola, soy tu asistente de Salto. Hoy no vamos a llenar un currículum — vamos a conversar. Cuéntame: ¿cuál ha sido el desafío más grande que has resuelto en el último año, aunque nadie te haya pagado por hacerlo?',
-};
+import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote, UserCircle2, Check } from 'lucide-react';
+import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 
 const MAX_TURNS = 5;
+
+const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: 'mujer', label: 'Mujer' },
+  { value: 'hombre', label: 'Hombre' },
+  { value: 'otro', label: 'Otro' },
+  { value: 'prefiero_no_decir', label: 'Prefiero no decir' },
+];
+
+function firstNameFrom(full: string): string {
+  return full.trim().split(/\s+/)[0] || full.trim();
+}
+
+function buildOpeningMessage(name: string): ChatMessage {
+  const first = firstNameFrom(name);
+  return {
+    role: 'agent',
+    content: `Hola ${first}, soy tu asistente de Salto. Hoy no vamos a llenar un currículum — vamos a conversar. Cuéntame: ¿cuál ha sido el desafío más grande que has resuelto en el último año, aunque nadie te haya pagado por hacerlo?`,
+  };
+}
 
 interface DetectedSignal {
   label: string;
@@ -34,7 +48,14 @@ const SIGNALS: DetectedSignal[] = [
 
 export default function ChatJoven() {
   const router = useRouter();
-  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
+  const [phase, setPhase] = useState<'basics' | 'interview'>('basics');
+  const [basics, setBasics] = useState<JovenBasics | null>(null);
+  const [formName, setFormName] = useState('');
+  const [formAge, setFormAge] = useState('');
+  const [formGender, setFormGender] = useState<Gender | ''>('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -42,7 +63,7 @@ export default function ChatJoven() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, loading, closing]);
+  }, [messages, loading, closing, phase]);
 
   const userTurns = messages.filter((m) => m.role === 'user').length;
 
@@ -59,8 +80,30 @@ export default function ChatJoven() {
       .reduce((acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length, 0);
   }, [messages]);
 
+  const startInterview = () => {
+    const name = formName.trim();
+    const age = parseInt(formAge, 10);
+    if (name.length < 2) {
+      setFormError('Escribe tu nombre completo (mínimo 2 caracteres).');
+      return;
+    }
+    if (!Number.isFinite(age) || age < 16 || age > 35) {
+      setFormError('La edad debe estar entre 16 y 35 años.');
+      return;
+    }
+    if (!formGender) {
+      setFormError('Selecciona cómo te identificas.');
+      return;
+    }
+    const b: JovenBasics = { name, age, gender: formGender };
+    setBasics(b);
+    setFormError(null);
+    setMessages([buildOpeningMessage(name)]);
+    setPhase('interview');
+  };
+
   const sendUserMessage = async () => {
-    if (!input.trim() || loading || closing) return;
+    if (!input.trim() || loading || closing || !basics) return;
 
     const userMsg: ChatMessage = { role: 'user', content: input.trim() };
     const history = [...messages, userMsg];
@@ -72,7 +115,10 @@ export default function ChatJoven() {
       const res = await fetch('/api/entrevista', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          firstName: firstNameFrom(basics.name),
+        }),
       });
       const data = await res.json();
 
@@ -89,13 +135,19 @@ export default function ChatJoven() {
         const closeRes = await fetch('/api/perfil', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: updated }),
+          body: JSON.stringify({ messages: updated, basics }),
         });
         const closeData = await closeRes.json();
         if (closeData.id) {
+          try {
+            localStorage.setItem('salto_last_profile_id', closeData.id);
+          } catch {
+            /* ignore */
+          }
           router.push(`/joven/perfil/${closeData.id}`);
         } else {
           setClosing(false);
+          setFormError(closeData.error || 'No pudimos crear tu perfil. Intenta de nuevo.');
         }
       }
     } catch (err) {
@@ -108,17 +160,135 @@ export default function ChatJoven() {
     }
   };
 
+  if (phase === 'basics') {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-10 lg:py-16 w-full">
+        <header className="mb-10 text-center">
+          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <UserCircle2 size={28} strokeWidth={1.75} />
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">Paso 1 de 2</div>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+            Antes de tu historia, lo básico.
+          </h1>
+          <p className="text-slate-600 mt-3 leading-relaxed max-w-md mx-auto">
+            Nombre y edad van en tu perfil y en el CV para ATS. El género lo eliges tú — no lo adivinamos por tu nombre.
+          </p>
+        </header>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 mb-2">Nombre completo</label>
+            <Input
+              placeholder="Ej. Camila Silva"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              className="h-12 text-base"
+              autoComplete="name"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 mb-2">Edad</label>
+            <Input
+              type="number"
+              min={16}
+              max={35}
+              placeholder="Ej. 21"
+              value={formAge}
+              onChange={(e) => setFormAge(e.target.value)}
+              className="h-12 text-base w-32"
+            />
+          </div>
+
+          <div>
+            <span className="block text-sm font-semibold text-slate-900 mb-3" id="gender-label">
+              ¿Cómo te identificas?
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby="gender-label"
+              aria-invalid={formError?.includes('identificas') ? true : undefined}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+            >
+              {GENDER_OPTIONS.map((opt) => {
+                const selected = formGender === opt.value;
+                const inputId = `gender-${opt.value}`;
+                return (
+                  <div key={opt.value}>
+                    <input
+                      type="radio"
+                      id={inputId}
+                      name="gender"
+                      value={opt.value}
+                      checked={selected}
+                      onChange={() => {
+                        setFormGender(opt.value);
+                        if (formError?.includes('identificas')) setFormError(null);
+                      }}
+                      className="sr-only peer"
+                    />
+                    <label
+                      htmlFor={inputId}
+                      className={`flex items-center justify-between gap-2 px-4 py-3 rounded-xl border text-sm font-medium cursor-pointer transition-all ${
+                        selected
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/30'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {selected && <Check size={18} className="text-emerald-600 flex-shrink-0" aria-hidden />}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+            {formError?.includes('identificas') && (
+              <p className="text-sm text-rose-700 mt-2" role="alert">
+                {formError}
+              </p>
+            )}
+          </div>
+
+          {formError && !formError.includes('identificas') && (
+            <p className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2" role="alert">
+              {formError}
+            </p>
+          )}
+
+          <Button size="lg" className="w-full h-12 gap-2" onClick={startInterview}>
+            Continuar a mi historia <ArrowRight size={16} />
+          </Button>
+        </div>
+
+        <p className="text-center text-xs text-slate-500 mt-6 max-w-sm mx-auto leading-relaxed">
+          Después conversamos 3–5 minutos sobre desafíos reales que hayas vivido. Eso alimenta tu Perfil de Evidencia.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 lg:py-12 w-full">
-      {/* Header */}
       <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">Entrevista conversacional</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
+            Paso 2 de 2 · Entrevista
+          </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            Cuéntame tu historia.
+            Cuéntame tu historia, {basics ? firstNameFrom(basics.name) : ''}.
           </h1>
           <p className="text-slate-600 mt-2 max-w-xl">
-            5 minutos, 3-5 preguntas. Sin formularios. Vamos a sacar la evidencia que las empresas no ven en tu CV.
+            {basics && (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="font-normal border-slate-200">
+                  {basics.name}
+                </Badge>
+                <Badge variant="outline" className="font-normal border-slate-200">
+                  {basics.age} años
+                </Badge>
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -142,8 +312,11 @@ export default function ChatJoven() {
         </div>
       </header>
 
+      {formError && phase === 'interview' && (
+        <div className="mb-4 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3">{formError}</div>
+      )}
+
       <div className="grid lg:grid-cols-12 gap-6">
-        {/* CHAT */}
         <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[600px] max-h-[700px] overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5">
             {messages.map((msg, i) => (
@@ -209,40 +382,29 @@ export default function ChatJoven() {
                 Enviar <ArrowRight size={14} />
               </Button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2 px-1">
-              <kbd className="px-1 py-0.5 text-[10px] bg-white border border-slate-200 rounded text-slate-500">Enter</kbd> envía · <kbd className="px-1 py-0.5 text-[10px] bg-white border border-slate-200 rounded text-slate-500">⇧ Enter</kbd> salto de línea
-            </p>
           </div>
         </section>
 
-        {/* SIDE PANEL — extraction live */}
         <aside className="lg:col-span-5 space-y-4">
           <div className="bg-slate-950 text-white rounded-3xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/15 rounded-full blur-3xl" aria-hidden />
             <div className="relative">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles size={14} className="text-emerald-400" />
                 <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Detectando en vivo</span>
               </div>
-              <h2 className="font-display font-bold text-2xl tracking-tight mb-1 leading-tight">
-                Señales en tu historia
-              </h2>
-              <p className="text-xs text-slate-400 mb-5">
-                A medida que cuentes, vamos marcando qué evidencias laborales aparecen. <span className="text-emerald-400">No es magia: es extracción semántica.</span>
-              </p>
-
+              <h2 className="font-display font-bold text-2xl tracking-tight mb-1 leading-tight">Señales en tu historia</h2>
               {detected.size === 0 ? (
-                <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl p-4 text-center">
-                  Aún no hay señales detectadas. Cuéntame qué hiciste, no qué quisiste hacer.
+                <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl p-4 text-center mt-4">
+                  Cuéntame qué hiciste, no qué quisiste hacer.
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 mt-4">
                   {SIGNALS.map((s) => {
                     const active = detected.has(s.label);
                     return (
                       <span
                         key={s.label}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                        className={`text-xs px-2.5 py-1 rounded-full border ${
                           active
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                             : 'bg-slate-900/60 text-slate-500 border-slate-800'
@@ -262,26 +424,18 @@ export default function ChatJoven() {
             <div className="bg-white border border-slate-200 rounded-2xl p-4">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Palabras</div>
               <div className="font-display font-bold text-3xl text-slate-900 tabular-nums">{wordsCount}</div>
-              <p className="text-[11px] text-slate-500 mt-1">Cuanto más concreto, mejor evidencia.</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-4">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Señales</div>
               <div className="font-display font-bold text-3xl text-emerald-600 tabular-nums">{detected.size}</div>
-              <p className="text-[11px] text-slate-500 mt-1">de {SIGNALS.length} posibles</p>
             </div>
-          </div>
-
-          <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex gap-3">
-            <MessageSquareQuote size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-900 leading-relaxed">
-              <strong className="font-semibold">Tip:</strong> menciona cifras concretas si las recuerdas ("subí las ventas un X%", "manejé Y clientes"). Los detalles convierten anécdotas en evidencia.
-            </p>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-4 flex gap-3">
             <Layers size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-slate-600 leading-relaxed">
-              Tras <strong className="text-slate-900">{MAX_TURNS} turnos</strong>, generamos tu Perfil de Evidencia con cada habilidad anclada a una cita textual de esta conversación.
+              Al terminar generamos tu perfil, tu <strong className="text-slate-900">CV ATS</strong> y podrás{' '}
+              <strong className="text-slate-900">conectar con empresas</strong>.
             </p>
           </div>
         </aside>
