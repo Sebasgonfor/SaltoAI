@@ -32,7 +32,16 @@ export function RoleCTA({ role, href, children, variant = 'default', className }
   const [busy, setBusy] = useState(false);
 
   const onClick = async () => {
-    if (loading || busy) return;
+    // Solo `busy` bloquea (cuando ya estamos disparando un signInWithGoogle).
+    // ANTES bloqueábamos también con `loading`, pero `loading` sigue `true`
+    // mientras el AuthProvider resuelve la sesión persistida + lee accounts
+    // de Firestore — en sesiones lentas eso son varios segundos en los que
+    // el botón se veía "muerto". El path es seguro sin esa guard:
+    //   - sin user      → signInWithGoogle dispara igual
+    //   - con user, sin account aún → mandamos a /onboarding/rol (RoleGate lo
+    //     redirige al destino correcto cuando el account llegue)
+    //   - con account   → navegación directa
+    if (busy) return;
     if (!user) {
       setBusy(true);
       try {
@@ -48,6 +57,9 @@ export function RoleCTA({ role, href, children, variant = 'default', className }
       return;
     }
     if (!account) {
+      // El AuthProvider todavía resolviendo el rol — el onboarding sabe
+      // qué hacer si llega un user con role pre-existente (auto-resuelve)
+      // o sin (muestra picker).
       router.push(`/onboarding/rol?next=${encodeURIComponent(href)}`);
       return;
     }
@@ -64,7 +76,7 @@ export function RoleCTA({ role, href, children, variant = 'default', className }
       size="lg"
       variant={variant}
       className={cn(className)}
-      disabled={busy || loading}
+      disabled={busy}
       onClick={onClick}
     >
       {busy ? (
