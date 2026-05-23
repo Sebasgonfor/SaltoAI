@@ -296,7 +296,10 @@ export default function ChatJoven() {
           <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
             Cuéntame tu historia, {basics ? firstNameFrom(basics.name) : ''}.
           </h1>
-          <p className="text-slate-600 mt-2 max-w-xl">
+          {/* `<Badge>` renderiza un `<div>`, así que el contenedor NO puede
+              ser `<p>` (HTML inválido → hydration error). Usamos `<div>` y
+              mantenemos el styling. */}
+          <div className="text-slate-600 mt-2 max-w-xl">
             {basics && (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="font-normal border-slate-200">
@@ -307,7 +310,7 @@ export default function ChatJoven() {
                 </Badge>
               </span>
             )}
-          </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
