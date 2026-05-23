@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Quote,
-  Download,
   CheckCircle2,
   Sparkles,
   MessageSquareQuote,
@@ -15,15 +14,8 @@ import {
   ArrowRight,
   Building2,
 } from 'lucide-react';
-import type { Gender, Profile } from '@/lib/types';
-import type { StorageMode } from '@/lib/db';
-
-const GENDER_LABEL: Record<Gender, string> = {
-  mujer: 'Mujer',
-  hombre: 'Hombre',
-  otro: 'Otro',
-  prefiero_no_decir: '',
-};
+import type { Profile } from '@/lib/types';
+import CvCustomizer from '@/components/cv-customizer';
 
 export default function PerfilPorId({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -137,17 +129,11 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 {perfil.summary}
               </p>
             )}
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Button variant="outline" className="gap-2" asChild>
-                <a href={`/api/cv?id=${encodeURIComponent(id)}`} download>
-                  <Download size={14} /> Descargar CV ATS (.txt)
-                </a>
-              </Button>
-              <Button variant="ghost" className="gap-2 text-slate-600" asChild>
-                <a href={`/api/cv?id=${encodeURIComponent(id)}&format=html`} target="_blank" rel="noopener noreferrer">
-                  Ver CV en navegador
-                </a>
-              </Button>
+            {/* CV ATS — one-click + panel opcional para completar contacto,
+                idiomas, educación. Los datos viajan como query params; el
+                renderer del CV los inyecta en las secciones estándar. */}
+            <div className="pt-2 max-w-2xl">
+              <CvCustomizer profileId={id} />
             </div>
           </div>
         </div>

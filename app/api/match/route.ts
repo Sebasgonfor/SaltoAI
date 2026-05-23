@@ -4,6 +4,8 @@ import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { cosineSimilarity } from "@/lib/embeddings";
 import { getAllProfiles, getNeed } from "@/lib/db";
 import { ICS_WEIGHTS } from "@/lib/types";
+import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
+import { startLog } from "@/lib/logger";
 import type { CompanyNeed, ICSBreakdown, Match, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -192,16 +194,33 @@ async function rankBatchWithLLM(
 }
 
 export async function POST(req: NextRequest) {
+  const log = startLog(req, "match");
   try {
     const { needId } = (await req.json()) as { needId: string };
-    if (!needId) return NextResponse.json({ error: "needId required" }, { status: 400 });
+    if (!needId) {
+      log.end({ status: 400, extra: { reason: "needId_required" } });
+      return NextResponse.json({ error: "needId required" }, { status: 400 });
+    }
 
     const need = await getNeed(needId);
-    if (!need) return NextResponse.json({ error: "need not found" }, { status: 404 });
+    if (!need) {
+      log.end({ status: 404, extra: { needId } });
+      return NextResponse.json({ error: "need not found" }, { status: 404 });
+    }
 
     const profiles = await getAllProfiles();
     if (profiles.length === 0) {
+      log.end({ status: 200, extra: { needId, note: "no_profiles" } });
       return NextResponse.json({ need, matches: [], note: "no_profiles" });
+    }
+
+    // Edge case: necesidad sin contexto/skills. El matching todavía corre
+    // sobre embeddings de la rawDescription pero la calidad será baja; lo
+    // marcamos en el log y le añadimos un aviso al cliente.
+    const needHasSignals =
+      need.requiredSkills.length > 0 || need.desiredTraits.length > 0 || need.context.length > 0;
+    if (!needHasSignals) {
+      log.warn("edge.need_without_signals", { needId });
     }
 
     // 1. Shortlist por similitud semántica
@@ -214,11 +233,25 @@ export async function POST(req: NextRequest) {
 
     // 2. Ranking batched (1 sola llamada al LLM)
     let llmResults: Map<string, Omit<Match, "profileId" | "profileName">> | null = null;
+    let rankingMode: "llm" | "heuristic" | "rate_limited_fallback" = "heuristic";
+    let rateLimitedShape: ReturnType<typeof classifyProviderError> | null = null;
     if (hasGeminiKey()) {
       try {
         llmResults = await rankBatchWithLLM(need, shortlist);
+        rankingMode = "llm";
       } catch (e) {
-        console.error("rankBatchWithLLM failed, falling back to heuristic:", (e as Error).message);
+        // Si el 429 ocurre en el ranking, NO devolvemos 500 — caemos a la
+        // heurística (matching sigue siendo útil) y avisamos al cliente.
+        if (isRateLimitError(e)) {
+          rateLimitedShape = classifyProviderError(e);
+          rankingMode = "rate_limited_fallback";
+          log.warn("rate_limited", {
+            stage: "ranking",
+            message: (e as Error)?.message,
+          });
+        } else {
+          log.warn("rank_batch_failed", { message: (e as Error)?.message });
+        }
       }
     }
 
@@ -228,9 +261,39 @@ export async function POST(req: NextRequest) {
     });
 
     ranked.sort((a, b) => b.ics - a.ics);
-    return NextResponse.json({ need, matches: ranked.slice(0, RETURN_SIZE) });
+    const matches = ranked.slice(0, RETURN_SIZE);
+    log.end({
+      status: 200,
+      extra: {
+        needId,
+        rankingMode,
+        shortlistSize: shortlist.length,
+        matchesReturned: matches.length,
+        topIcs: matches[0]?.ics,
+      },
+    });
+    // Combinamos avisos en un solo campo `warning` para que el frontend
+    // muestre una sola cinta amarilla, no dos pegadas.
+    const warnings: string[] = [];
+    if (rateLimitedShape) warnings.push(rateLimitedShape.error);
+    if (!needHasSignals)
+      warnings.push("La necesidad no tiene contexto estructurado; el ranking puede ser ruidoso.");
+
+    return NextResponse.json({
+      need,
+      matches,
+      ...(warnings.length > 0 && { warning: warnings.join(" ") }),
+      ...(rateLimitedShape && { warningCode: rateLimitedShape.code }),
+    });
   } catch (err) {
-    console.error("match error:", err);
-    return NextResponse.json({ error: "Match failed" }, { status: 500 });
+    if (isRateLimitError(err)) {
+      const shape = classifyProviderError(err);
+      log.warn("rate_limited", { message: (err as Error)?.message });
+      log.end({ status: shape.status, extra: { code: shape.code } });
+      return errorResponse(shape);
+    }
+    log.error("match.exception", { message: (err as Error)?.message });
+    log.end({ status: 500, extra: { code: "unknown" } });
+    return NextResponse.json({ error: "Match failed", code: "unknown" }, { status: 500 });
   }
 }
