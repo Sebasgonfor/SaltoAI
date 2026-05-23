@@ -175,7 +175,18 @@ Esto NO está en los must-haves pero **es lo que separa una demo bonita de un pr
 | **Casos borde honestos (§8.5)** | Respuesta de 1 palabra, conversación con 0 user turns, necesidad sin contexto — antes reventaban o caían al mock genérico "Camila Silva". Hoy devuelven 422 con mensaje "necesito más detalle para construir tu perfil". | [`lib/input-validation.ts`](lib/input-validation.ts). |
 | **Smoke test E2E reproducible** | Levanta server, hace seed, crea necesidad, corre match, valida ICS ≥ 80 para Camila ↔ Arepas, persiste feedback, genera CV. Se corre antes del pitch en ~15 segundos. | [`scripts/smoke.sh`](scripts/smoke.sh). |
 | **Fallback graceful sin Firebase / Gemini** | Bypass por colección (no por proceso): si las reglas de `feedback` no están deployadas, solo esa colección cae a memoria, no toda la base. Si Gemini falla, ranking heurístico (no pantalla rota). | [`lib/db.ts`](lib/db.ts) (`firestoreDisabledFor`), [`lib/gemini.ts`](lib/gemini.ts) (`hasGeminiKey()`). |
-| **Reglas Firestore por colección** | Permisos abiertos solo para `profiles`/`needs`/`feedback`; cualquier otra colección negada. Listas para deploy con `firebase deploy --only firestore:rules`. | [`firestore.rules`](firestore.rules). |
+| **Reglas Firestore auth-scoped** | Reemplazado el `allow-all` por reglas por colección y por `uid`: `profiles` se autoescriben solo por el dueño (doc id == `auth.uid`), `needs` quedan ligadas al `ownerUid` que las creó, `microtasks` visibles solo para el joven y la empresa propietaria, `feedback` write autenticado y read solo del backend. Default deny en todas las demás. Listas para deploy con `firebase deploy --only firestore:rules`. | [`firestore.rules`](firestore.rules). |
+| **Sign-In con Google (Firebase Auth)** | Sin login, el perfil del joven se perdía entre sesiones y la empresa no se podía atar a sus necesidades. Hoy: Google Sign-In en el header, `AuthProvider` en el root layout, `UserButton` con avatar/email/menú. El perfil del joven se persiste con doc id == `uid` (clave para las reglas Firestore arriba). `/empresa/publicar` está gated por sign-in. | [`lib/auth-context.tsx`](lib/auth-context.tsx) · [`components/auth/user-button.tsx`](components/auth/user-button.tsx). |
+
+### 6.4 Funcionalidades agregadas más allá del scope original
+
+Tres piezas grandes que entraron post-MVP y refuerzan el foso defensivo del producto. No estaban en los 6 must-haves originales del hackatón.
+
+| Pieza | Qué hace | Por qué importa | Dónde vive |
+|---|---|---|---|
+| **Detector de talento latente** | Endpoint `/api/talento-latente`: dado un Perfil de Evidencia, infiere `hiddenSkills` (habilidades implícitas en la trayectoria que el joven no nombró), `transversalSkills`, `suggestedRoles` con `whyFits` + `readinessHint`, y un `closingMessage` motivacional. Devuelve `LatentProfile`. | El joven se entera de capacidades que tiene pero no nombra (ej. "negociación" inferida desde "manejé reclamos del local familiar"). Sube su confianza y amplía qué necesidades pueden matchear. | [`app/api/talento-latente/route.ts`](app/api/talento-latente/route.ts) · types `HiddenSkill` / `TransversalSkill` / `SuggestedRole` / `LatentProfile` en [`lib/types.ts`](lib/types.ts). |
+| **Micro-tareas pagadas E2E** | 4 endpoints (`proponer` / `entregar` / `evaluar` / `list`) + 4 páginas (`/empresa/probar/[profileId]`, `/empresa/tareas/[id]`, `/joven/tareas`, `/joven/tareas/[id]`). La empresa propone una tarea acotada y pagada como "audición antes del contrato". El joven entrega. La IA evalúa contra criterios estructurados + la empresa rate-ea + pago. | Solución concreta al "¿y si me equivoco al contratar al junior?" del founder: tarea acotada y pagada como filtro de bajo riesgo. Y genera el dato propietario más valioso del producto: **outcome verificable de desempeño real**, no opinión. | [`app/api/microtask/*`](app/api/microtask/) · types `MicroTask` / `MicroTaskStatus` / `EvaluationCriterion` / `CriterionScore` / `TaskOutcomeStat`. |
+| **Outcome stats en el match** | Cuando un candidato tiene `taskStats` (totalCompleted, averageRating de micro-tareas previas), la card del match #1 muestra un badge "X tareas verificadas · rating Y". | El ICS dejó de ser solo predicción; ahora hay historial real anclado al perfil. Reduce incertidumbre del founder y prepara la entrada del outcome data al reentrenamiento de pesos (§8.6). | Campo `taskStats?: TaskOutcomeStat` en `Profile` y `Match` ([`lib/types.ts`](lib/types.ts)). |
 
 ---
 
@@ -319,9 +330,10 @@ Punto de entrada: botón `¿útil? sí/no` en cada card de match ([`components/m
                 │
 ┌───────────────▼───────────────────────────────────────────┐
 │  DATOS                                                     │
-│  - Firestore (perfiles, empresas, matches, feedback)       │
+│  - Firestore (profiles, needs, microtasks, feedback)       │
 │  - Vector store (embeddings de perfiles y necesidades)     │
-│  - Auth (Firebase Auth)                                    │
+│  - Auth (Firebase Auth + Google Sign-In) — perfil ID == uid│
+│  - Reglas auth-scoped por colección (default deny)         │
 │  - Ontología de competencias (para RAG)                    │
 └───────────────────────────────────────────────────────────┘
 ```
@@ -344,6 +356,11 @@ Punto de entrada: botón `¿útil? sí/no` en cada card de match ([`components/m
 | `/api/match` | POST | Shortlist por embeddings + ranking ICS por LLM, fallback heurístico, avisos al cliente. | [`app/api/match/route.ts`](app/api/match/route.ts) |
 | `/api/cv` | GET/POST | CV ATS one-click (HTML imprimible / JSON plain-text). Tailoring por `?needId=...`. | [`app/api/cv/route.ts`](app/api/cv/route.ts) |
 | `/api/feedback` | POST/GET | Persiste y lista feedback de matches (data flywheel). | [`app/api/feedback/route.ts`](app/api/feedback/route.ts) |
+| `/api/talento-latente` | POST | Detector de habilidades implícitas + roles sugeridos a partir del Perfil de Evidencia (`LatentProfile`). | [`app/api/talento-latente/route.ts`](app/api/talento-latente/route.ts) |
+| `/api/microtask/proponer` | POST | Empresa propone micro-tarea pagada (brief, criterios, monto COP, deadline) a un candidato matchea­do. | [`app/api/microtask/proponer/route.ts`](app/api/microtask/proponer/route.ts) |
+| `/api/microtask/entregar` | POST | Joven entrega su deliverable (texto + adjuntos opcionales). | [`app/api/microtask/entregar/route.ts`](app/api/microtask/entregar/route.ts) |
+| `/api/microtask/evaluar` | POST | LLM evalúa el deliverable contra los `EvaluationCriterion` definidos por la empresa, devuelve `CriterionScore[]` + score global. La empresa rate-ea encima. | [`app/api/microtask/evaluar/route.ts`](app/api/microtask/evaluar/route.ts) |
+| `/api/microtask/list` | GET | Lista micro-tareas del usuario actual (joven o empresa según contexto). | [`app/api/microtask/list/route.ts`](app/api/microtask/list/route.ts) |
 | `/api/seed` | GET/POST | Carga 5 perfiles demo idempotente. | [`app/api/seed/route.ts`](app/api/seed/route.ts) |
 
 ---
