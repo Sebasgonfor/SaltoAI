@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote, UserCircle2, Check } from 'lucide-react';
+import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote, UserCircle2, Check, RotateCcw } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 
@@ -47,6 +47,46 @@ const SIGNALS: DetectedSignal[] = [
   { label: 'Persistencia', match: /(insist[íi]|seguí|no me rendí|volv[íi] a intentar|terminé)/i },
 ];
 
+// Persistencia en localStorage para que la entrevista sobreviva navegación
+// (salir a otra página y volver, refresh accidental, etc.). Una key por uid
+// (o "anon") para no cruzar conversaciones entre usuarios distintos en el
+// mismo navegador. Se limpia al crear el perfil con éxito.
+interface ChatPersistedState {
+  phase: 'basics' | 'interview';
+  basics: JovenBasics | null;
+  formName: string;
+  formAge: string;
+  formGender: Gender | '';
+  messages: ChatMessage[];
+  input: string;
+}
+
+function storageKey(uid: string | null | undefined): string {
+  return `salto_chat_state_${uid || 'anon'}`;
+}
+
+function loadPersisted(uid: string | null | undefined): ChatPersistedState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(storageKey(uid));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ChatPersistedState;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersisted(uid: string | null | undefined): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(storageKey(uid));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function ChatJoven() {
   const router = useRouter();
   const { user } = useAuth();
@@ -61,7 +101,46 @@ export default function ChatJoven() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [restored, setRestored] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Restaurar estado al montar (una vez por uid). Si la sesión cambia de
+  // usuario, leemos la persistencia del usuario nuevo y descartamos el
+  // estado en memoria.
+  useEffect(() => {
+    const saved = loadPersisted(user?.uid);
+    if (saved) {
+      if (saved.phase) setPhase(saved.phase);
+      if (saved.basics) setBasics(saved.basics);
+      if (typeof saved.formName === 'string') setFormName(saved.formName);
+      if (typeof saved.formAge === 'string') setFormAge(saved.formAge);
+      if (typeof saved.formGender === 'string') setFormGender(saved.formGender as Gender | '');
+      if (Array.isArray(saved.messages)) setMessages(saved.messages);
+      if (typeof saved.input === 'string') setInput(saved.input);
+    }
+    setRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
+
+  // Guardar cada vez que cambie algo relevante. Esperamos a `restored` para
+  // no pisar la persistencia con los valores iniciales antes de leer.
+  useEffect(() => {
+    if (!restored || typeof window === 'undefined') return;
+    const payload: ChatPersistedState = {
+      phase,
+      basics,
+      formName,
+      formAge,
+      formGender,
+      messages,
+      input,
+    };
+    try {
+      localStorage.setItem(storageKey(user?.uid), JSON.stringify(payload));
+    } catch {
+      /* localStorage puede fallar en modo privado; ignoramos. */
+    }
+  }, [restored, phase, basics, formName, formAge, formGender, messages, input, user?.uid]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -85,6 +164,27 @@ export default function ChatJoven() {
       .filter((m) => m.role === 'user')
       .reduce((acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length, 0);
   }, [messages]);
+
+  const resetInterview = () => {
+    if (closing) return;
+    const ok =
+      typeof window === 'undefined' ||
+      window.confirm(
+        '¿Reiniciar la entrevista? Se borra todo lo que llevás escrito y volvés al paso 1. Tus datos básicos (nombre, edad) también se vacían.'
+      );
+    if (!ok) return;
+    clearPersisted(user?.uid);
+    setMessages([]);
+    setInput('');
+    setBasics(null);
+    setFormName(user?.displayName ?? '');
+    setFormAge('');
+    setFormGender('');
+    setFormError(null);
+    setLoading(false);
+    setClosing(false);
+    setPhase('basics');
+  };
 
   const startInterview = () => {
     const name = formName.trim();
@@ -155,6 +255,8 @@ export default function ChatJoven() {
           } catch {
             /* ignore */
           }
+          // Limpiamos la persistencia de la entrevista: ya cumplió su rol.
+          clearPersisted(user?.uid);
           router.push(`/joven/perfil/${closeData.id}`);
         } else {
           // Casos borde (PRD §8.5): el agente cree que terminó pero el
@@ -312,7 +414,7 @@ export default function ChatJoven() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1.5">
             {Array.from({ length: MAX_TURNS }).map((_, i) => (
               <span
@@ -330,6 +432,17 @@ export default function ChatJoven() {
           <span className="text-xs text-slate-500 tabular-nums font-medium">
             {userTurns}/{MAX_TURNS}
           </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetInterview}
+            disabled={loading || closing}
+            className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 gap-1.5 -ml-1"
+            title="Empezar de cero la entrevista"
+          >
+            <RotateCcw size={14} />
+            Reiniciar
+          </Button>
         </div>
       </header>
 
