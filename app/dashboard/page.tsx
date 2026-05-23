@@ -194,7 +194,11 @@ function getInsight(profile: Profile | null, tasks: MicroTask[]): string {
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  // `/dashboard` es la home del JOVEN (sidebar con "Mi perfil", "Oportunidades", etc.).
+  // Sin chequeo de rol, una empresa logueada cae acá y ve una UI que no es suya
+  // (regresión introducida al lanzar el dashboard sin gating por rol).
+  // Solución: si el `account.role` es `empresa`, redirigimos al hub de empresas.
+  const { user, account, loading, roleLoading } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tasks, setTasks] = useState<MicroTask[]>([]);
@@ -203,8 +207,15 @@ export default function DashboardPage() {
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/');
-  }, [user, loading, router]);
+    if (loading || roleLoading) return;
+    if (!user) {
+      router.replace('/');
+      return;
+    }
+    if (account?.role === 'empresa') {
+      router.replace('/empresa');
+    }
+  }, [user, account, loading, roleLoading, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -240,7 +251,10 @@ export default function DashboardPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, [sidebarOpen]);
 
-  if (loading || !user) {
+  // Mientras se resuelve auth/rol, mostramos el loader. Si rol resolvió como
+  // empresa, el useEffect ya disparó router.replace; igual mantenemos loader
+  // para evitar un flash de UI joven antes del redirect.
+  if (loading || roleLoading || !user || account?.role === 'empresa') {
     return (
       <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
         <div className="flex items-center gap-2">
