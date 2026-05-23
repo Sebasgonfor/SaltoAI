@@ -12,6 +12,7 @@ import {
   Layers,
   Network,
   ArrowRight,
+  Building2,
 } from 'lucide-react';
 import type { Profile } from '@/lib/types';
 import CvCustomizer from '@/components/cv-customizer';
@@ -19,6 +20,7 @@ import CvCustomizer from '@/components/cv-customizer';
 export default function PerfilPorId({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [perfil, setPerfil] = useState<Profile | null>(null);
+  const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,15 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           return;
         }
         const data = await res.json();
-        if (!cancelled) setPerfil(data.profile);
+        if (!cancelled) {
+          setPerfil(data.profile);
+          setStorage(data.storage ?? (id.startsWith('local_') ? 'memory' : 'firestore'));
+          try {
+            localStorage.setItem('salto_last_profile_id', id);
+          } catch {
+            /* ignore */
+          }
+        }
       } catch (e) {
         if (!cancelled) setError('Error cargando perfil');
       } finally {
@@ -95,10 +105,25 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
                 Indexado para matching
               </Badge>
+              {storage === 'firestore' ? (
+                <Badge variant="outline" className="border-emerald-200 bg-emerald-50/50 text-emerald-800">
+                  Guardado en la nube
+                </Badge>
+              ) : storage === 'memory' ? (
+                <Badge variant="outline" className="border-amber-200 bg-amber-50/50 text-amber-900">
+                  Solo en esta sesión · configura Firebase
+                </Badge>
+              ) : null}
             </div>
             <h1 className="text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
               {perfil.name}
             </h1>
+            <p className="text-slate-600 mt-2">
+              {perfil.age ?? '—'} años
+              {perfil.gender && perfil.gender !== 'prefiero_no_decir' && GENDER_LABEL[perfil.gender]
+                ? ` · ${GENDER_LABEL[perfil.gender]}`
+                : ''}
+            </p>
             {perfil.summary && (
               <p className="text-lg md:text-xl text-slate-700 leading-relaxed max-w-3xl">
                 {perfil.summary}
@@ -271,9 +296,9 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           <p className="text-slate-300 leading-relaxed mb-6 max-w-2xl">
             Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, Salto calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás entre sus 3 candidatos.
           </p>
-          <Link href="/empresa/publicar">
+          <Link href={`/joven/conectar?profileId=${encodeURIComponent(id)}`}>
             <Button className="gap-2 bg-white text-slate-900 hover:bg-slate-100">
-              Simular cómo te ven las empresas <ArrowRight size={14} />
+              <Building2 size={16} /> Conectar con empresas <ArrowRight size={14} />
             </Button>
           </Link>
         </div>

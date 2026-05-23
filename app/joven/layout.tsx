@@ -25,6 +25,12 @@ export default function JovenLayout({ children }: { children: React.ReactNode })
           >
             Mi Perfil
           </Link>
+          <Link
+            href="/joven/conectar"
+            className="px-3 py-1.5 rounded-md text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 transition-colors"
+          >
+            Empresas
+          </Link>
         </nav>
       </header>
       <main className="flex-1 flex flex-col w-full">

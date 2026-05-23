@@ -98,7 +98,15 @@ function buildEmbeddingText(p: Omit<Profile, "id" | "createdAt" | "embedding">):
 export async function POST(req: NextRequest) {
   const log = startLog(req, "perfil");
   try {
-    const { messages } = (await req.json()) as { messages: ChatMessage[] };
+    const body = (await req.json()) as { messages: ChatMessage[]; basics?: unknown };
+    const { messages, basics: basicsRaw } = body;
+    const basics = parseBasics(basicsRaw);
+    if (!basics) {
+      return NextResponse.json(
+        { error: "Completa nombre, edad (16-35) y género antes de generar el perfil." },
+        { status: 400 }
+      );
+    }
     if (!Array.isArray(messages) || messages.length === 0) {
       log.end({ status: 400, extra: { reason: "messages_required" } });
       return NextResponse.json({ error: "messages required" }, { status: 400 });
@@ -131,7 +139,7 @@ export async function POST(req: NextRequest) {
     } else {
       const response = await gemini().models.generateContent({
         model: GEMINI_MODEL,
-        contents: `${EXTRACTION_PROMPT}\n\nTranscripción:\n${transcript}`,
+        contents: `${EXTRACTION_PROMPT}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
         config: {
           responseMimeType: "application/json",
           responseSchema: schema,
@@ -139,7 +147,9 @@ export async function POST(req: NextRequest) {
       });
       const parsed = JSON.parse(response.text || "{}");
       extracted = {
-        name: parsed.name || "Candidato/a Salto",
+        name: basics.name,
+        age: basics.age,
+        gender: basics.gender,
         summary: parsed.summary || "",
         skills: Array.isArray(parsed.skills) ? parsed.skills : [],
         traits: Array.isArray(parsed.traits) ? parsed.traits : [],
@@ -164,7 +174,7 @@ export async function POST(req: NextRequest) {
 
     const embedding = await embed(buildEmbeddingText(extracted));
 
-    const id = await createProfile({
+    const { id, storage } = await createProfile({
       ...extracted,
       embedding,
     });

@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
     };
 
     const embedding = await embed(buildEmbeddingText(base));
-    const id = await createNeed({ ...base, embedding });
+    const { id, storage } = await createNeed({ ...base, embedding });
     const saved = await getNeed(id);
     log.end({
       status: 200,
