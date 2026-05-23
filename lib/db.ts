@@ -7,11 +7,25 @@ import {
   addDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Profile, CompanyNeed, FeedbackEntry } from "./types";
+import {
+  query,
+  where,
+  orderBy,
+  updateDoc,
+} from "firebase/firestore";
+import type {
+  Profile,
+  CompanyNeed,
+  FeedbackEntry,
+  MicroTask,
+  LatentProfile,
+  TaskOutcomeStat,
+} from "./types";
 
 const PROFILES = "profiles";
 const NEEDS = "needs";
 const FEEDBACK = "feedback";
+const MICROTASKS = "microtasks";
 
 export type StorageMode = "firestore" | "memory";
 
@@ -36,6 +50,7 @@ type DbGlobals = {
   memProfiles: Map<string, Profile>;
   memNeeds: Map<string, CompanyNeed>;
   memFeedback: FeedbackEntry[];
+  memMicroTasks: Map<string, MicroTask>;
 };
 const g = globalThis as unknown as { __saltoDb?: DbGlobals };
 if (!g.__saltoDb) {
@@ -43,11 +58,13 @@ if (!g.__saltoDb) {
     memProfiles: new Map(),
     memNeeds: new Map(),
     memFeedback: [],
+    memMicroTasks: new Map(),
   };
 }
 const memProfiles = g.__saltoDb.memProfiles;
 const memNeeds = g.__saltoDb.memNeeds;
 const memFeedback = g.__saltoDb.memFeedback;
+const memMicroTasks = g.__saltoDb.memMicroTasks;
 
 // Antes había un único flag global `firestoreDisabled` que se prendía con
 // el PRIMER error y dejaba el proceso entero en modo memoria — un permiso
@@ -84,12 +101,17 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out as T;
 }
 
-export async function createProfile(p: Omit<Profile, "id" | "createdAt">): Promise<string> {
+export async function createProfile(
+  p: Omit<Profile, "id" | "createdAt">
+): Promise<{ id: string; storage: StorageMode }> {
   const data: Profile = { ...p, createdAt: Date.now() };
   if (useFirestore(PROFILES)) {
     try {
-      const ref = await addDoc(collection(db, PROFILES), stripUndefined(data));
-      return ref.id;
+      const ref = await addDoc(
+        collection(db, PROFILES),
+        stripUndefined(data as unknown as Record<string, unknown>)
+      );
+      return { id: ref.id, storage: "firestore" };
     } catch (e) {
       disableFirestoreWithWarning(e, "createProfile", PROFILES);
     }
@@ -128,7 +150,7 @@ export async function getAllProfiles(): Promise<Profile[]> {
 export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): Promise<void> {
   if (useFirestore(PROFILES)) {
     try {
-      await setDoc(doc(db, PROFILES, id), stripUndefined(p as Record<string, unknown>));
+      await setDoc(doc(db, PROFILES, id), stripUndefined(p as unknown as Record<string, unknown>));
       return;
     } catch (e) {
       disableFirestoreWithWarning(e, "upsertProfileWithId", PROFILES);
@@ -143,8 +165,11 @@ export async function createNeed(
   const data: CompanyNeed = { ...n, createdAt: Date.now() };
   if (useFirestore(NEEDS)) {
     try {
-      const ref = await addDoc(collection(db, NEEDS), stripUndefined(data));
-      return ref.id;
+      const ref = await addDoc(
+        collection(db, NEEDS),
+        stripUndefined(data as unknown as Record<string, unknown>)
+      );
+      return { id: ref.id, storage: "firestore" };
     } catch (e) {
       disableFirestoreWithWarning(e, "createNeed", NEEDS);
     }
@@ -161,7 +186,7 @@ export async function getAllNeeds(): Promise<CompanyNeed[]> {
       const remote = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CompanyNeed, "id">) }));
       return remote.length > 0 ? remote : Array.from(memNeeds.values());
     } catch (e) {
-      disableFirestoreWithWarning(e, "getAllNeeds");
+      disableFirestoreWithWarning(e, "getAllNeeds", NEEDS);
     }
   }
   return Array.from(memNeeds.values());
@@ -191,7 +216,7 @@ export async function recordFeedback(
       // con "Unsupported field value: undefined".
       const ref = await addDoc(
         collection(db, FEEDBACK),
-        stripUndefined(data as Record<string, unknown>)
+        stripUndefined(data as unknown as Record<string, unknown>)
       );
       return ref.id;
     } catch (e) {
@@ -216,6 +241,144 @@ export async function listFeedback(): Promise<FeedbackEntry[]> {
     }
   }
   return [...memFeedback];
+}
+
+export async function updateProfileLatent(id: string, latent: LatentProfile): Promise<void> {
+  if (useFirestore(PROFILES)) {
+    try {
+      await updateDoc(doc(db, PROFILES, id), { latent });
+      return;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "updateProfileLatent", PROFILES);
+    }
+  }
+  const existing = memProfiles.get(id);
+  if (existing) memProfiles.set(id, { ...existing, latent });
+}
+
+export async function updateProfileTaskStats(
+  id: string,
+  taskStats: TaskOutcomeStat
+): Promise<void> {
+  if (useFirestore(PROFILES)) {
+    try {
+      await updateDoc(doc(db, PROFILES, id), { taskStats });
+      return;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "updateProfileTaskStats", PROFILES);
+    }
+  }
+  const existing = memProfiles.get(id);
+  if (existing) memProfiles.set(id, { ...existing, taskStats });
+}
+
+export async function createMicroTask(
+  t: Omit<MicroTask, "id" | "createdAt">
+): Promise<string> {
+  const data: MicroTask = { ...t, createdAt: Date.now() };
+  if (useFirestore(MICROTASKS)) {
+    try {
+      const ref = await addDoc(
+        collection(db, MICROTASKS),
+        stripUndefined(data as unknown as Record<string, unknown>)
+      );
+      return ref.id;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "createMicroTask", MICROTASKS);
+    }
+  }
+  const id = makeLocalId();
+  memMicroTasks.set(id, { ...data, id });
+  return id;
+}
+
+export async function getMicroTask(id: string): Promise<MicroTask | null> {
+  if (useFirestore(MICROTASKS)) {
+    try {
+      const snap = await getDoc(doc(db, MICROTASKS, id));
+      if (!snap.exists()) return memMicroTasks.get(id) ?? null;
+      return { id: snap.id, ...(snap.data() as Omit<MicroTask, "id">) };
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getMicroTask", MICROTASKS);
+    }
+  }
+  return memMicroTasks.get(id) ?? null;
+}
+
+export async function updateMicroTask(id: string, patch: Partial<MicroTask>): Promise<void> {
+  if (useFirestore(MICROTASKS)) {
+    try {
+      await updateDoc(
+        doc(db, MICROTASKS, id),
+        stripUndefined(patch as unknown as Record<string, unknown>)
+      );
+      return;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "updateMicroTask", MICROTASKS);
+    }
+  }
+  const existing = memMicroTasks.get(id);
+  if (existing) memMicroTasks.set(id, { ...existing, ...patch });
+}
+
+export async function listMicroTasksByProfile(profileId: string): Promise<MicroTask[]> {
+  if (useFirestore(MICROTASKS)) {
+    try {
+      const q = query(
+        collection(db, MICROTASKS),
+        where("profileId", "==", profileId),
+        orderBy("createdAt", "desc")
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }));
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listMicroTasksByProfile", MICROTASKS);
+    }
+  }
+  return Array.from(memMicroTasks.values())
+    .filter((t) => t.profileId === profileId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function listMicroTasksByCompany(companyId: string): Promise<MicroTask[]> {
+  if (useFirestore(MICROTASKS)) {
+    try {
+      const q = query(
+        collection(db, MICROTASKS),
+        where("companyId", "==", companyId),
+        orderBy("createdAt", "desc")
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }));
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listMicroTasksByCompany", MICROTASKS);
+    }
+  }
+  return Array.from(memMicroTasks.values())
+    .filter((t) => t.companyId === companyId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function countMicroTasksBetween(
+  companyId: string,
+  profileId: string
+): Promise<number> {
+  if (useFirestore(MICROTASKS)) {
+    try {
+      const q = query(
+        collection(db, MICROTASKS),
+        where("companyId", "==", companyId),
+        where("profileId", "==", profileId)
+      );
+      const snap = await getDocs(q);
+      return snap.size;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "countMicroTasksBetween", MICROTASKS);
+    }
+  }
+  return Array.from(memMicroTasks.values()).filter(
+    (t) => t.companyId === companyId && t.profileId === profileId
+  ).length;
 }
 
 export { isFirestoreConfigured };

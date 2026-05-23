@@ -14,8 +14,16 @@ import {
   ArrowRight,
   Building2,
 } from 'lucide-react';
-import type { Profile } from '@/lib/types';
+import type { Gender, Profile } from '@/lib/types';
+import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
+
+const GENDER_LABEL: Record<Gender, string> = {
+  mujer: 'Mujer',
+  hombre: 'Hombre',
+  otro: 'Otro',
+  prefiero_no_decir: '',
+};
 
 export default function PerfilPorId({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

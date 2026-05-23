@@ -19,6 +19,36 @@ export interface EvidenceItem {
   quote: string;
 }
 
+export interface HiddenSkill {
+  name: string;
+  derivedFrom: string;
+  marketContext: string;
+  confidence: "low" | "medium" | "high" | string;
+}
+
+export interface TransversalSkill {
+  name: string;
+  derivedFrom: string;
+}
+
+export interface SuggestedRole {
+  roleTitle: string;
+  whyFits: string;
+  readinessHint: string;
+}
+
+export interface LatentProfile {
+  hiddenSkills: HiddenSkill[];
+  transversalSkills: TransversalSkill[];
+  suggestedRoles: SuggestedRole[];
+  closingMessage: string;
+}
+
+export interface TaskOutcomeStat {
+  totalCompleted: number;
+  averageRating: number;
+}
+
 export interface Profile {
   id?: string;
   name: string;
@@ -30,6 +60,54 @@ export interface Profile {
   traits: string[];
   evidence: EvidenceItem[];
   embedding: number[];
+  createdAt: number;
+  latent?: LatentProfile;
+  taskStats?: TaskOutcomeStat;
+}
+
+export type MicroTaskStatus =
+  | "pending"
+  | "in_progress"
+  | "delivered"
+  | "evaluated"
+  | "paid";
+
+export interface EvaluationCriterion {
+  name: string;
+  description: string;
+}
+
+export interface CriterionScore {
+  name: string;
+  score: number;
+  comment: string;
+}
+
+export interface MicroTask {
+  id?: string;
+  companyId: string;
+  companyName: string;
+  profileId: string;
+  profileName: string;
+  needId?: string;
+  title: string;
+  rawRequest: string;
+  brief: string;
+  expectedDeliverable: string;
+  criteria: EvaluationCriterion[];
+  amountCOP: number;
+  deadlineHours: number;
+  status: MicroTaskStatus;
+  deliverable?: string;
+  deliveredAt?: number;
+  aiEvaluation?: {
+    criteriaScores: CriterionScore[];
+    overallScore: number;
+    overallComment: string;
+  };
+  companyRating?: number;
+  companyComment?: string;
+  evaluatedAt?: number;
   createdAt: number;
 }
 
@@ -70,6 +148,7 @@ export interface Match {
   reason: string;
   redFlag: string;
   topSkills: string[];
+  taskStats?: TaskOutcomeStat;
 }
 
 /**
