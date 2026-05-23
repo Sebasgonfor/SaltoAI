@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { LogOut, User as UserIcon, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LogOut, User as UserIcon, ChevronDown, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,7 @@ interface UserButtonProps {
 
 export function UserButton({ variant = 'light', className }: UserButtonProps) {
   const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,7 +51,8 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
         onClick={async () => {
           setBusy(true);
           try {
-            await signInWithGoogle();
+            const result = await signInWithGoogle();
+            if (result) router.push('/dashboard');
           } finally {
             setBusy(false);
           }
@@ -110,6 +113,14 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
             </div>
             <div className="text-xs text-slate-500 truncate">{user.email}</div>
           </div>
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+            role="menuitem"
+          >
+            <LayoutDashboard size={14} /> Mi dashboard
+          </Link>
           <Link
             href={`/joven/perfil/${user.uid}`}
             onClick={() => setOpen(false)}
