@@ -92,9 +92,9 @@ export async function POST(req: NextRequest) {
     };
 
     const embedding = await embed(buildEmbeddingText(base));
-    const id = await createNeed({ ...base, embedding });
+    const { id, storage } = await createNeed({ ...base, embedding });
     const saved = await getNeed(id);
-    return NextResponse.json({ id, need: saved });
+    return NextResponse.json({ id, need: saved, storage });
   } catch (err) {
     console.error("necesidad error:", err);
     return NextResponse.json({ error: "No pudimos estructurar la necesidad." }, { status: 500 });

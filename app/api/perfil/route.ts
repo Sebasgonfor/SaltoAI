@@ -2,8 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
-import { createProfile, getProfile } from "@/lib/db";
-import type { ChatMessage, Profile } from "@/lib/types";
+import { createProfile, getProfile, storageFromId } from "@/lib/db";
+import type { ChatMessage, Gender, JovenBasics, Profile } from "@/lib/types";
+
+const VALID_GENDERS: Gender[] = ["mujer", "hombre", "otro", "prefiero_no_decir"];
+
+function parseBasics(raw: unknown): JovenBasics | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as Record<string, unknown>;
+  const name = typeof b.name === "string" ? b.name.trim() : "";
+  const age = typeof b.age === "number" ? b.age : Number(b.age);
+  const gender = b.gender as Gender;
+  if (!name || name.length < 2) return null;
+  if (!Number.isFinite(age) || age < 16 || age > 35) return null;
+  if (!VALID_GENDERS.includes(gender)) return null;
+  return { name, age: Math.round(age), gender };
+}
 
 export const runtime = "nodejs";
 
@@ -48,9 +62,14 @@ const schema = {
   required: ["name", "summary", "skills", "traits", "evidence"],
 };
 
-function mockExtraction(transcript: string): Omit<Profile, "id" | "createdAt" | "embedding"> {
+function mockExtraction(
+  basics: JovenBasics,
+  _transcript: string
+): Omit<Profile, "id" | "createdAt" | "embedding"> {
   return {
-    name: "Camila Silva",
+    name: basics.name,
+    age: basics.age,
+    gender: basics.gender,
     summary:
       "Joven con experiencia informal manejando redes sociales y atención al cliente en un negocio familiar. Aprende sola y resuelve sin que nadie le diga.",
     skills: ["Gestión de Redes Sociales", "Ventas B2C", "Atención al Cliente"],
@@ -80,7 +99,15 @@ function buildEmbeddingText(p: Omit<Profile, "id" | "createdAt" | "embedding">):
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = (await req.json()) as { messages: ChatMessage[] };
+    const body = (await req.json()) as { messages: ChatMessage[]; basics?: unknown };
+    const { messages, basics: basicsRaw } = body;
+    const basics = parseBasics(basicsRaw);
+    if (!basics) {
+      return NextResponse.json(
+        { error: "Completa nombre, edad (16-35) y género antes de generar el perfil." },
+        { status: 400 }
+      );
+    }
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "messages required" }, { status: 400 });
     }
@@ -92,11 +119,11 @@ export async function POST(req: NextRequest) {
     let extracted: Omit<Profile, "id" | "createdAt" | "embedding">;
 
     if (!hasGeminiKey()) {
-      extracted = mockExtraction(transcript);
+      extracted = mockExtraction(basics, transcript);
     } else {
       const response = await gemini().models.generateContent({
         model: GEMINI_MODEL,
-        contents: `${EXTRACTION_PROMPT}\n\nTranscripción:\n${transcript}`,
+        contents: `${EXTRACTION_PROMPT}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
         config: {
           responseMimeType: "application/json",
           responseSchema: schema,
@@ -104,7 +131,9 @@ export async function POST(req: NextRequest) {
       });
       const parsed = JSON.parse(response.text || "{}");
       extracted = {
-        name: parsed.name || "Candidato/a Salto",
+        name: basics.name,
+        age: basics.age,
+        gender: basics.gender,
         summary: parsed.summary || "",
         skills: Array.isArray(parsed.skills) ? parsed.skills : [],
         traits: Array.isArray(parsed.traits) ? parsed.traits : [],
@@ -114,13 +143,13 @@ export async function POST(req: NextRequest) {
 
     const embedding = await embed(buildEmbeddingText(extracted));
 
-    const id = await createProfile({
+    const { id, storage } = await createProfile({
       ...extracted,
       embedding,
     });
 
     const saved = await getProfile(id);
-    return NextResponse.json({ id, profile: saved });
+    return NextResponse.json({ id, profile: saved, storage });
   } catch (err) {
     console.error("perfil error:", err);
     return NextResponse.json({ error: "No pudimos construir el perfil." }, { status: 500 });
@@ -132,5 +161,5 @@ export async function GET(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
   const p = await getProfile(id);
   if (!p) return NextResponse.json({ error: "not found" }, { status: 404 });
-  return NextResponse.json({ profile: p });
+  return NextResponse.json({ profile: p, storage: storageFromId(id) });
 }

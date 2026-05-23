@@ -59,7 +59,10 @@ function fallbackResponse(messages: ChatMessage[]) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = (await req.json()) as { messages: ChatMessage[] };
+    const { messages, firstName } = (await req.json()) as {
+      messages: ChatMessage[];
+      firstName?: string;
+    };
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "messages required" }, { status: 400 });
     }
@@ -74,9 +77,13 @@ export async function POST(req: NextRequest) {
       .map((m) => `${m.role === "user" ? "JOVEN" : "AGENTE"}: ${m.content}`)
       .join("\n");
 
+    const nameHint = firstName?.trim()
+      ? `\nLa persona se llama ${firstName.trim()}. Puedes tutearla por su nombre de pila de vez en cuando, sin ser repetitivo.`
+      : "";
+
     const response = await gemini().models.generateContent({
       model: GEMINI_MODEL,
-      contents: `${SYSTEM_PROMPT}\n\nHistorial hasta ahora (turno actual del joven: ${userTurns}):\n${transcript}\n\nDevuelve la siguiente pregunta o marca done si ya tienes evidencia suficiente.`,
+      contents: `${SYSTEM_PROMPT}${nameHint}\n\nHistorial hasta ahora (turno actual del joven: ${userTurns}):\n${transcript}\n\nDevuelve la siguiente pregunta o marca done si ya tienes evidencia suficiente.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
