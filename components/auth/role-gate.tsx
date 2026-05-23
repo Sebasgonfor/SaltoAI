@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Lock, UserCog, Building2, GraduationCap, ArrowRight } from 'lucide-react';
@@ -32,6 +32,16 @@ export function RoleGate({ role, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [signingIn, setSigningIn] = useState(false);
+
+  // El redirect a /onboarding/rol vivía DENTRO del render (`if (!account) router.replace(...)`),
+  // lo cual disparaba el warning "Cannot update a component (`Router`) while rendering
+  // a different component". Lo movemos a useEffect: side effect = side effect, no en render.
+  useEffect(() => {
+    if (loading || roleLoading) return;
+    if (!user || account) return;
+    if (pathname === '/onboarding/rol') return;
+    router.replace(`/onboarding/rol?next=${encodeURIComponent(pathname || '/')}`);
+  }, [user, account, loading, roleLoading, pathname, router]);
 
   // 1. Bootstrap de auth
   if (loading || roleLoading) {
@@ -84,11 +94,8 @@ export function RoleGate({ role, children }: Props) {
     );
   }
 
-  // 3. Sesión sin rol asignado → onboarding
+  // 3. Sesión sin rol asignado → onboarding (el useEffect arriba ya disparó el replace)
   if (!account) {
-    if (typeof window !== 'undefined' && pathname !== '/onboarding/rol') {
-      router.replace(`/onboarding/rol?next=${encodeURIComponent(pathname || '/')}`);
-    }
     return (
       <div className="max-w-6xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
         Llevándote a elegir tu rol…
