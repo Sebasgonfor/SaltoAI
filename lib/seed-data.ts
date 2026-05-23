@@ -7,6 +7,8 @@ export const SEED_PROFILES: { id: string; data: SeedProfile }[] = [
     id: "seed_camila_silva",
     data: {
       name: "Camila Silva",
+      age: 21,
+      gender: "mujer",
       summary:
         "Joven de 21 años que manejó las redes y las ventas del negocio de comida de su tía durante 2 años. Aprende sola, responde clientes y maneja caos de local pequeño.",
       skills: ["Gestión de Redes Sociales", "Ventas B2C", "Atención al Cliente", "Copywriting básico"],
@@ -31,6 +33,8 @@ export const SEED_PROFILES: { id: string; data: SeedProfile }[] = [
     id: "seed_andres_bermejo",
     data: {
       name: "Andrés Bermejo",
+      age: 23,
+      gender: "hombre",
       summary:
         "Joven 23, autodidacta. Le armó al taller mecánico de su barrio un sistema simple en Excel para llevar órdenes y proveedores. Termina lo que empieza.",
       skills: ["Excel intermedio", "Organización operativa", "Soporte básico", "Resolución de problemas"],
@@ -51,6 +55,8 @@ export const SEED_PROFILES: { id: string; data: SeedProfile }[] = [
     id: "seed_luisa_pertuz",
     data: {
       name: "Luisa Pertuz",
+      age: 20,
+      gender: "mujer",
       summary:
         "Joven 20, trabajó como mesera informal en cumpleaños y eventos familiares. Buena con gente, paciente, traduce reclamos en soluciones.",
       skills: ["Atención al Cliente", "Hospitalidad", "Trabajo bajo presión", "Comunicación interpersonal"],
@@ -71,6 +77,8 @@ export const SEED_PROFILES: { id: string; data: SeedProfile }[] = [
     id: "seed_jhon_marquez",
     data: {
       name: "Jhon Márquez",
+      age: 22,
+      gender: "hombre",
       summary:
         "Joven 22, creador de contenido en TikTok para emprendimientos locales pequeños. Escribe ganchos y entiende qué hace que un video llegue.",
       skills: ["Creación de contenido", "Copywriting", "Edición de video básica", "Estrategia de TikTok"],
@@ -91,6 +99,8 @@ export const SEED_PROFILES: { id: string; data: SeedProfile }[] = [
     id: "seed_maritza_polo",
     data: {
       name: "Maritza Polo",
+      age: 24,
+      gender: "mujer",
       summary:
         "Joven 24, ayudaba a su mamá en la tienda del barrio: pedidos, inventario, fiados, cuadre diario de caja. Sabe llevar números chicos.",
       skills: ["Inventario", "Manejo de caja", "Atención al Cliente", "Operaciones de tienda"],

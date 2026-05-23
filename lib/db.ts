@@ -12,6 +12,12 @@ import type { Profile, CompanyNeed } from "./types";
 const PROFILES = "profiles";
 const NEEDS = "needs";
 
+export type StorageMode = "firestore" | "memory";
+
+export function storageFromId(id: string): StorageMode {
+  return id.startsWith("local_") ? "memory" : "firestore";
+}
+
 function isFirestoreConfigured(): boolean {
   return (
     !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
@@ -41,19 +47,21 @@ function makeLocalId(): string {
   return `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function createProfile(p: Omit<Profile, "id" | "createdAt">): Promise<string> {
+export async function createProfile(
+  p: Omit<Profile, "id" | "createdAt">
+): Promise<{ id: string; storage: StorageMode }> {
   const data: Profile = { ...p, createdAt: Date.now() };
   if (useFirestore()) {
     try {
       const ref = await addDoc(collection(db, PROFILES), data);
-      return ref.id;
+      return { id: ref.id, storage: "firestore" };
     } catch (e) {
       disableFirestoreWithWarning(e, "createProfile");
     }
   }
   const id = makeLocalId();
   memProfiles.set(id, { ...data, id });
-  return id;
+  return { id, storage: "memory" };
 }
 
 export async function getProfile(id: string): Promise<Profile | null> {
@@ -94,19 +102,34 @@ export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): P
   memProfiles.set(id, { ...p, id });
 }
 
-export async function createNeed(n: Omit<CompanyNeed, "id" | "createdAt">): Promise<string> {
+export async function createNeed(
+  n: Omit<CompanyNeed, "id" | "createdAt">
+): Promise<{ id: string; storage: StorageMode }> {
   const data: CompanyNeed = { ...n, createdAt: Date.now() };
   if (useFirestore()) {
     try {
       const ref = await addDoc(collection(db, NEEDS), data);
-      return ref.id;
+      return { id: ref.id, storage: "firestore" };
     } catch (e) {
       disableFirestoreWithWarning(e, "createNeed");
     }
   }
   const id = makeLocalId();
   memNeeds.set(id, { ...data, id });
-  return id;
+  return { id, storage: "memory" };
+}
+
+export async function getAllNeeds(): Promise<CompanyNeed[]> {
+  if (useFirestore()) {
+    try {
+      const snap = await getDocs(collection(db, NEEDS));
+      const remote = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CompanyNeed, "id">) }));
+      return remote.length > 0 ? remote : Array.from(memNeeds.values());
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getAllNeeds");
+    }
+  }
+  return Array.from(memNeeds.values());
 }
 
 export async function getNeed(id: string): Promise<CompanyNeed | null> {

@@ -1,5 +1,14 @@
 export type Role = "agent" | "user";
 
+/** Género declarado por la persona (no se infiere del nombre). */
+export type Gender = "mujer" | "hombre" | "otro" | "prefiero_no_decir";
+
+export interface JovenBasics {
+  name: string;
+  age: number;
+  gender: Gender;
+}
+
 export interface ChatMessage {
   role: Role;
   content: string;
@@ -13,12 +22,23 @@ export interface EvidenceItem {
 export interface Profile {
   id?: string;
   name: string;
+  /** Perfiles antiguos pueden no tener edad. */
+  age?: number;
+  gender?: Gender;
   summary: string;
   skills: string[];
   traits: string[];
   evidence: EvidenceItem[];
   embedding: number[];
   createdAt: number;
+}
+
+export interface OpportunityMatch {
+  needId: string;
+  companyName: string;
+  role: string;
+  ics: number;
+  reason: string;
 }
 
 export interface CompanyNeed {
