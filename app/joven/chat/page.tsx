@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote, UserCircle2, Check } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 
+const MIN_TURNS = 3;
 const MAX_TURNS = 5;
+
+const CLOSING_AGENT_MSG =
+  'Genial, tengo lo que necesitaba. Voy a construir tu Perfil de Evidencia ahora.';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'mujer', label: 'Mujer' },
@@ -66,6 +70,8 @@ export default function ChatJoven() {
   }, [messages, loading, closing, phase]);
 
   const userTurns = messages.filter((m) => m.role === 'user').length;
+  const displayTurns = Math.min(userTurns, MAX_TURNS);
+  const atTurnLimit = userTurns >= MAX_TURNS;
 
   const detected = useMemo(() => {
     const text = messages.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
@@ -102,40 +108,16 @@ export default function ChatJoven() {
     setPhase('interview');
   };
 
-  const sendUserMessage = async () => {
-    if (!input.trim() || loading || closing || !basics) return;
-
-    const userMsg: ChatMessage = { role: 'user', content: input.trim() };
-    const history = [...messages, userMsg];
-    setMessages(history);
-    setInput('');
-    setLoading(true);
-
-    try {
-      const res = await fetch('/api/entrevista', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: history,
-          firstName: firstNameFrom(basics.name),
-        }),
-      });
-      const data = await res.json();
-
-      const agentMsg: ChatMessage = {
-        role: 'agent',
-        content: data.nextQuestion || 'Cuéntame más, ¿cómo lo hiciste?',
-      };
-      const updated = [...history, agentMsg];
-      setMessages(updated);
+  const finishInterview = useCallback(
+    async (conversation: ChatMessage[]) => {
+      if (!basics || closing) return;
+      setClosing(true);
       setLoading(false);
-
-      if (data.done) {
-        setClosing(true);
+      try {
         const closeRes = await fetch('/api/perfil', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: updated, basics }),
+          body: JSON.stringify({ messages: conversation, basics }),
         });
         const closeData = await closeRes.json();
         if (closeData.id) {
@@ -149,15 +131,71 @@ export default function ChatJoven() {
           setClosing(false);
           setFormError(closeData.error || 'No pudimos crear tu perfil. Intenta de nuevo.');
         }
+      } catch (err) {
+        console.error(err);
+        setClosing(false);
+        setFormError('Error de red al crear tu perfil.');
+      }
+    },
+    [basics, closing, router]
+  );
+
+  const sendUserMessage = async () => {
+    if (!input.trim() || loading || closing || !basics) return;
+    if (userTurns >= MAX_TURNS) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: input.trim() };
+    const history = [...messages, userMsg];
+    setMessages(history);
+    setInput('');
+    setLoading(true);
+
+    const turnsAfterSend = history.filter((m) => m.role === 'user').length;
+
+    try {
+      const res = await fetch('/api/entrevista', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: history,
+          firstName: firstNameFrom(basics.name),
+        }),
+      });
+      const data = await res.json();
+
+      const shouldClose = !!data.done || turnsAfterSend >= MAX_TURNS;
+      const agentContent = shouldClose
+        ? CLOSING_AGENT_MSG
+        : data.nextQuestion || '¿Qué hiciste tú concretamente en esa situación?';
+
+      const updated = [...history, { role: 'agent' as const, content: agentContent }];
+      setMessages(updated);
+      setLoading(false);
+
+      if (shouldClose) {
+        await finishInterview(updated);
       }
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'agent', content: 'Tuvimos un problema. ¿Puedes contarme otra vez?' },
-      ]);
       setLoading(false);
+      if (turnsAfterSend >= MAX_TURNS) {
+        const updated = [...history, { role: 'agent' as const, content: CLOSING_AGENT_MSG }];
+        setMessages(updated);
+        await finishInterview(updated);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'agent', content: 'Tuvimos un problema de conexión. Intenta enviar de nuevo.' },
+        ]);
+      }
     }
+  };
+
+  const finishEarly = async () => {
+    if (!basics || loading || closing || userTurns < MIN_TURNS) return;
+    const updated = [...messages, { role: 'agent' as const, content: CLOSING_AGENT_MSG }];
+    setMessages(updated);
+    await finishInterview(updated);
   };
 
   if (phase === 'basics') {
@@ -297,9 +335,9 @@ export default function ChatJoven() {
               <span
                 key={i}
                 className={`h-2 rounded-full transition-all ${
-                  i < userTurns
+                  i < displayTurns
                     ? 'w-6 bg-emerald-500'
-                    : i === userTurns
+                    : i === displayTurns && !atTurnLimit
                     ? 'w-6 bg-slate-300'
                     : 'w-2 bg-slate-200'
                 }`}
@@ -307,8 +345,13 @@ export default function ChatJoven() {
             ))}
           </div>
           <span className="text-xs text-slate-500 tabular-nums font-medium">
-            {userTurns}/{MAX_TURNS}
+            {displayTurns}/{MAX_TURNS}
           </span>
+          {userTurns >= MIN_TURNS && !atTurnLimit && (
+            <Button type="button" variant="outline" size="sm" onClick={finishEarly} disabled={loading || closing}>
+              Terminar ahora
+            </Button>
+          )}
         </div>
       </header>
 
@@ -362,7 +405,6 @@ export default function ChatJoven() {
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex gap-2 items-end">
               <Textarea
-                placeholder="Cuéntame con tus palabras…"
                 className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -372,12 +414,13 @@ export default function ChatJoven() {
                     sendUserMessage();
                   }
                 }}
-                disabled={loading || closing}
+                disabled={loading || closing || atTurnLimit}
+                placeholder={atTurnLimit ? 'Generando tu perfil…' : 'Cuéntame con tus palabras…'}
               />
               <Button
                 className="h-[64px] px-5 gap-2"
                 onClick={sendUserMessage}
-                disabled={loading || closing || !input.trim()}
+                disabled={loading || closing || atTurnLimit || !input.trim()}
               >
                 Enviar <ArrowRight size={14} />
               </Button>
