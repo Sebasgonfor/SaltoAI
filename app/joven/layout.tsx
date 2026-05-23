@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { SaltoLogo } from '@/components/ui/salto-logo';
+import { UserButton } from '@/components/auth/user-button';
+import { RoleGate } from '@/components/auth/role-gate';
 
 export default function JovenLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,7 +14,7 @@ export default function JovenLayout({ children }: { children: React.ReactNode })
             <span className="text-[10px] uppercase tracking-[0.15em] text-emerald-600 font-medium">para jóvenes</span>
           </div>
         </Link>
-        <nav className="flex gap-1 text-sm font-medium">
+        <nav className="flex gap-1 items-center text-sm font-medium">
           <Link
             href="/joven/chat"
             className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
@@ -31,10 +33,18 @@ export default function JovenLayout({ children }: { children: React.ReactNode })
           >
             Empresas
           </Link>
+          <Link
+            href="/joven/tareas"
+            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          >
+            Mis Tareas
+          </Link>
+          <div className="h-5 w-px bg-slate-200 mx-2" />
+          <UserButton />
         </nav>
       </header>
       <main className="flex-1 flex flex-col w-full">
-        {children}
+        <RoleGate role="joven">{children}</RoleGate>
       </main>
       <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
         <span>Salto · Tu primer salto al empleo formal</span>

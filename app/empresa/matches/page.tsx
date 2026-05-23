@@ -15,7 +15,7 @@ export default function MatchesIndex() {
       <p className="text-slate-600 leading-relaxed mb-8">
         Cuéntanos tu contexto real en lenguaje natural. La IA lo estructura, busca por compatibilidad semántica y te devuelve los 3 mejores con score explicable — no 200 CVs.
       </p>
-      <Link href="/empresa/publicar">
+      <Link href="/empresa/chat">
         <Button size="lg" className="gap-2">
           Publicar necesidad <ArrowRight size={16} />
         </Button>

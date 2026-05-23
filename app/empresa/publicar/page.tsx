@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, ArrowRight, Lightbulb, AlertTriangle, Wand2 } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 const EXAMPLES = [
   {
@@ -40,6 +41,7 @@ const SIGNAL_HINTS = [
 
 export default function PublicarEmpresa() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('');
@@ -54,14 +56,20 @@ export default function PublicarEmpresa() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName.trim() || !rawDescription.trim()) return;
+    if (!companyName.trim() || !rawDescription.trim() || !user) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/necesidad', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyName, rawDescription }),
+        body: JSON.stringify({
+          companyName,
+          rawDescription,
+          ownerUid: user.uid,
+          ownerEmail: user.email,
+          ownerName: user.displayName,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.id) {

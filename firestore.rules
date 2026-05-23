@@ -1,14 +1,78 @@
 rules_version = '2';
 
-// DEMO ONLY — reglas abiertas para el hackatón.
-// Antes de cualquier piloto real, restringir por auth y por colección.
+// Salto — reglas con auth por uid de Google.
+// Filosofía: cada doc tiene un dueño verificable (request.auth.uid).
+// El backend matcher (server-side) lee con Admin SDK y bypassa estas reglas.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /profiles/{profileId} {
-      allow read, write: if true;
+
+    // ACCOUNTS — el rol asignado al usuario (joven o empresa).
+    // - El dueño puede leer y crear su doc (escribir su propio rol la primera vez).
+    // - Update/delete bloqueado desde cliente: cambiar de rol requiere soporte
+    //   (Admin SDK), evita que un joven con perfil se convierta en empresa y
+    //   vea su propia ficha como reclutador.
+    match /accounts/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.role in ['joven', 'empresa'];
+      allow update, delete: if false;
     }
+
+    // PROFILES — el doc id es el uid del joven (ver app/api/perfil con upsertProfileWithId).
+    // - El dueño puede leer y escribir su propio doc.
+    // - Cualquier usuario autenticado puede LEER otros perfiles (las empresas
+    //   necesitan ver candidatos para los matches). Si más adelante queremos
+    //   matching ciego, esto se restringe a una vista pública parcial.
+    // - Crear solo si el doc.id coincide con tu uid (impide squat de perfil ajeno).
+    match /profiles/{profileId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.auth.uid == profileId;
+      allow update, delete: if request.auth != null
+                            && request.auth.uid == profileId;
+    }
+
+    // NEEDS — necesidades publicadas por empresas. Cada need lleva ownerUid del
+    // founder que la publicó.
+    // - Lectura abierta para usuarios autenticados (los jóvenes deben poder
+    //   ver/aplicar a necesidades).
+    // - Crear: el ownerUid debe ser el del request (no podés crear necesidades
+    //   a nombre de otro).
+    // - Editar/borrar: solo el dueño original.
     match /needs/{needId} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // FEEDBACK loop (PRD §6.2.6) — write desde la app autenticada, read solo
+    // para auditoría (Admin SDK). Cerramos read del lado cliente.
+    match /feedback/{feedbackId} {
+      allow read: if false;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // MICROTASKS (PRD §6.3) — tareas pagadas joven↔empresa. Cada tarea
+    // tiene profileId (uid del joven) y companyOwnerUid. Solo ellos dos pueden leer/escribir.
+    match /microtasks/{taskId} {
+      allow read: if request.auth != null
+                  && (resource.data.profileId == request.auth.uid
+                      || resource.data.companyOwnerUid == request.auth.uid);
+      allow create: if request.auth != null
+                    && request.resource.data.companyOwnerUid == request.auth.uid;
+      allow update: if request.auth != null
+                    && (resource.data.profileId == request.auth.uid
+                        || resource.data.companyOwnerUid == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // Cualquier otra colección queda cerrada por defecto.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
