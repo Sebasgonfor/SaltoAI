@@ -142,26 +142,51 @@ Un ecosistema de matching por potencial donde la IA (a) **extrae evidencia labor
 
 **Must-have (esto es lo que se demo-ea):**
 
-1. **Entrevista de descubrimiento conversacional (IA)** — *núcleo diferenciador.*
+1. **Entrevista de descubrimiento conversacional (IA)** — *núcleo diferenciador.* ✅ Construido — [`app/api/entrevista/route.ts`](app/api/entrevista/route.ts).
    El joven no "llena un CV". Conversa con un agente que le pregunta:
    > "¿Qué desafíos has vivido? ¿Qué resolviste? ¿Qué hiciste aunque nadie te pagara por eso?"
    La IA hace **preguntas de seguimiento adaptativas** y de ahí **extrae habilidades, competencias y rasgos** (esto conecta directo con tu nota: *"a partir de ahí sacar las habilidades, conectar con la persona"*).
+   El prompt apunta **explícitamente a cubrir las 8 señales** que el panel lateral detecta — iniciativa, aprendizaje autónomo, resolución de problemas, resultados medibles, atención al cliente, trabajo en equipo, adaptación al cambio, persistencia — sin repetir el ángulo de preguntas anteriores. Cap de 3-5 turnos.
 
-2. **Perfil de Evidencia (no CV)** — la IA estructura la conversación en señales comparables: habilidades (con nivel inferido + por qué), rasgos de personalidad laboral, capacidad de aprendizaje, y **evidencia citada** ("dijiste que subiste ventas 30% en el negocio familiar → señal de orientación a resultados").
+2. **Perfil de Evidencia (no CV)** ✅ Construido — [`app/api/perfil/route.ts`](app/api/perfil/route.ts). La IA estructura la conversación en señales comparables: habilidades (con nivel inferido + por qué), rasgos de personalidad laboral, capacidad de aprendizaje, y **evidencia citada** ("dijiste que subiste ventas 30% en el negocio familiar → señal de orientación a resultados"). Cada quote viene en tercera-persona-pasado-acción para que sea CV-ready (verbo de acción + cuantificación preservada).
 
-3. **Publicación de necesidad por la empresa (lenguaje natural)** — el founder describe su empresa y su dolor en texto libre ("abro local, necesito alguien que me maneje redes y atienda clientes, somos caóticos"). La IA estructura el rol, el contexto y los rasgos que ese contexto exige.
+3. **Publicación de necesidad por la empresa (lenguaje natural)** ✅ Construido — [`app/api/necesidad/route.ts`](app/api/necesidad/route.ts). El founder describe su empresa y su dolor en texto libre ("abro local, necesito alguien que me maneje redes y atienda clientes, somos caóticos"). La IA estructura el rol, el contexto y los rasgos que ese contexto exige.
 
-4. **Motor de Matching de Potencial → "Índice de Compatibilidad Salto (ICS)"** — genera el "*82% de compatibilidad con tu empresa*" **explicable** (por qué ese %, qué señales pesaron). Ver §8.
+4. **Motor de Matching de Potencial → "Índice de Compatibilidad Salto (ICS)"** ✅ Construido — [`app/api/match/route.ts`](app/api/match/route.ts). Pipeline híbrido: embeddings → shortlist top-5 → LLM ranking batched con desglose 4D auditable. Genera el "*82% de compatibilidad con tu empresa*" **explicable** (por qué ese %, qué señales pesaron). Ver §8.
 
-5. **CV optimizado para ATS (one-click)** — generado desde el Perfil de Evidencia. Es el **gancho de adquisición** del lado joven (no el core). Tu nota *"ATS una columna"* → vista de una sola columna, parseable por ATS, sin tablas ni gráficos que rompen el parser.
+5. **CV optimizado para ATS (one-click)** ✅ Construido — [`app/api/cv/route.ts`](app/api/cv/route.ts) + panel de personalización [`components/cv-customizer.tsx`](components/cv-customizer.tsx). Generado desde el Perfil de Evidencia. Es el **gancho de adquisición** del lado joven (no el core). Tu nota *"ATS una columna"* → vista de una sola columna, parseable por ATS, sin tablas ni gráficos que rompen el parser. 7 secciones estándar (Perfil profesional · Competencias · Experiencia y logros · Rasgos · Educación · Certificaciones · Idiomas), fuentes del sistema (Arial), `@page` A4 con márgenes 16/18mm. **Tailoring por necesidad** (`?needId=...`) reordena skills/evidencia poniendo los matches con el JD primero — keyword density alta donde los ATS la buscan.
 
-6. **Feedback en todas las etapas** — cada etapa (perfil, match, entrevista, contratación, post-contratación) pide feedback a ambos lados. Esto es UX **y** combustible del modelo (§8.6).
+6. **Feedback en todas las etapas** ✅ Mínimo viable construido — [`app/api/feedback/route.ts`](app/api/feedback/route.ts) + [`components/match-feedback.tsx`](components/match-feedback.tsx). Botón "¿útil? sí/no" en cada match → POST a `/api/feedback` con `{matchId, needId, profileId, useful, timestamp, source}` → colección `feedback` en Firestore (fallback a memoria si la regla aún no está deployada). No reentrena pesos todavía; el dato queda **propietario** como combustible del flywheel (§8.6). Por construir: feedback en post-entrevista, post-contratación y dashboard de auditoría.
 
 **Nice-to-have (si sobra tiempo en el hackatón):**
 - Preparación para entrevistas con IA (simulacro + feedback).
 - Dashboard de impacto para aliados (GOyn/ACOPI).
 
 **Out of scope MVP:** pagos/nómina, contratos legales, app móvil nativa, verificación de identidad robusta.
+
+### 6.3 Infraestructura no-funcional construida (lo que el jurado pregunta tarde)
+
+Esto NO está en los must-haves pero **es lo que separa una demo bonita de un producto creíble**. Está implementado y demoable.
+
+| Pieza | Por qué importa | Dónde vive |
+|---|---|---|
+| **Logs estructurados JSON-line** | Una línea JSON por request con `ts`, `route`, `event`, `requestId`, `status`, `latencyMs`. Respuesta concreta a "¿cómo monitorearían esto en producción?". `tail -f \| jq` en vivo durante el pitch. | [`lib/logger.ts`](lib/logger.ts), aplicado en las 7 rutas API. |
+| **Manejo robusto de 429 / rate limits** | El free tier de Gemini son 5-10 req/min. Antes el 429 se traducía en un 500 opaco. Hoy detectamos `RESOURCE_EXHAUSTED` por status/código/mensaje/body, devolvemos HTTP 429 con header `Retry-After`, body `{error, code: "rate_limited", retryAfterSec}` y mensaje en español ("estamos a tope, intentá en N segundos"). El frontend lo muestra como cinta amarilla, no como pantalla rota. | [`lib/api-errors.ts`](lib/api-errors.ts). |
+| **Casos borde honestos (§8.5)** | Respuesta de 1 palabra, conversación con 0 user turns, necesidad sin contexto — antes reventaban o caían al mock genérico "Camila Silva". Hoy devuelven 422 con mensaje "necesito más detalle para construir tu perfil". | [`lib/input-validation.ts`](lib/input-validation.ts). |
+| **Smoke test E2E reproducible** | Levanta server, hace seed, crea necesidad, corre match, valida ICS ≥ 80 para Camila ↔ Arepas, persiste feedback, genera CV. Se corre antes del pitch en ~15 segundos. | [`scripts/smoke.sh`](scripts/smoke.sh). |
+| **Fallback graceful sin Firebase / Gemini** | Bypass por colección (no por proceso): si las reglas de `feedback` no están deployadas, solo esa colección cae a memoria, no toda la base. Si Gemini falla, ranking heurístico (no pantalla rota). | [`lib/db.ts`](lib/db.ts) (`firestoreDisabledFor`), [`lib/gemini.ts`](lib/gemini.ts) (`hasGeminiKey()`). |
+| **Reglas Firestore auth-scoped** | Reemplazado el `allow-all` por reglas por colección y por `uid`: `profiles` se autoescriben solo por el dueño (doc id == `auth.uid`), `needs` quedan ligadas al `ownerUid` que las creó, `microtasks` visibles solo para el joven y la empresa propietaria, `feedback` write autenticado y read solo del backend. Default deny en todas las demás. Listas para deploy con `firebase deploy --only firestore:rules`. | [`firestore.rules`](firestore.rules). |
+| **Sign-In con Google (Firebase Auth)** | Sin login, el perfil del joven se perdía entre sesiones y la empresa no se podía atar a sus necesidades. Hoy: Google Sign-In en el header, `AuthProvider` en el root layout, `UserButton` con avatar/email/menú. El perfil del joven se persiste con doc id == `uid` (clave para las reglas Firestore arriba). `/empresa/publicar` está gated por sign-in. | [`lib/auth-context.tsx`](lib/auth-context.tsx) · [`components/auth/user-button.tsx`](components/auth/user-button.tsx). |
+
+### 6.4 Funcionalidades agregadas más allá del scope original
+
+Tres piezas grandes que entraron post-MVP y refuerzan el foso defensivo del producto. No estaban en los 6 must-haves originales del hackatón.
+
+| Pieza | Qué hace | Por qué importa | Dónde vive |
+|---|---|---|---|
+| **Detector de talento latente** | Endpoint `/api/talento-latente`: dado un Perfil de Evidencia, infiere `hiddenSkills` (habilidades implícitas en la trayectoria que el joven no nombró), `transversalSkills`, `suggestedRoles` con `whyFits` + `readinessHint`, y un `closingMessage` motivacional. Devuelve `LatentProfile`. | El joven se entera de capacidades que tiene pero no nombra (ej. "negociación" inferida desde "manejé reclamos del local familiar"). Sube su confianza y amplía qué necesidades pueden matchear. | [`app/api/talento-latente/route.ts`](app/api/talento-latente/route.ts) · types `HiddenSkill` / `TransversalSkill` / `SuggestedRole` / `LatentProfile` en [`lib/types.ts`](lib/types.ts). |
+| **Micro-tareas pagadas E2E** | 4 endpoints (`proponer` / `entregar` / `evaluar` / `list`) + 4 páginas (`/empresa/probar/[profileId]`, `/empresa/tareas/[id]`, `/joven/tareas`, `/joven/tareas/[id]`). La empresa propone una tarea acotada y pagada como "audición antes del contrato". El joven entrega. La IA evalúa contra criterios estructurados + la empresa rate-ea + pago. | Solución concreta al "¿y si me equivoco al contratar al junior?" del founder: tarea acotada y pagada como filtro de bajo riesgo. Y genera el dato propietario más valioso del producto: **outcome verificable de desempeño real**, no opinión. | [`app/api/microtask/*`](app/api/microtask/) · types `MicroTask` / `MicroTaskStatus` / `EvaluationCriterion` / `CriterionScore` / `TaskOutcomeStat`. |
+| **Outcome stats en el match** | Cuando un candidato tiene `taskStats` (totalCompleted, averageRating de micro-tareas previas), la card del match #1 muestra un badge "X tareas verificadas · rating Y". | El ICS dejó de ser solo predicción; ahora hay historial real anclado al perfil. Reduce incertidumbre del founder y prepara la entrada del outcome data al reentrenamiento de pesos (§8.6). | Campo `taskStats?: TaskOutcomeStat` en `Profile` y `Match` ([`lib/types.ts`](lib/types.ts)). |
 
 ---
 
@@ -246,18 +271,39 @@ La IA no es una *feature* de Salto. La IA **es** el producto. Quitarla no degrad
 
 > El jurado da el 5 a quien **maneja claramente los límites**. Esto casi nadie lo hace — es donde más fácil ganamos puntos.
 
-| Riesgo | Mitigación concreta |
-|---|---|
-| **Alucinación** (inventar skills) | Toda señal debe estar **anclada a una cita** de la conversación. Sin evidencia → no entra al perfil. |
-| **Sesgo / discriminación** (género, origen, nombre) | El matching corre sobre evidencia y señales, **no** sobre datos demográficos. Auditoría de sesgo en los matches. El score es explicable para poder auditarlo. |
-| **Sobre-confianza del score** | El ICS se presenta como **señal de priorización, no veredicto**. El humano decide. Mostramos incertidumbre, no solo el %. |
-| **Casos borde** (perfil muy escaso, conversación vacía) | Fallback: el agente pide más; si no hay señal suficiente, lo dice honestamente en vez de inventar. |
-| **Errores de extracción** | El joven **revisa y edita** su Perfil de Evidencia antes de publicarlo (human-in-the-loop). |
-| **Falla del proveedor LLM** | Capa de abstracción de modelo + degradación elegante (cae a extracción más simple, no a pantalla rota). |
-| **Privacidad** | Las historias de vida son sensibles. Consentimiento explícito, minimización de datos, el joven controla qué se publica. |
+| Riesgo | Mitigación concreta | Implementado en |
+|---|---|---|
+| **Alucinación** (inventar skills) | Toda señal debe estar **anclada a una cita** de la conversación. Sin evidencia → no entra al perfil. El prompt de extracción rechaza skills/quotes sin sustento textual. | [`app/api/perfil/route.ts`](app/api/perfil/route.ts) (EXTRACTION_PROMPT) |
+| **Sesgo / discriminación** (género, origen, nombre) | El matching corre sobre evidencia y señales, **no** sobre datos demográficos. Auditoría de sesgo en los matches. El score es explicable para poder auditarlo. | Schema `Profile` sin campos demográficos; ICS desglosado y auditable. |
+| **Sobre-confianza del score** | El ICS se presenta como **señal de priorización, no veredicto**. El humano decide. Mostramos incertidumbre con el `redFlag` por candidato + cinta de aviso si el ranking corrió en heurística. | [`app/empresa/matches/[needId]/page.tsx`](app/empresa/matches/[needId]/page.tsx) |
+| **Casos borde** — respuesta de 1 palabra, 0 user turns, necesidad sin contexto | Validación previa: el agente pide más detalle ANTES de gastar cuota LLM. Cierre de perfil con <15 palabras o última respuesta <3 palabras → 422 con mensaje "necesito más detalle para construir tu perfil". Necesidad sin contexto → match corre igual pero emite `warning` al cliente. | [`lib/input-validation.ts`](lib/input-validation.ts) |
+| **Rate limits del proveedor** (free tier Gemini = 5-10 req/min) | Detectamos `RESOURCE_EXHAUSTED` / HTTP 429 por status, código, mensaje o body (`retryDelay:"30s"`). Devolvemos HTTP 429 con header `Retry-After`, body `{code: "rate_limited", retryAfterSec, error}` en español. En `/api/match` cae a ranking heurístico (matching no se rompe). | [`lib/api-errors.ts`](lib/api-errors.ts) |
+| **Errores de extracción** | El joven revisa su Perfil de Evidencia antes de publicarlo (human-in-the-loop). Si la extracción devuelve 0 skills + 0 evidencia, respondemos 422 "no pudimos anclar evidencia concreta — profundizá con un ejemplo". | [`app/api/perfil/route.ts`](app/api/perfil/route.ts) |
+| **Falla del proveedor LLM** | Capa de abstracción de modelo + degradación elegante: fallback a heurística para ranking, banco de preguntas determinista para la entrevista, mock extractor para el perfil. La demo no se rompe sin internet. | [`lib/gemini.ts`](lib/gemini.ts) (`hasGeminiKey()`), fallbacks en cada route. |
+| **Falla del backend (Firestore)** | Bypass **por colección**, no por proceso: si las reglas faltan en `feedback`, solo esa colección cae a memoria. `profiles`/`needs` siguen contra Firestore. Antes un permiso faltante desactivaba la base entera. | [`lib/db.ts`](lib/db.ts) (`firestoreDisabledFor`) |
+| **Privacidad** | Las historias de vida son sensibles. Consentimiento explícito, minimización de datos, el joven controla qué se publica. Reglas Firestore deploy-ables por colección. | [`firestore.rules`](firestore.rules) |
 
 ### 8.6 Por qué Salto se vuelve mejor que cualquier wrapper (data flywheel)
 Cada contratación genera un dato propietario que nadie más tiene: **¿el match de alto ICS efectivamente funcionó?** Ese feedback (de tu nota "feedback en todas las etapas") reentrena los pesos del ICS. Con el tiempo, Salto predice compatibilidad mejor que cualquier prompt genérico sobre un modelo público. **Ese es el foso defensivo.**
+
+**Lo que ya está capturando data (MVP, día 1):**
+
+Colección `feedback` en Firestore, schema mínimo:
+```ts
+{
+  matchId: string,        // `${needId}__${profileId}` — idempotente, sin secuencias
+  needId?: string,
+  profileId?: string,
+  useful: boolean,        // ¿el founder marcó "útil" o "no útil"?
+  timestamp: number,
+  source: "empresa_match" | "joven_perfil" | "other",
+  note?: string
+}
+```
+
+Punto de entrada: botón `¿útil? sí/no` en cada card de match ([`components/match-feedback.tsx`](components/match-feedback.tsx)), POST a [`/api/feedback`](app/api/feedback/route.ts). Persistente en localStorage del navegador (sobrevive refresh sin auth). Reentrenamiento de pesos del ICS = roadmap fase 1-2 con piloto real.
+
+**Próximas etapas a instrumentar (no en MVP):** post-entrevista joven ("¿la conversación se sintió justa?"), post-contratación empresa ("¿el match efectivamente funcionó después de N días?"), dashboard de auditoría para aliados.
 
 ---
 
@@ -284,9 +330,10 @@ Cada contratación genera un dato propietario que nadie más tiene: **¿el match
                 │
 ┌───────────────▼───────────────────────────────────────────┐
 │  DATOS                                                     │
-│  - Firestore (perfiles, empresas, matches, feedback)       │
+│  - Firestore (profiles, needs, microtasks, feedback)       │
 │  - Vector store (embeddings de perfiles y necesidades)     │
-│  - Auth (Firebase Auth)                                    │
+│  - Auth (Firebase Auth + Google Sign-In) — perfil ID == uid│
+│  - Reglas auth-scoped por colección (default deny)         │
 │  - Ontología de competencias (para RAG)                    │
 └───────────────────────────────────────────────────────────┘
 ```
@@ -295,6 +342,26 @@ Cada contratación genera un dato propietario que nadie más tiene: **¿el match
 - **Sin servidores pesados al inicio:** Next.js + Vercel + Firebase = un equipo de 2–3 lo opera. Realismo de despliegue = puntos en Criterio 3.
 - **Capa de abstracción de modelo:** no casados con un solo proveedor (mitiga riesgo, §8.5).
 - **El motor de ICS es código propio**, no una llamada a LLM — así controlamos explicabilidad y reentrenamiento.
+- **Sin vector DB todavía:** cosine similarity en memoria sobre arrays de embeddings guardados en Firestore. Suficiente para demo y piloto temprano (decenas de miles de perfiles); migrar a pgvector / índice gestionado cuando lo justifique la escala.
+
+**Rutas API construidas en el MVP:**
+
+| Endpoint | Método | Función | Archivo |
+|---|---|---|---|
+| `/api/entrevista` | POST | Siguiente pregunta adaptativa con cobertura de las 8 señales. Devuelve `{nextQuestion, done, targetedSignal, signalsCovered}`. | [`app/api/entrevista/route.ts`](app/api/entrevista/route.ts) |
+| `/api/perfil` | POST | Cierre de entrevista → extracción + embedding + persistencia. Devuelve `{id, profile}`. | [`app/api/perfil/route.ts`](app/api/perfil/route.ts) |
+| `/api/perfil` | GET | Lee perfil por id. | idem |
+| `/api/necesidad` | POST | Estructura texto libre del founder → rol/contexto/skills/traits/restricciones + embedding. | [`app/api/necesidad/route.ts`](app/api/necesidad/route.ts) |
+| `/api/necesidad` | GET | Lee necesidad por id. | idem |
+| `/api/match` | POST | Shortlist por embeddings + ranking ICS por LLM, fallback heurístico, avisos al cliente. | [`app/api/match/route.ts`](app/api/match/route.ts) |
+| `/api/cv` | GET/POST | CV ATS one-click (HTML imprimible / JSON plain-text). Tailoring por `?needId=...`. | [`app/api/cv/route.ts`](app/api/cv/route.ts) |
+| `/api/feedback` | POST/GET | Persiste y lista feedback de matches (data flywheel). | [`app/api/feedback/route.ts`](app/api/feedback/route.ts) |
+| `/api/talento-latente` | POST | Detector de habilidades implícitas + roles sugeridos a partir del Perfil de Evidencia (`LatentProfile`). | [`app/api/talento-latente/route.ts`](app/api/talento-latente/route.ts) |
+| `/api/microtask/proponer` | POST | Empresa propone micro-tarea pagada (brief, criterios, monto COP, deadline) a un candidato matchea­do. | [`app/api/microtask/proponer/route.ts`](app/api/microtask/proponer/route.ts) |
+| `/api/microtask/entregar` | POST | Joven entrega su deliverable (texto + adjuntos opcionales). | [`app/api/microtask/entregar/route.ts`](app/api/microtask/entregar/route.ts) |
+| `/api/microtask/evaluar` | POST | LLM evalúa el deliverable contra los `EvaluationCriterion` definidos por la empresa, devuelve `CriterionScore[]` + score global. La empresa rate-ea encima. | [`app/api/microtask/evaluar/route.ts`](app/api/microtask/evaluar/route.ts) |
+| `/api/microtask/list` | GET | Lista micro-tareas del usuario actual (joven o empresa según contexto). | [`app/api/microtask/list/route.ts`](app/api/microtask/list/route.ts) |
+| `/api/seed` | GET/POST | Carga 5 perfiles demo idempotente. | [`app/api/seed/route.ts`](app/api/seed/route.ts) |
 
 ---
 
@@ -396,13 +463,13 @@ No es la UI ni el CV builder (copiables). Es el **data flywheel de resultados de
 
 ## 15. Roadmap
 
-| Fase | Tiempo | Objetivo |
-|---|---|---|
-| **0. Hackatón** | 48h | MVP demo-able: entrevista IA → Perfil de Evidencia → ICS explicable → CV ATS. Validación en vivo (§2.4). |
-| **1. Piloto Caribe** | Mes 1–3 | 1 aliado (GOyn/ACOPI) + 10–20 empresas tempranas + cohorte de jóvenes. Probar el loop. Calibrar ICS con resultados reales. |
-| **2. Product-market fit** | Mes 4–6 | Iterar matching con data real. Primeras métricas de retención. Primeros ingresos B2B. |
-| **3. Escala regional** | Mes 7–12 | Más aliados/ciudades, automatizar onboarding, dashboard de impacto institucional. **Desplegable en contexto real ✔ (responde Criterio 3).** |
-| **4. LATAM** | 12+ | Replicar el modelo de aliados a otros países; reentrenar ICS por mercado. |
+| Fase | Tiempo | Objetivo | Estado |
+|---|---|---|---|
+| **0. Hackatón** | 48h | MVP demo-able: entrevista IA → Perfil de Evidencia → ICS explicable → CV ATS + feedback loop + manejo robusto de 429 + casos borde honestos + smoke E2E + logs estructurados. Validación en vivo (§2.4). | ✅ Construido — smoke test verde con Camila ↔ Arepas ICS=93 (LLM) o 89 (heurístico). |
+| **1. Piloto Caribe** | Mes 1–3 | 1 aliado (GOyn/ACOPI) + 10–20 empresas tempranas + cohorte de jóvenes. Probar el loop. Calibrar ICS con resultados reales. Migrar de cliente web Firebase a `firebase-admin` con service account. Reglas Firestore por auth + ownership. | Pendiente |
+| **2. Product-market fit** | Mes 4–6 | Iterar matching con data real. Primeras métricas de retención. Primeros ingresos B2B. Reentrenar los pesos del ICS con la colección `feedback` acumulada. Auditoría de sesgo con datos reales. | Pendiente |
+| **3. Escala regional** | Mes 7–12 | Más aliados/ciudades, automatizar onboarding, dashboard de impacto institucional, migrar a vector DB gestionado (pgvector / Vertex). **Desplegable en contexto real ✔ (responde Criterio 3).** | Pendiente |
+| **4. LATAM** | 12+ | Replicar el modelo de aliados a otros países; reentrenar ICS por mercado. | Pendiente |
 
 ---
 

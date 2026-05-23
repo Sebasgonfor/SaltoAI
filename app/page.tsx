@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SaltoLogo } from '@/components/ui/salto-logo';
+import { UserButton } from '@/components/auth/user-button';
 import { ArrowRight, Sparkles, MessageSquareQuote, Layers, Network } from 'lucide-react';
 
 export default function LandingPage() {
@@ -24,6 +25,8 @@ export default function LandingPage() {
           <Link href="/empresa/publicar">
             <Button size="sm">Soy empresa</Button>
           </Link>
+          <div className="h-5 w-px bg-slate-200 mx-2" />
+          <UserButton />
         </nav>
       </header>
 
