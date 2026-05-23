@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { LogOut, User as UserIcon, ChevronDown } from 'lucide-react';
+import { LogOut, User as UserIcon, ChevronDown, Building2, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ interface UserButtonProps {
 }
 
 export function UserButton({ variant = 'light', className }: UserButtonProps) {
-  const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const { user, account, loading, signInWithGoogle, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -109,15 +109,43 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
               {user.displayName || 'Usuario'}
             </div>
             <div className="text-xs text-slate-500 truncate">{user.email}</div>
+            {account && (
+              <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                {account.role === 'joven' ? <GraduationCap size={10} /> : <Building2 size={10} />}
+                {account.role}
+              </div>
+            )}
           </div>
-          <Link
-            href={`/joven/perfil/${user.uid}`}
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-            role="menuitem"
-          >
-            <UserIcon size={14} /> Mi perfil
-          </Link>
+          {account?.role === 'joven' && (
+            <Link
+              href={`/joven/perfil/${user.uid}`}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+              role="menuitem"
+            >
+              <UserIcon size={14} /> Mi perfil
+            </Link>
+          )}
+          {account?.role === 'empresa' && (
+            <Link
+              href="/empresa/publicar"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+              role="menuitem"
+            >
+              <Building2 size={14} /> Publicar necesidad
+            </Link>
+          )}
+          {!account && user && (
+            <Link
+              href="/onboarding/rol"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm text-emerald-700 hover:bg-emerald-50 font-medium"
+              role="menuitem"
+            >
+              <UserIcon size={14} /> Elegir mi rol
+            </Link>
+          )}
           <button
             type="button"
             onClick={async () => {
