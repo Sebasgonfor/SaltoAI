@@ -179,6 +179,39 @@ export async function createNeed(
   return { id, storage: "memory" };
 }
 
+/**
+ * Lista necesidades publicadas por un founder específico (filtra por
+ * `ownerUid`). Es lo que alimenta el dashboard de empresa (`/empresa`).
+ *
+ * En Firestore usamos `where("ownerUid", "==", uid)`. En modo memoria
+ * filtramos el array. Devuelve ordenado por `createdAt` desc (más nuevas
+ * primero) — el dashboard las muestra como lista cronológica reversa.
+ */
+export async function listNeedsByOwner(ownerUid: string): Promise<CompanyNeed[]> {
+  if (!ownerUid) return [];
+  if (useFirestore(NEEDS)) {
+    try {
+      const q = query(collection(db, NEEDS), where("ownerUid", "==", ownerUid));
+      const snap = await getDocs(q);
+      const remote = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<CompanyNeed, "id">),
+      }));
+      remote.sort((a, b) => b.createdAt - a.createdAt);
+      return remote;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listNeedsByOwner", NEEDS);
+    }
+  }
+  // Fallback memoria: no tenemos `ownerUid` indexado, hacemos linear scan.
+  const inMem = Array.from(memNeeds.values()).filter((n) => {
+    const o = (n as CompanyNeed & { ownerUid?: string }).ownerUid;
+    return o === ownerUid;
+  });
+  inMem.sort((a, b) => b.createdAt - a.createdAt);
+  return inMem;
+}
+
 export async function getAllNeeds(): Promise<CompanyNeed[]> {
   if (useFirestore()) {
     try {
