@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SaltoLogo } from '@/components/ui/salto-logo';
+import { UserButton } from '@/components/auth/user-button';
 
 export default function EmpresaLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -29,6 +30,8 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
           <Button variant="outline" size="sm" className="hidden md:inline-flex ml-2">
             Ayuda
           </Button>
+          <div className="h-5 w-px bg-slate-200 mx-2" />
+          <UserButton />
         </nav>
       </header>
       <main className="flex-1 flex flex-col w-full">

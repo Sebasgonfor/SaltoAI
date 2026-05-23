@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote, UserCircle2, Check } from 'lucide-react';
+import { Bot, User, Sparkles, Layers, ArrowRight, MessageSquareQuote, UserCircle2, Check, Lock } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
+import { useAuth } from '@/lib/auth-context';
 
 const MAX_TURNS = 5;
 
@@ -48,6 +49,8 @@ const SIGNALS: DetectedSignal[] = [
 
 export default function ChatJoven() {
   const router = useRouter();
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  const [signingIn, setSigningIn] = useState(false);
   const [phase, setPhase] = useState<'basics' | 'interview'>('basics');
   const [basics, setBasics] = useState<JovenBasics | null>(null);
   const [formName, setFormName] = useState('');
@@ -64,6 +67,10 @@ export default function ChatJoven() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, closing, phase]);
+
+  useEffect(() => {
+    if (user?.displayName && !formName) setFormName(user.displayName);
+  }, [user, formName]);
 
   const userTurns = messages.filter((m) => m.role === 'user').length;
 
@@ -135,7 +142,12 @@ export default function ChatJoven() {
         const closeRes = await fetch('/api/perfil', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: updated, basics }),
+          body: JSON.stringify({
+            messages: updated,
+            basics,
+            uid: user?.uid,
+            displayName: user?.displayName,
+          }),
         });
         const closeData = await closeRes.json();
         if (closeData.id) {
@@ -166,6 +178,61 @@ export default function ChatJoven() {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
+        Cargando tu sesión…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-16 lg:py-24 w-full">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-6">
+            <Lock size={22} />
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-3">
+            Tu historia, guardada
+          </div>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+            Inicia sesión para empezar tu entrevista.
+          </h1>
+          <p className="text-slate-600 mt-4 leading-relaxed">
+            Vinculamos tu Perfil de Evidencia a tu cuenta de Google para que puedas{' '}
+            <strong className="text-slate-900">retomar la conversación</strong>, ver tus matches y
+            recibir tareas — sin volver a contar tu historia desde cero.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Button
+              size="lg"
+              className="h-12 px-6 gap-3"
+              disabled={signingIn}
+              onClick={async () => {
+                setSigningIn(true);
+                try {
+                  await signInWithGoogle();
+                } finally {
+                  setSigningIn(false);
+                }
+              }}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                <path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.56c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                <path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.56-2.77c-.99.66-2.25 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+              </svg>
+              {signingIn ? 'Abriendo Google…' : 'Continuar con Google'}
+            </Button>
+            <p className="text-xs text-slate-400">
+              Usamos tu nombre y correo para crear tu perfil. Nada se publica sin tu permiso.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === 'basics') {
     return (

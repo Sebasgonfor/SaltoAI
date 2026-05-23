@@ -2,13 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
-import { createProfile, getProfile } from "@/lib/db";
+import { createProfile, getProfile, upsertProfileWithId, storageFromId } from "@/lib/db";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateForProfileExtraction } from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
-import type { ChatMessage, Profile } from "@/lib/types";
+import type { ChatMessage, Gender, JovenBasics, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
+
+const VALID_GENDERS: Gender[] = ["mujer", "hombre", "otro", "prefiero_no_decir"];
+
+function parseBasics(raw: unknown): JovenBasics | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as Record<string, unknown>;
+  const name = typeof b.name === "string" ? b.name.trim() : "";
+  const age = typeof b.age === "number" ? b.age : Number(b.age);
+  const gender = b.gender as Gender;
+  if (!name || name.length < 2) return null;
+  if (!Number.isFinite(age) || age < 16 || age > 35) return null;
+  if (!VALID_GENDERS.includes(gender)) return null;
+  return { name, age: Math.round(age), gender };
+}
 
 const EXTRACTION_PROMPT = `Eres el extractor de Perfil de Evidencia de Salto.
 A partir de la transcripción de la entrevista, extrae SOLO lo que el joven dijo, con evidencia citada.
@@ -70,12 +84,15 @@ const schema = {
 
 /**
  * Extracción mock SOLO cuando hay transcript real pero no hay Gemini key.
- * Antes esto se disparaba también con conversaciones vacías → falsa Camila
- * Silva en la demo. Hoy solo se usa si hay contenido validado.
  */
-function mockExtraction(_transcript: string): Omit<Profile, "id" | "createdAt" | "embedding"> {
+function mockExtraction(
+  basics: JovenBasics,
+  _transcript: string
+): Omit<Profile, "id" | "createdAt" | "embedding"> {
   return {
-    name: "Candidato/a Salto",
+    name: basics.name,
+    age: basics.age,
+    gender: basics.gender,
     summary:
       "Perfil generado en modo demo (sin clave de IA). Las habilidades y rasgos se infirieron con heurística simple sobre la conversación.",
     skills: ["Comunicación", "Iniciativa"],
@@ -98,10 +115,16 @@ function buildEmbeddingText(p: Omit<Profile, "id" | "createdAt" | "embedding">):
 export async function POST(req: NextRequest) {
   const log = startLog(req, "perfil");
   try {
-    const body = (await req.json()) as { messages: ChatMessage[]; basics?: unknown };
-    const { messages, basics: basicsRaw } = body;
+    const body = (await req.json()) as {
+      messages: ChatMessage[];
+      basics?: unknown;
+      uid?: string;
+      displayName?: string;
+    };
+    const { messages, basics: basicsRaw, uid } = body;
     const basics = parseBasics(basicsRaw);
     if (!basics) {
+      log.end({ status: 400, extra: { reason: "invalid_basics" } });
       return NextResponse.json(
         { error: "Completa nombre, edad (16-35) y género antes de generar el perfil." },
         { status: 400 }
@@ -134,7 +157,7 @@ export async function POST(req: NextRequest) {
     let extracted: Omit<Profile, "id" | "createdAt" | "embedding">;
 
     if (!hasGeminiKey()) {
-      extracted = mockExtraction(transcript);
+      extracted = mockExtraction(basics, transcript);
       log.info("mode.mock_extraction");
     } else {
       const response = await gemini().models.generateContent({
@@ -156,8 +179,6 @@ export async function POST(req: NextRequest) {
         evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
       };
 
-      // Si tras pasar por el LLM no quedó NADA citado, mejor honestidad que
-      // un perfil vacío que rompe el matching más adelante.
       if (extracted.evidence.length === 0 && extracted.skills.length === 0) {
         log.warn("edge.empty_extraction");
         log.end({ status: 422, extra: { code: "no_evidence_extracted" } });
@@ -174,10 +195,27 @@ export async function POST(req: NextRequest) {
 
     const embedding = await embed(buildEmbeddingText(extracted));
 
-    const { id, storage } = await createProfile({
-      ...extracted,
-      embedding,
-    });
+    let id: string;
+    let storage: "firestore" | "memory";
+    if (uid) {
+      const existing = await getProfile(uid);
+      await upsertProfileWithId(uid, {
+        ...extracted,
+        embedding,
+        createdAt: existing?.createdAt ?? Date.now(),
+        latent: existing?.latent,
+        taskStats: existing?.taskStats,
+      });
+      id = uid;
+      storage = storageFromId(uid);
+    } else {
+      const created = await createProfile({
+        ...extracted,
+        embedding,
+      });
+      id = created.id;
+      storage = created.storage;
+    }
 
     const saved = await getProfile(id);
     log.end({
@@ -187,9 +225,10 @@ export async function POST(req: NextRequest) {
         skills: extracted.skills.length,
         traits: extracted.traits.length,
         evidence: extracted.evidence.length,
+        storage,
       },
     });
-    return NextResponse.json({ id, profile: saved });
+    return NextResponse.json({ id, profile: saved, storage });
   } catch (err) {
     if (isRateLimitError(err)) {
       const shape = classifyProviderError(err);
@@ -219,5 +258,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   log.end({ status: 200, extra: { profileId: id } });
-  return NextResponse.json({ profile: p });
+  return NextResponse.json({ profile: p, storage: storageFromId(id) });
 }
