@@ -154,7 +154,19 @@ Un ecosistema de matching por potencial donde la IA (a) **extrae evidencia labor
 
 4. **Motor de Matching de Potencial → "Índice de Compatibilidad Salto (ICS)"** ✅ Construido — [`app/api/match/route.ts`](app/api/match/route.ts). Pipeline híbrido: embeddings → shortlist top-5 → LLM ranking batched con desglose 4D auditable. Genera el "*82% de compatibilidad con tu empresa*" **explicable** (por qué ese %, qué señales pesaron). Ver §8.
 
-5. **CV optimizado para ATS (one-click)** ✅ Construido — [`app/api/cv/route.ts`](app/api/cv/route.ts) + panel de personalización [`components/cv-customizer.tsx`](components/cv-customizer.tsx). Generado desde el Perfil de Evidencia. Es el **gancho de adquisición** del lado joven (no el core). Tu nota *"ATS una columna"* → vista de una sola columna, parseable por ATS, sin tablas ni gráficos que rompen el parser. 7 secciones estándar (Perfil profesional · Competencias · Experiencia y logros · Rasgos · Educación · Certificaciones · Idiomas), fuentes del sistema (Arial), `@page` A4 con márgenes 16/18mm. **Tailoring por necesidad** (`?needId=...`) reordena skills/evidencia poniendo los matches con el JD primero — keyword density alta donde los ATS la buscan.
+5. **CV optimizado para ATS (one-click) — 5 plantillas seleccionables** ✅ Construido — [`app/api/cv/route.ts`](app/api/cv/route.ts) + renderers en [`lib/cv-templates.ts`](lib/cv-templates.ts) + picker visual en [`components/cv-customizer.tsx`](components/cv-customizer.tsx). Generado desde el Perfil de Evidencia. Es el **gancho de adquisición** del lado joven (no el core).
+
+   El joven elige entre los 5 formatos que el mercado reconoce, cada uno con su trade-off de **compatibilidad ATS** explícito (0-5 estrellas + aviso cuando aplica):
+
+   | Estilo | Estructura | ATS | Para quién |
+   |---|---|---|---|
+   | **ATS minimalista** (`?style=minimalist`, default) | Una columna, headings estándar, sin gráficos | ★★★★★ | Portales tipo Computrabajo, Greenhouse, Workday |
+   | **Híbrido / Combinado** (`?style=hybrid`, recomendado) | Resumen de skills + logros por competencia | ★★★★★ | Junior con evidencia rica (recomendado para Salto) |
+   | **Funcional** (`?style=functional`) | Logros agrupados por competencia, sin timeline | ★★★★☆ | Junior sin historial cronológico formal |
+   | **Cronológico** (`?style=chronological`) | Experiencia con fechas, formato corporativo | ★★★★★ | Roles corporativos / sectores tradicionales |
+   | **Creativo / Diseño** (`?style=creative`) | 2 columnas, color emerald, tipografía grande | ★★☆☆☆ | Roles creativos / diseño / marketing |
+
+   El estilo se persiste por `profileId` en `localStorage`. Tailoring por `?needId=...` reordena skills/evidencia poniendo los matches del JD primero (keyword density alta) — funciona en los 5 estilos. Tres formatos de salida por cada estilo: HTML con autoprint (Cmd+P → PDF), HTML descargable, JSON con `plainText` para campos "Pegá tu CV" de ATS legacy (Computrabajo / OCC / Bumeran). Fuentes del sistema (Arial/Helvetica), `@page A4` con márgenes 16/18mm. La plantilla Creative incluye un aviso visible solo en pantalla (no en print) advirtiendo que rompe ATS estrictos — el joven decide informado.
 
 6. **Feedback en todas las etapas** ✅ Mínimo viable construido — [`app/api/feedback/route.ts`](app/api/feedback/route.ts) + [`components/match-feedback.tsx`](components/match-feedback.tsx). Botón "¿útil? sí/no" en cada match → POST a `/api/feedback` con `{matchId, needId, profileId, useful, timestamp, source}` → colección `feedback` en Firestore (fallback a memoria si la regla aún no está deployada). No reentrena pesos todavía; el dato queda **propietario** como combustible del flywheel (§8.6). Por construir: feedback en post-entrevista, post-contratación y dashboard de auditoría.
 
