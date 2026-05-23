@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { embed } from "@/lib/embeddings";
 import { getProfile, upsertProfileWithId } from "@/lib/db";
 import { SEED_PROFILES } from "@/lib/seed-data";
+import { startLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -34,13 +35,19 @@ async function runSeed(force: boolean) {
 }
 
 export async function POST(req: Request) {
+  const log = startLog(req, "seed");
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "1";
   const results = await runSeed(force);
+  const created = results.filter((r) => r.status === "created").length;
+  log.end({ status: 200, extra: { force, created, total: results.length } });
   return NextResponse.json({ ok: true, force, results });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const log = startLog(req, "seed");
   const results = await runSeed(false);
+  const created = results.filter((r) => r.status === "created").length;
+  log.end({ status: 200, extra: { force: false, created, total: results.length } });
   return NextResponse.json({ ok: true, force: false, results });
 }

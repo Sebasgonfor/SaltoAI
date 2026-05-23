@@ -17,11 +17,14 @@ import {
 } from 'lucide-react';
 import type { CompanyNeed, Match, ICSBreakdown } from '@/lib/types';
 import { ICS_WEIGHTS } from '@/lib/types';
+import MatchFeedback from '@/components/match-feedback';
 
 interface MatchResponse {
   need: CompanyNeed;
   matches: Match[];
   note?: string;
+  warning?: string;
+  warningCode?: string;
 }
 
 const DIM_LABELS: { key: keyof ICSBreakdown; label: string; weight: number | null; help: string }[] = [
@@ -218,6 +221,20 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         </div>
       </header>
 
+      {/* Aviso (rate-limit en ranking, contexto débil, etc.) */}
+      {data.warning && (
+        <div
+          role="status"
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-sm text-amber-900"
+        >
+          <AlertCircle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-semibold mb-0.5">Aviso del motor</div>
+            <p className="leading-relaxed">{data.warning}</p>
+          </div>
+        </div>
+      )}
+
       {/* Pipeline visual */}
       {matches.length > 0 && (
         <section className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
@@ -286,6 +303,11 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <Button variant="outline" className="gap-2">
                     Contactar
                   </Button>
+                </div>
+
+                {/* Feedback loop — combustible del flywheel (PRD §8.6) */}
+                <div className="pt-3">
+                  <MatchFeedback needId={needId} profileId={top.profileId} variant="hero" />
                 </div>
               </div>
 
@@ -363,6 +385,10 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                       Ver perfil <ArrowRight size={12} />
                     </Button>
                   </Link>
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-slate-100">
+                  <MatchFeedback needId={needId} profileId={m.profileId} />
                 </div>
               </article>
             ))}
