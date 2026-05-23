@@ -14,6 +14,7 @@ import {
   MessageSquareQuote,
 } from 'lucide-react';
 import type { Gender, OpportunityMatch, Profile } from '@/lib/types';
+import { RoleGate } from '@/components/auth/role-gate';
 
 const GENDER_LABEL: Record<Gender, string> = {
   mujer: 'Mujer',
@@ -220,13 +221,20 @@ function ConectarContent() {
 }
 
 export default function ConectarPage() {
+  // RoleGate envuelve afuera del Suspense — las oportunidades del joven son
+  // privadas a él (el founder ve sus matches en /empresa/matches/{needId},
+  // no acá). Antes el gate vivía en el layout, ahora vive per-page.
   return (
-    <Suspense
-      fallback={
-        <div className="max-w-4xl mx-auto px-6 py-24 text-center text-slate-500 text-sm">Cargando…</div>
-      }
-    >
-      <ConectarContent />
-    </Suspense>
+    <RoleGate role="joven">
+      <Suspense
+        fallback={
+          <div className="max-w-4xl mx-auto px-6 py-24 text-center text-slate-500 text-sm">
+            Cargando…
+          </div>
+        }
+      >
+        <ConectarContent />
+      </Suspense>
+    </RoleGate>
   );
 }

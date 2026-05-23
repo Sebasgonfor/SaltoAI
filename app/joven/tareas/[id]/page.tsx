@@ -19,8 +19,21 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import type { MicroTask } from '@/lib/types';
+import { RoleGate } from '@/components/auth/role-gate';
 
-export default function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
+/**
+ * Detalle de micro-tarea del joven. Privado — solo el dueño puede entregar
+ * y ver la evaluación. RoleGate movido del layout a esta page.
+ */
+export default function TareaDetalleJovenPage(props: { params: Promise<{ id: string }> }) {
+  return (
+    <RoleGate role="joven">
+      <TareaDetalleJoven {...props} />
+    </RoleGate>
+  );
+}
+
+function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [task, setTask] = useState<MicroTask | null>(null);
