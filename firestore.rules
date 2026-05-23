@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// DEMO ONLY — reglas abiertas para el hackatón.
+// Antes de cualquier piloto real, restringir por auth y por colección.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /profiles/{profileId} {
+      allow read, write: if true;
+    }
+    match /needs/{needId} {
+      allow read, write: if true;
+    }
+  }
+}
