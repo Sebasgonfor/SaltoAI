@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { GraduationCap, Building2, ArrowRight, Lock, Sparkles } from 'lucide-react';
@@ -18,6 +18,18 @@ function defaultDestination(role: UserRole): string {
   return role === 'joven' ? '/joven/chat' : '/empresa/publicar';
 }
 
+/**
+ * Si la URL `next` apunta a un área cuyo rol es inequívoco (/empresa/* o
+ * /joven/*), no tiene sentido preguntar de nuevo: el usuario ya eligió al
+ * hacer click desde la landing. Devolvemos el rol implícito para auto-
+ * resolver el onboarding y mandar directo al destino.
+ */
+function roleFromNext(next: string): UserRole | null {
+  if (next.startsWith('/empresa/') || next === '/empresa') return 'empresa';
+  if (next.startsWith('/joven/') || next === '/joven') return 'joven';
+  return null;
+}
+
 function OnboardingRolInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -25,6 +37,8 @@ function OnboardingRolInner() {
   const [submitting, setSubmitting] = useState<UserRole | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const next = isSafeNext(params.get('next'));
+  const impliedRole = roleFromNext(next);
+  const autoResolvedRef = useRef(false);
 
   const choose = async (role: UserRole) => {
     if (!user) return;
@@ -39,6 +53,17 @@ function OnboardingRolInner() {
     }
   };
 
+  // Auto-resolución: si el destino implica el rol (vino de "Soy empresa" /
+  // "Soy joven" en la landing), no preguntamos de nuevo. Lo elegimos en
+  // background y mandamos al destino. El ref evita disparar el efecto dos
+  // veces durante el ciclo de render.
+  useEffect(() => {
+    if (!user || account || !impliedRole || autoResolvedRef.current) return;
+    autoResolvedRef.current = true;
+    void choose(impliedRole);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, account, impliedRole]);
+
   // Si ya hay rol asignado, sacarlo de aquí inmediatamente.
   if (account) {
     if (typeof window !== 'undefined') {
@@ -46,6 +71,21 @@ function OnboardingRolInner() {
       router.replace(target);
     }
     return null;
+  }
+
+  // Auto-resolviendo: el efecto ya disparó choose(impliedRole); mostramos
+  // un loader honesto en vez de la pantalla de selección.
+  if (user && impliedRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
+        <span className="inline-flex items-center gap-2">
+          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
+          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+          <span className="ml-2">Llevándote a {impliedRole === 'empresa' ? 'tu panel de empresa' : 'tu entrevista'}…</span>
+        </span>
+      </div>
+    );
   }
 
   if (loading) {
