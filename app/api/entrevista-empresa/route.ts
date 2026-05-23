@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { countUserTurns, isLastAnswerTooShort } from "@/lib/input-validation";
+import {
+  countUserTurns,
+  isLastAnswerTooShort,
+  isYesNoQuestion,
+  lastAgentMessage,
+  pickYesNoFollowup,
+} from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
@@ -35,20 +41,20 @@ const QUESTION_BANK: Record<(typeof TARGET_SLOTS)[number], string[]> = {
     "Olvidate del título del puesto un segundo. ¿Qué es lo que esta persona haría en un día normal? ¿Y en una semana cargada?",
   ],
   ritmo_contexto: [
-    "¿Cómo es el ritmo del día a día? ¿Hay picos, presión, multitarea, o es más estable? ¿Es presencial, remoto, híbrido, y en qué horario?",
-    "Contame del contexto operativo: ¿es caótico, ordenado, hay procesos escritos o se va resolviendo sobre la marcha? ¿Dónde y cuándo trabajaría?",
+    "Describime el ritmo del día a día: cómo se siente, dónde se trabaja (local, oficina, remoto) y en qué horario.",
+    "Contame el contexto operativo: cuán caótico u ordenado es, qué procesos hay escritos y qué se resuelve sobre la marcha. ¿Dónde y cuándo trabajaría?",
   ],
   restricciones_duras: [
-    "¿Hay algún requisito duro que sí o sí necesita la persona? Por ejemplo ubicación específica, idioma, alguna herramienta concreta, jornada completa, edad mínima legal.",
-    "¿Cuáles son los no-negociables del rol? Pensá en ubicación, horario, idioma, o herramientas específicas sin las cuales no podría empezar.",
+    "Decime los requisitos duros y no-negociables: ubicación, idioma, herramienta concreta, jornada, edad mínima legal. Listalos.",
+    "Contame qué no-negociables tiene el rol — ubicación, horario, idioma o herramientas específicas sin las cuales no podría empezar.",
   ],
   fallos_previos: [
-    "¿Han contratado para algo parecido antes? Si fue así, ¿qué les costó, qué tipo de persona no funcionó y por qué?",
+    "Contame la última vez que contrataron para algo parecido: qué les costó, qué tipo de persona no funcionó y por qué.",
     "Si ya intentaron contratar para este rol u otro parecido, contame qué falló. Esa señal nos sirve más que la lista de skills.",
   ],
   dealbreakers: [
-    "Pensando en candidatos: ¿qué rasgo o actitud sería un deal-breaker para vos? ¿Y qué cosas son “nice-to-have” pero no esenciales?",
-    "Si tuvieras que elegir entre dos candidatos parecidos, ¿qué rasgo te haría decir “este sí” o “este no”? Diferenciá lo esencial de lo deseable.",
+    "Decime qué rasgo o actitud sería un deal-breaker para vos, y qué cosas son “nice-to-have” pero no esenciales.",
+    "Si tuvieras que elegir entre dos candidatos parecidos, contame qué rasgo te haría decir “este sí” y cuál “este no”. Diferenciá esencial de deseable.",
   ],
 };
 
@@ -88,6 +94,12 @@ ESTILO:
 - Español natural rioplatense/colombiano, cercano, no corporativo.
 - UNA pregunta a la vez, corta y específica (máx 2 oraciones).
 - Tuteo o "vos", consistente.
+
+PROHIBIDO PREGUNTAS SÍ/NO:
+- Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabés…?", "¿Han contratado…?", "¿Hay…?".
+- Esas preguntas se contestan con "sí" o "no" y matan la entrevista.
+- Toda pregunta debe empezar con QUÉ, CÓMO, CUÁNDO, CUÁNTOS, CUÁL o un imperativo tipo "Contame…", "Pensá en…", "Dame un ejemplo de…".
+- Si querés explorar si algo ocurrió, pedí directamente el ejemplo: "Contame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
 
 CIERRE (done=true):
 - Marcá done=true cuando tengas AL MENOS 5 de los 6 slots cubiertos con detalle concreto.
@@ -185,15 +197,18 @@ export async function POST(req: NextRequest) {
     const userTurns = countUserTurns(messages);
 
     if (userTurns > 0 && isLastAnswerTooShort(messages, 3)) {
-      log.info("edge.too_short_answer", { userTurns });
-      log.end({ status: 200, extra: { edge: "too_short", done: false } });
+      const prevAgent = lastAgentMessage(messages);
+      const wasYesNo = isYesNoQuestion(prevAgent);
+      log.info("edge.too_short_answer", { userTurns, wasYesNo });
+      log.end({ status: 200, extra: { edge: "too_short", done: false, wasYesNo } });
       return NextResponse.json({
-        nextQuestion:
-          "Eso es muy poquito para trabajar. Contame con más detalle — ¿podés darme un ejemplo concreto?",
+        nextQuestion: wasYesNo
+          ? pickYesNoFollowup(userTurns)
+          : "Eso es muy poquito para trabajar. Contame con más detalle, dame un ejemplo concreto.",
         done: false,
         targetedSlot: null,
         slotsCovered: detectSlots(messages),
-        edge: "too_short",
+        edge: wasYesNo ? "yes_no_followup" : "too_short",
       });
     }
 
