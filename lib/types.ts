@@ -52,6 +52,22 @@ export interface Match {
   topSkills: string[];
 }
 
+/**
+ * Feedback de match: el dato propietario que reentrena el ICS (PRD §8.6).
+ * Mínimo viable: ¿este match le pareció útil al founder? sí/no/timestamp.
+ * matchId = `${needId}__${profileId}` para que sea idempotente sin secuencias.
+ */
+export interface FeedbackEntry {
+  id?: string;
+  matchId: string;
+  needId?: string;
+  profileId?: string;
+  useful: boolean;
+  timestamp: number;
+  source?: "empresa_match" | "joven_perfil" | "other";
+  note?: string;
+}
+
 export const ICS_WEIGHTS = {
   skillsFit: 0.35,
   behavioralFit: 0.3,

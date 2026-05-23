@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Quote,
-  Download,
   CheckCircle2,
   Sparkles,
   MessageSquareQuote,
@@ -15,6 +14,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import type { Profile } from '@/lib/types';
+import CvCustomizer from '@/components/cv-customizer';
 
 export default function PerfilPorId({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -104,10 +104,11 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 {perfil.summary}
               </p>
             )}
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Button variant="outline" className="gap-2" disabled>
-                <Download size={14} /> CV ATS <span className="text-slate-400 text-xs">(próximo)</span>
-              </Button>
+            {/* CV ATS — one-click + panel opcional para completar contacto,
+                idiomas, educación. Los datos viajan como query params; el
+                renderer del CV los inyecta en las secciones estándar. */}
+            <div className="pt-2 max-w-2xl">
+              <CvCustomizer profileId={id} />
             </div>
           </div>
         </div>

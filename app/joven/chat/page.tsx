@@ -95,6 +95,13 @@ export default function ChatJoven() {
         if (closeData.id) {
           router.push(`/joven/perfil/${closeData.id}`);
         } else {
+          // Casos borde (PRD §8.5): el agente cree que terminó pero el
+          // extractor no encuentra evidencia suficiente. En vez de freezar,
+          // devolvemos la conversación al usuario con el mensaje honesto.
+          const fallback =
+            closeData.error ||
+            'No pudimos construir tu perfil con lo que contaste. Profundizá un poco más con un ejemplo concreto.';
+          setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
           setClosing(false);
         }
       }

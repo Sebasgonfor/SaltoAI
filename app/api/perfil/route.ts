@@ -3,6 +3,9 @@ import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
 import { createProfile, getProfile } from "@/lib/db";
+import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
+import { validateForProfileExtraction } from "@/lib/input-validation";
+import { startLog } from "@/lib/logger";
 import type { ChatMessage, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -10,15 +13,32 @@ export const runtime = "nodejs";
 const EXTRACTION_PROMPT = `Eres el extractor de Perfil de Evidencia de Salto.
 A partir de la transcripción de la entrevista, extrae SOLO lo que el joven dijo, con evidencia citada.
 
-Reglas estrictas:
-- Cada skill DEBE estar anclada a una cita textual (o cuasi-textual) del joven.
-- Si una skill no tiene evidencia clara en la transcripción, NO la incluyas.
-- Los rasgos (traits) son patrones de comportamiento observados, no juicios genéricos. Ejemplos buenos: "Tolerancia al caos", "Autodidacta", "Orientación a resultados". Ejemplos malos: "Buena persona", "Trabajador".
-- summary: 1-2 frases que describan a la persona en lenguaje natural, no corporativo.
-- Si la persona dijo su nombre, úsalo. Si no, deja "Candidato/a Salto".
-- Idioma: español natural.
+Reglas estrictas (anti-alucinación):
+- Cada skill DEBE estar anclada a un hecho REAL que el joven mencionó. Si no hay sustento en la transcripción, NO la incluyas.
+- NO inventes números, fechas ni resultados. Si el joven no los mencionó, no aparecen.
 
-Devuelve JSON estricto con el schema indicado.`;
+Formato de evidencia (CV-ready):
+- Cada quote se redacta en TERCERA PERSONA, tiempo PASADO, empezando con un VERBO DE ACCIÓN fuerte
+  ("Triplicó", "Diseñó", "Coordinó", "Aprendió", "Resolvió", "Atendió", "Implementó", "Lideró").
+- Conservá los detalles cuantificables que el joven dio (cifras, %, cantidades, plazos, número de clientes). NO los inventes; si no los dio, omitilos.
+- Cada quote es 1 oración, máximo 2. Concisa, en español natural, sin jerga corporativa.
+- Reformulá lo que dijo el joven (paráfrasis cercana), no copies textual la primera persona —
+  el resultado debe leerse como un bullet de CV listo para imprimir.
+- Ejemplos del formato deseado:
+  · "Triplicó las ventas del local de su tía en 6 meses gestionando pedidos por Instagram."
+  · "Aprendió por su cuenta a editar Reels y consiguió 200 clientes nuevos sin pagar publicidad."
+  · "Resolvió reclamos de clientes en un evento de 80 personas sin que escalara a la organización."
+
+Otros campos:
+- skills: 3-6 habilidades concretas con nombre estándar de mercado laboral (ej. "Atención al Cliente",
+  "Gestión de Redes Sociales", "Ventas B2C"), no descripciones largas.
+- traits: 2-5 rasgos conductuales observados, no juicios. Buenos: "Tolerancia al caos", "Autodidacta",
+  "Orientación a resultados". Malos: "Buena persona", "Trabajador", "Dedicado".
+- summary: 2-3 frases en lenguaje natural describiendo a la persona y su trayectoria informal.
+- name: si la persona dijo su nombre, úsalo; si no, "Candidato/a Salto".
+
+Idioma: español natural rioplatense/colombiano.
+Devolvé JSON estricto con el schema indicado.`;
 
 const schema = {
   type: Type.OBJECT,
@@ -48,23 +68,20 @@ const schema = {
   required: ["name", "summary", "skills", "traits", "evidence"],
 };
 
-function mockExtraction(transcript: string): Omit<Profile, "id" | "createdAt" | "embedding"> {
+/**
+ * Extracción mock SOLO cuando hay transcript real pero no hay Gemini key.
+ * Antes esto se disparaba también con conversaciones vacías → falsa Camila
+ * Silva en la demo. Hoy solo se usa si hay contenido validado.
+ */
+function mockExtraction(_transcript: string): Omit<Profile, "id" | "createdAt" | "embedding"> {
   return {
-    name: "Camila Silva",
+    name: "Candidato/a Salto",
     summary:
-      "Joven con experiencia informal manejando redes sociales y atención al cliente en un negocio familiar. Aprende sola y resuelve sin que nadie le diga.",
-    skills: ["Gestión de Redes Sociales", "Ventas B2C", "Atención al Cliente"],
-    traits: ["Tolerancia al caos", "Autodidacta", "Orientación a resultados"],
+      "Perfil generado en modo demo (sin clave de IA). Las habilidades y rasgos se infirieron con heurística simple sobre la conversación.",
+    skills: ["Comunicación", "Iniciativa"],
+    traits: ["Proactividad"],
     evidence: [
-      { skill: "Ventas B2C", quote: "Triplicó las ventas del negocio de su tía en 6 meses." },
-      {
-        skill: "Gestión de Redes Sociales",
-        quote: "Manejó el Instagram sin experiencia previa y consiguió 200 clientes nuevos.",
-      },
-      {
-        skill: "Atención al Cliente",
-        quote: "Respondía mensajes y reclamos directamente, sin protocolo.",
-      },
+      { skill: "Comunicación", quote: "Contó su historia con detalle al agente de Salto." },
     ],
   };
 }
@@ -79,10 +96,27 @@ function buildEmbeddingText(p: Omit<Profile, "id" | "createdAt" | "embedding">):
 }
 
 export async function POST(req: NextRequest) {
+  const log = startLog(req, "perfil");
   try {
     const { messages } = (await req.json()) as { messages: ChatMessage[] };
     if (!Array.isArray(messages) || messages.length === 0) {
+      log.end({ status: 400, extra: { reason: "messages_required" } });
       return NextResponse.json({ error: "messages required" }, { status: 400 });
+    }
+
+    // §8.5: si no hay señal suficiente, lo decimos honestamente.
+    const validity = validateForProfileExtraction(messages);
+    if (!validity.ok) {
+      log.warn("edge.insufficient_input", { reason: validity.reason });
+      log.end({ status: 422, extra: { code: "insufficient_input", reason: validity.reason } });
+      return NextResponse.json(
+        {
+          error: validity.message,
+          code: "insufficient_input",
+          reason: validity.reason,
+        },
+        { status: 422 }
+      );
     }
 
     const transcript = messages
@@ -93,6 +127,7 @@ export async function POST(req: NextRequest) {
 
     if (!hasGeminiKey()) {
       extracted = mockExtraction(transcript);
+      log.info("mode.mock_extraction");
     } else {
       const response = await gemini().models.generateContent({
         model: GEMINI_MODEL,
@@ -110,6 +145,21 @@ export async function POST(req: NextRequest) {
         traits: Array.isArray(parsed.traits) ? parsed.traits : [],
         evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
       };
+
+      // Si tras pasar por el LLM no quedó NADA citado, mejor honestidad que
+      // un perfil vacío que rompe el matching más adelante.
+      if (extracted.evidence.length === 0 && extracted.skills.length === 0) {
+        log.warn("edge.empty_extraction");
+        log.end({ status: 422, extra: { code: "no_evidence_extracted" } });
+        return NextResponse.json(
+          {
+            error:
+              "No pudimos anclar evidencia concreta en lo que contaste. Volvé al chat y profundizá con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
+            code: "no_evidence_extracted",
+          },
+          { status: 422 }
+        );
+      }
     }
 
     const embedding = await embed(buildEmbeddingText(extracted));
@@ -120,17 +170,44 @@ export async function POST(req: NextRequest) {
     });
 
     const saved = await getProfile(id);
+    log.end({
+      status: 200,
+      extra: {
+        profileId: id,
+        skills: extracted.skills.length,
+        traits: extracted.traits.length,
+        evidence: extracted.evidence.length,
+      },
+    });
     return NextResponse.json({ id, profile: saved });
   } catch (err) {
-    console.error("perfil error:", err);
-    return NextResponse.json({ error: "No pudimos construir el perfil." }, { status: 500 });
+    if (isRateLimitError(err)) {
+      const shape = classifyProviderError(err);
+      log.warn("rate_limited", { message: (err as Error)?.message });
+      log.end({ status: shape.status, extra: { code: shape.code } });
+      return errorResponse(shape);
+    }
+    log.error("perfil.exception", { message: (err as Error)?.message });
+    log.end({ status: 500, extra: { code: "unknown" } });
+    return NextResponse.json(
+      { error: "No pudimos construir el perfil.", code: "unknown" },
+      { status: 500 }
+    );
   }
 }
 
 export async function GET(req: NextRequest) {
+  const log = startLog(req, "perfil");
   const id = req.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!id) {
+    log.end({ status: 400, extra: { reason: "id_required" } });
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
   const p = await getProfile(id);
-  if (!p) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!p) {
+    log.end({ status: 404, extra: { profileId: id } });
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+  log.end({ status: 200, extra: { profileId: id } });
   return NextResponse.json({ profile: p });
 }
