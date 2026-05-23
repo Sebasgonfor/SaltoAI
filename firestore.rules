@@ -6,6 +6,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ACCOUNTS — el rol asignado al usuario (joven o empresa).
+    // - El dueño puede leer y crear su doc (escribir su propio rol la primera vez).
+    // - Update/delete bloqueado desde cliente: cambiar de rol requiere soporte
+    //   (Admin SDK), evita que un joven con perfil se convierta en empresa y
+    //   vea su propia ficha como reclutador.
+    match /accounts/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.role in ['joven', 'empresa'];
+      allow update, delete: if false;
+    }
+
     // PROFILES — el doc id es el uid del joven (ver app/api/perfil con upsertProfileWithId).
     // - El dueño puede leer y escribir su propio doc.
     // - Cualquier usuario autenticado puede LEER otros perfiles (las empresas

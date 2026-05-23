@@ -6,7 +6,7 @@ import { createNeed, getNeed } from "@/lib/db";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateNeedDescription } from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
-import type { CompanyNeed } from "@/lib/types";
+import type { CompanyLegal, CompanyNeed } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -56,9 +56,10 @@ function buildEmbeddingText(n: Omit<CompanyNeed, "id" | "createdAt" | "embedding
 export async function POST(req: NextRequest) {
   const log = startLog(req, "necesidad");
   try {
-    const { companyName, rawDescription } = (await req.json()) as {
+    const { companyName, rawDescription, legal } = (await req.json()) as {
       companyName: string;
       rawDescription: string;
+      legal?: CompanyLegal;
     };
     if (!companyName?.trim() || !rawDescription?.trim()) {
       log.end({ status: 400, extra: { reason: "fields_required" } });
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
       companyName: companyName.trim(),
       rawDescription: rawDescription.trim(),
       ...structured,
+      ...(legal && legal.acceptedTerms ? { legal } : {}),
     };
 
     const embedding = await embed(buildEmbeddingText(base));

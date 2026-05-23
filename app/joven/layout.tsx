@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
+import { RoleGate } from '@/components/auth/role-gate';
 
 export default function JovenLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -43,7 +44,7 @@ export default function JovenLayout({ children }: { children: React.ReactNode })
         </nav>
       </header>
       <main className="flex-1 flex flex-col w-full">
-        {children}
+        <RoleGate role="joven">{children}</RoleGate>
       </main>
       <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
         <span>Salto · Tu primer salto al empleo formal</span>

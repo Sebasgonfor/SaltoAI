@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
+import { RoleGate } from '@/components/auth/role-gate';
 
 export default function EmpresaLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,7 +17,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
         </Link>
         <nav className="flex gap-1 items-center text-sm font-medium">
           <Link
-            href="/empresa/publicar"
+            href="/empresa/chat"
             className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             Publicar necesidad
@@ -35,7 +36,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
         </nav>
       </header>
       <main className="flex-1 flex flex-col w-full">
-        {children}
+        <RoleGate role="empresa">{children}</RoleGate>
       </main>
       <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
         <span>Salto · Calidad, no volumen</span>

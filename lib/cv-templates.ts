@@ -1,0 +1,872 @@
+/**
+ * 5 plantillas de CV seleccionables por el joven (PRD §6.2.5).
+ *
+ * Cada formato tiene un trade-off entre **parseabilidad ATS** y
+ * **legibilidad humana**. Le pasamos al usuario la decisión con un
+ * indicador claro (atsScore 0-5) y una recomendación.
+ *
+ *   minimalist      — la más parseable. Lo que armamos antes.
+ *   chronological   — la convención corporativa: experiencia con fechas.
+ *   functional      — agrupa por competencia. Ideal para junior sin chrono.
+ *   hybrid          — mezcla resumen de skills + bloques por competencia.
+ *   creative        — 2 columnas, color emerald, tipografía grande.
+ *                     Riesgo: rompe ATS estrictos. Para roles creativos.
+ *
+ * Decisiones de diseño compartidas a TODAS las plantillas:
+ *  - Fuentes "del sistema" (Arial/Helvetica) — los ATS no descargan webfonts.
+ *  - Headings semánticos `<h1>/<h2>/<h3>` — Workday/Greenhouse los detectan
+ *    como secciones aun en español.
+ *  - Sin `<img>`, sin `<table>` (excepto Creative, advertido), sin text-boxes.
+ *  - `@page A4` con márgenes 16/18mm para print.
+ *  - `.screen-only` para hints que no se imprimen.
+ */
+import type { CompanyNeed, Profile } from "./types";
+
+// ---------- Tipos públicos ----------
+
+export type CvStyle = "minimalist" | "chronological" | "functional" | "hybrid" | "creative";
+
+export interface CvOptions {
+  email?: string;
+  phone?: string;
+  city?: string;
+  linkedin?: string;
+  languages?: string;
+  education?: string;
+  certifications?: string;
+  headline?: string;
+  /** Si vino un needId, mostramos un badge tailored y reordenamos skills. */
+  needRole?: string;
+  /** Inyecta script de window.print() al cargar. */
+  autoprint: boolean;
+}
+
+export interface CvStyleMeta {
+  id: CvStyle;
+  label: string;
+  /** Tagline corto que va abajo del nombre en el picker. */
+  tagline: string;
+  /** Descripción de 1-2 frases para el tooltip / leyenda. */
+  description: string;
+  /** Compatibilidad ATS de 0 a 5 estrellas (heurística + criterio editorial). */
+  atsScore: 0 | 1 | 2 | 3 | 4 | 5;
+  /** A quién le sirve más este formato. */
+  bestFor: string;
+}
+
+export const CV_STYLES: CvStyleMeta[] = [
+  {
+    id: "minimalist",
+    label: "ATS minimalista",
+    tagline: "Una columna, máximo parseable",
+    description:
+      "El formato más seguro para portales tipo Computrabajo, Greenhouse, Workday. Una sola columna, sin gráficos, headings estándar. Default seguro.",
+    atsScore: 5,
+    bestFor: "Postulaciones a empresas grandes o portales con ATS automático.",
+  },
+  {
+    id: "hybrid",
+    label: "Híbrido / Combinado",
+    tagline: "Skills + logros por competencia",
+    description:
+      "Lo mejor de los dos mundos: resumen de habilidades arriba, logros agrupados por competencia debajo. Recomendado para Salto: usa la evidencia citada como puntos fuertes.",
+    atsScore: 5,
+    bestFor: "Recomendado para perfiles junior con evidencia rica.",
+  },
+  {
+    id: "functional",
+    label: "Funcional",
+    tagline: "Agrupado por competencia, sin fechas",
+    description:
+      "Tu evidencia laboral se ordena por habilidad, no por timeline. Ideal cuando tu trayectoria es informal y querés que cada skill brille con sus logros.",
+    atsScore: 4,
+    bestFor: "Junior sin historial cronológico formal; cambios de carrera.",
+  },
+  {
+    id: "chronological",
+    label: "Cronológico",
+    tagline: "Experiencia con fechas, formato clásico",
+    description:
+      "El formato corporativo estándar: experiencia en orden reverso con períodos. Útil si tenés educación/cursos con fechas concretas para mostrar.",
+    atsScore: 5,
+    bestFor: "Postulaciones a roles corporativos o sectores tradicionales.",
+  },
+  {
+    id: "creative",
+    label: "Creativo / Diseño",
+    tagline: "Dos columnas, color y tipografía",
+    description:
+      "Layout visual con sidebar, acentos en color emerald y tipografía grande. Genial para roles de diseño / marketing / contenido. Aviso: NO pasa ciertos ATS estrictos.",
+    atsScore: 2,
+    bestFor: "Roles creativos donde el portfolio importa más que el ATS.",
+  },
+];
+
+export function isCvStyle(s: string): s is CvStyle {
+  return CV_STYLES.some((m) => m.id === s);
+}
+
+// ---------- Helpers comunes ----------
+
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalize(s: string): string {
+  return s.toLowerCase().trim();
+}
+
+export function tailorToNeed(profile: Profile, need: CompanyNeed): Profile {
+  const reqNorm = need.requiredSkills.map(normalize);
+  const traitNorm = need.desiredTraits.map(normalize);
+
+  const matchesSkill = (s: string) => {
+    const n = normalize(s);
+    return reqNorm.some((r) => n.includes(r) || r.includes(n));
+  };
+  const matchesTrait = (t: string) => {
+    const n = normalize(t);
+    return traitNorm.some((r) => n.includes(r) || r.includes(n));
+  };
+
+  return {
+    ...profile,
+    skills: [
+      ...profile.skills.filter(matchesSkill),
+      ...profile.skills.filter((s) => !matchesSkill(s)),
+    ],
+    traits: [
+      ...profile.traits.filter(matchesTrait),
+      ...profile.traits.filter((t) => !matchesTrait(t)),
+    ],
+    evidence: [
+      ...profile.evidence.filter((e) => matchesSkill(e.skill)),
+      ...profile.evidence.filter((e) => !matchesSkill(e.skill)),
+    ],
+  };
+}
+
+export function deriveHeadline(p: Profile, override?: string): string {
+  if (override && override.trim()) return override.trim();
+  return p.skills.slice(0, 3).join(" · ") || "Candidato/a — primer empleo formal";
+}
+
+function buildContactLine(opts: CvOptions): { html: string; hasContact: boolean } {
+  const parts: string[] = [];
+  if (opts.email) parts.push(escapeHtml(opts.email));
+  if (opts.phone) parts.push(escapeHtml(opts.phone));
+  if (opts.city) parts.push(escapeHtml(opts.city));
+  if (opts.linkedin) parts.push(escapeHtml(opts.linkedin));
+  if (parts.length > 0) {
+    return { html: `<p class="contact">${parts.join(" · ")}</p>`, hasContact: true };
+  }
+  return {
+    html: `<p class="contact placeholder">[Email] · [Teléfono] · [Ciudad] · [LinkedIn]</p>
+<p class="screen-only contact-hint">Completá tus datos de contacto antes de enviar. Volvé al perfil para pasarlos como parámetros o editá el PDF luego de imprimir.</p>`,
+    hasContact: false,
+  };
+}
+
+function buildLanguagesList(opts: CvOptions): string[] {
+  return (opts.languages?.trim() || "Español (nativo)")
+    .split(/[,\n;]/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+function tailoredBadge(opts: CvOptions): string {
+  return opts.needRole
+    ? `<p class="tailored screen-only">CV adaptado para: <strong>${escapeHtml(opts.needRole)}</strong> · skills relevantes ordenadas al inicio.</p>`
+    : "";
+}
+
+function todayLatamLocale(): string {
+  return new Date().toLocaleDateString("es-CO", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function autoprintScript(opts: CvOptions): string {
+  return opts.autoprint
+    ? `<script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>`
+    : "";
+}
+
+/**
+ * CSS base compartido entre las 4 plantillas ATS-safe (todas menos Creative).
+ * Lo que cambia entre estilos es el LAYOUT y el ORDEN de secciones, no la
+ * tipografía base.
+ */
+const BASE_CSS = `
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+    font-size: 11pt;
+    line-height: 1.45;
+    color: #1a1a1a;
+    background: #f6f6f6;
+  }
+  main {
+    background: white;
+    max-width: 780px;
+    margin: 32px auto;
+    padding: 36px 44px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  }
+  h1 {
+    font-size: 22pt;
+    margin: 0 0 2px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #111;
+  }
+  .headline {
+    font-size: 11pt;
+    color: #444;
+    margin: 0 0 6px;
+    font-weight: 500;
+  }
+  .contact {
+    font-size: 10.5pt;
+    color: #333;
+    margin: 4px 0 0;
+  }
+  .contact.placeholder { color: #999; font-style: italic; }
+  .contact-hint {
+    font-size: 9pt;
+    color: #b45309;
+    margin: 4px 0 0;
+    background: #fef3c7;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid #fde68a;
+  }
+  section { margin-top: 18px; page-break-inside: avoid; break-inside: avoid; }
+  h2 {
+    font-size: 10.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #222;
+    font-weight: 700;
+    color: #111;
+  }
+  h3 {
+    font-size: 11pt;
+    margin: 10px 0 4px;
+    font-weight: 700;
+    color: #111;
+  }
+  .section-note { font-size: 9.5pt; color: #555; margin: 0 0 6px; font-style: italic; }
+  ul { margin: 4px 0 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .skills-list, .traits-list, .languages-list {
+    columns: 2;
+    column-gap: 28px;
+    padding-left: 18px;
+  }
+  .experience-list li { margin-bottom: 8px; }
+  .experience-list li strong { color: #111; }
+  .entry { margin-bottom: 10px; }
+  .entry .meta { font-size: 9.5pt; color: #555; margin: 0 0 2px; }
+  .entry .role { font-weight: 700; font-size: 11pt; margin: 0 0 2px; }
+  p.freeform { margin: 0; }
+  .tailored {
+    margin: 6px 0 12px;
+    font-size: 9.5pt;
+    color: #065f46;
+    background: #d1fae5;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid #6ee7b7;
+  }
+  .doc-footer {
+    margin-top: 28px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    font-size: 8.5pt;
+    color: #666;
+    line-height: 1.4;
+  }
+  @page { size: A4; margin: 16mm 18mm; }
+  @media print {
+    body { background: white; }
+    main { max-width: none; margin: 0; padding: 0; box-shadow: none; }
+    .screen-only { display: none !important; }
+    .skills-list, .traits-list, .languages-list { columns: 1; }
+    a { color: inherit; text-decoration: none; }
+  }
+`;
+
+// ---------- Bloques reutilizables (devuelven strings HTML) ----------
+
+function summaryBlock(p: Profile): string {
+  return p.summary
+    ? `<section><h2>Perfil profesional</h2><p>${escapeHtml(p.summary)}</p></section>`
+    : "";
+}
+
+function skillsBlock(p: Profile, heading = "Competencias clave"): string {
+  if (p.skills.length === 0) return "";
+  const items = p.skills.map((s) => `    <li>${escapeHtml(s)}</li>`).join("\n");
+  return `<section>
+  <h2>${heading}</h2>
+  <ul class="skills-list">
+${items}
+  </ul>
+</section>`;
+}
+
+function traitsBlock(p: Profile): string {
+  if (p.traits.length === 0) return "";
+  const items = p.traits.map((t) => `    <li>${escapeHtml(t)}</li>`).join("\n");
+  return `<section>
+  <h2>Rasgos profesionales</h2>
+  <ul class="traits-list">
+${items}
+  </ul>
+</section>`;
+}
+
+function evidenceListBlock(p: Profile, heading = "Experiencia y logros"): string {
+  if (p.evidence.length === 0) return "";
+  const items = p.evidence
+    .map(
+      (e) =>
+        `    <li><strong>${escapeHtml(e.skill)}.</strong> ${escapeHtml(e.quote)}</li>`
+    )
+    .join("\n");
+  return `<section>
+  <h2>${heading}</h2>
+  <p class="section-note">Trayectoria informal y proyectos personales · evidencia verificada por Salto IA.</p>
+  <ul class="experience-list">
+${items}
+  </ul>
+</section>`;
+}
+
+/**
+ * Logros agrupados por habilidad. Cada `<h3>` es una skill, los bullets son
+ * sus quotes. Si una skill no tiene evidencia citada, no aparece (no inventamos).
+ */
+function evidenceByCompetencyBlock(p: Profile): string {
+  if (p.evidence.length === 0) return "";
+  // Agrupamos por skill conservando el orden de p.skills (después de tailor)
+  const grouped = new Map<string, string[]>();
+  for (const e of p.evidence) {
+    if (!grouped.has(e.skill)) grouped.set(e.skill, []);
+    grouped.get(e.skill)!.push(e.quote);
+  }
+  const order = p.skills.filter((s) => grouped.has(s));
+  // Edge case: si la evidencia tiene skills que no están en p.skills, las
+  // agregamos al final para no perderlas.
+  for (const key of grouped.keys()) if (!order.includes(key)) order.push(key);
+
+  const blocks = order
+    .map((skill) => {
+      const quotes = grouped.get(skill)!;
+      const items = quotes.map((q) => `    <li>${escapeHtml(q)}</li>`).join("\n");
+      return `  <div class="entry">
+    <h3>${escapeHtml(skill)}</h3>
+    <ul>
+${items}
+    </ul>
+  </div>`;
+    })
+    .join("\n");
+
+  return `<section>
+  <h2>Logros por competencia</h2>
+  <p class="section-note">Cada competencia anclada a evidencia citada de la entrevista.</p>
+${blocks}
+</section>`;
+}
+
+function educationBlock(opts: CvOptions): string {
+  if (!opts.education?.trim()) return "";
+  return `<section>
+  <h2>Educación</h2>
+  <p class="freeform">${escapeHtml(opts.education).replace(/\n/g, "<br />")}</p>
+</section>`;
+}
+
+function certificationsBlock(opts: CvOptions): string {
+  if (!opts.certifications?.trim()) return "";
+  return `<section>
+  <h2>Certificaciones y cursos</h2>
+  <p class="freeform">${escapeHtml(opts.certifications).replace(/\n/g, "<br />")}</p>
+</section>`;
+}
+
+function languagesBlock(opts: CvOptions): string {
+  const langs = buildLanguagesList(opts);
+  const items = langs.map((l) => `    <li>${escapeHtml(l)}</li>`).join("\n");
+  return `<section>
+  <h2>Idiomas</h2>
+  <ul class="languages-list">
+${items}
+  </ul>
+</section>`;
+}
+
+function docFooter(): string {
+  return `<p class="doc-footer">
+    Documento generado por <strong>Salto</strong> a partir del Perfil de Evidencia · cada habilidad listada está anclada a una cita de la entrevista conversacional · ${todayLatamLocale()}.
+  </p>`;
+}
+
+function htmlShell(args: {
+  name: string;
+  styleId: CvStyle;
+  bodyClass?: string;
+  customCss?: string;
+  inner: string;
+  autoprint: boolean;
+  profileIdMeta?: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>CV — ${args.name}</title>
+<meta name="generator" content="Salto · Perfil de Evidencia · ${args.styleId}" />
+<meta name="cv-style" content="${args.styleId}" />
+<meta name="profile-id" content="${escapeHtml(args.profileIdMeta || "")}" />
+<style>
+${BASE_CSS}
+${args.customCss ?? ""}
+</style>
+</head>
+<body${args.bodyClass ? ` class="${args.bodyClass}"` : ""}>
+${args.inner}
+${autoprintScript({ autoprint: args.autoprint } as CvOptions)}
+</body>
+</html>`;
+}
+
+function header(p: Profile, opts: CvOptions): string {
+  const { html: contactHtml } = buildContactLine(opts);
+  return `  <header>
+    <h1>${escapeHtml(p.name || "Candidato/a Salto")}</h1>
+    <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
+    ${contactHtml}
+  </header>`;
+}
+
+// ---------- 1. Minimalist (ATS-friendly, default) ----------
+
+function renderMinimalist(p: Profile, opts: CvOptions): string {
+  const inner = `<main>
+${header(p, opts)}
+  ${tailoredBadge(opts)}
+  ${summaryBlock(p)}
+  ${skillsBlock(p)}
+  ${evidenceListBlock(p)}
+  ${traitsBlock(p)}
+  ${educationBlock(opts)}
+  ${certificationsBlock(opts)}
+  ${languagesBlock(opts)}
+  ${docFooter()}
+</main>`;
+  return htmlShell({
+    name: p.name,
+    styleId: "minimalist",
+    inner,
+    autoprint: opts.autoprint,
+    profileIdMeta: p.id,
+  });
+}
+
+// ---------- 2. Chronological (clásico corporativo) ----------
+
+function renderChronological(p: Profile, opts: CvOptions): string {
+  // En chrono "real" iría por años. Sin fechas formales, el bloque de
+  // experiencia se muestra como "Trayectoria reciente" con cada evidencia
+  // como entrada. Educación lista textual de opts (donde sí hay fechas).
+  const evidenceEntries =
+    p.evidence.length > 0
+      ? `<section>
+  <h2>Experiencia y trayectoria</h2>
+  <p class="section-note">Trayectoria informal y proyectos personales — orden por relevancia. Evidencia verificada por Salto IA.</p>
+${p.evidence
+  .map(
+    (e) => `  <div class="entry">
+    <p class="meta">Reciente · trayectoria informal</p>
+    <p class="role">${escapeHtml(e.skill)}</p>
+    <p>${escapeHtml(e.quote)}</p>
+  </div>`
+  )
+  .join("\n")}
+</section>`
+      : "";
+
+  const inner = `<main>
+${header(p, opts)}
+  ${tailoredBadge(opts)}
+  ${summaryBlock(p)}
+  ${evidenceEntries}
+  ${educationBlock(opts)}
+  ${certificationsBlock(opts)}
+  ${skillsBlock(p, "Habilidades")}
+  ${traitsBlock(p)}
+  ${languagesBlock(opts)}
+  ${docFooter()}
+</main>`;
+  return htmlShell({
+    name: p.name,
+    styleId: "chronological",
+    inner,
+    autoprint: opts.autoprint,
+    profileIdMeta: p.id,
+  });
+}
+
+// ---------- 3. Functional (por competencia) ----------
+
+function renderFunctional(p: Profile, opts: CvOptions): string {
+  const inner = `<main>
+${header(p, opts)}
+  ${tailoredBadge(opts)}
+  ${summaryBlock(p)}
+  ${evidenceByCompetencyBlock(p)}
+  ${traitsBlock(p)}
+  ${educationBlock(opts)}
+  ${certificationsBlock(opts)}
+  ${languagesBlock(opts)}
+  ${docFooter()}
+</main>`;
+  return htmlShell({
+    name: p.name,
+    styleId: "functional",
+    inner,
+    autoprint: opts.autoprint,
+    profileIdMeta: p.id,
+  });
+}
+
+// ---------- 4. Hybrid (lo recomendado) ----------
+
+function renderHybrid(p: Profile, opts: CvOptions): string {
+  const inner = `<main>
+${header(p, opts)}
+  ${tailoredBadge(opts)}
+  ${summaryBlock(p)}
+  ${skillsBlock(p, "Competencias destacadas")}
+  ${evidenceByCompetencyBlock(p)}
+  ${traitsBlock(p)}
+  ${educationBlock(opts)}
+  ${certificationsBlock(opts)}
+  ${languagesBlock(opts)}
+  ${docFooter()}
+</main>`;
+  return htmlShell({
+    name: p.name,
+    styleId: "hybrid",
+    inner,
+    autoprint: opts.autoprint,
+    profileIdMeta: p.id,
+  });
+}
+
+// ---------- 5. Creative / Diseño ----------
+
+/**
+ * Layout 2 columnas con sidebar emerald. Está **explícitamente NO recomendado**
+ * para portales ATS estrictos. El propio documento incluye un aviso visible
+ * solo en pantalla (no en print) para que el joven sepa el trade-off.
+ *
+ * Para minimizar el daño ATS, ordenamos el DOM de forma que el bloque MAIN
+ * vaya ANTES del SIDEBAR — los parsers leen el orden del HTML, no el visual.
+ * Así, aunque parezca 2 columnas, el contenido fluye en el orden correcto
+ * para los ATS que sí lo intentan.
+ */
+function renderCreative(p: Profile, opts: CvOptions): string {
+  const initials = (p.name || "?")
+    .split(" ")
+    .map((s) => s[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const { html: contactHtml } = buildContactLine(opts);
+  const langs = buildLanguagesList(opts);
+
+  const css = `
+    body { background: #f0fdf4; }
+    main.creative {
+      background: white;
+      max-width: 880px;
+      margin: 28px auto;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 0;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 6px 30px rgba(5, 95, 70, 0.08);
+    }
+    aside.creative-side {
+      background: linear-gradient(180deg, #064e3b 0%, #065f46 100%);
+      color: white;
+      padding: 36px 28px;
+    }
+    aside.creative-side h2 {
+      color: #d1fae5;
+      border-bottom-color: #10b981;
+      margin-top: 22px;
+    }
+    aside.creative-side h2:first-of-type { margin-top: 0; }
+    aside.creative-side ul, aside.creative-side p { color: #ecfdf5; }
+    aside.creative-side .skills-list,
+    aside.creative-side .traits-list,
+    aside.creative-side .languages-list { columns: 1; padding-left: 18px; }
+    .avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      background: white;
+      color: #065f46;
+      font-size: 38pt;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      letter-spacing: -0.02em;
+    }
+    aside.creative-side .contact { color: #ecfdf5; font-size: 10pt; word-break: break-word; }
+    aside.creative-side .contact.placeholder { color: #6ee7b7; }
+    .creative-main { padding: 40px 36px; }
+    .creative-main h1 {
+      font-size: 26pt;
+      color: #064e3b;
+      letter-spacing: -0.02em;
+    }
+    .creative-main .headline {
+      color: #065f46;
+      font-weight: 600;
+      font-size: 12pt;
+    }
+    .creative-main h2 {
+      color: #064e3b;
+      border-bottom-color: #10b981;
+    }
+    .creative-main h3 { color: #065f46; }
+    .creative-warning {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #78350f;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 9.5pt;
+      margin: 10px 0;
+      line-height: 1.4;
+    }
+    @media print {
+      body { background: white; }
+      main.creative {
+        max-width: none;
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+        grid-template-columns: 240px 1fr;
+      }
+      aside.creative-side { background: #065f46 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .creative-warning, .screen-only { display: none !important; }
+    }
+  `;
+
+  // El <main> va PRIMERO en el orden del DOM para que ATS lean el contenido
+  // central antes del sidebar. CSS Grid sigue mostrándolos lado a lado.
+  const inner = `<main class="creative">
+  <section class="creative-main" style="grid-column: 2;">
+    <header>
+      <h1>${escapeHtml(p.name || "Candidato/a Salto")}</h1>
+      <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
+    </header>
+    ${tailoredBadge(opts)}
+    <p class="creative-warning screen-only">
+      <strong>Aviso:</strong> este formato es visualmente atractivo pero <strong>NO pasa todos los ATS estrictos</strong> (algunos rompen al ver layouts de 2 columnas). Usalo para roles creativos / diseño / marketing. Para postulaciones corporativas, elegí "ATS minimalista" o "Híbrido".
+    </p>
+    ${summaryBlock(p)}
+    ${evidenceByCompetencyBlock(p)}
+    ${educationBlock(opts)}
+    ${certificationsBlock(opts)}
+    ${docFooter()}
+  </section>
+  <aside class="creative-side" style="grid-column: 1; grid-row: 1;">
+    <div class="avatar">${escapeHtml(initials)}</div>
+    <h2>Contacto</h2>
+    ${contactHtml}
+    ${
+      p.skills.length > 0
+        ? `<h2>Habilidades</h2><ul class="skills-list">${p.skills
+            .map((s) => `<li>${escapeHtml(s)}</li>`)
+            .join("")}</ul>`
+        : ""
+    }
+    ${
+      p.traits.length > 0
+        ? `<h2>Rasgos</h2><ul class="traits-list">${p.traits
+            .map((t) => `<li>${escapeHtml(t)}</li>`)
+            .join("")}</ul>`
+        : ""
+    }
+    <h2>Idiomas</h2>
+    <ul class="languages-list">${langs.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>
+  </aside>
+</main>`;
+
+  return htmlShell({
+    name: p.name,
+    styleId: "creative",
+    customCss: css,
+    inner,
+    autoprint: opts.autoprint,
+    profileIdMeta: p.id,
+  });
+}
+
+// ---------- Dispatcher ----------
+
+export function renderCv(profile: Profile, style: CvStyle, opts: CvOptions): string {
+  switch (style) {
+    case "chronological":
+      return renderChronological(profile, opts);
+    case "functional":
+      return renderFunctional(profile, opts);
+    case "hybrid":
+      return renderHybrid(profile, opts);
+    case "creative":
+      return renderCreative(profile, opts);
+    case "minimalist":
+    default:
+      return renderMinimalist(profile, opts);
+  }
+}
+
+/**
+ * Versión plain-text, alineada al estilo elegido. Para campos "Pegá tu CV"
+ * de ATS legacy (Computrabajo / OCC / Bumeran). El estilo afecta el ORDEN
+ * de las secciones, no el rendering en sí (todo es texto).
+ */
+export function renderPlainText(profile: Profile, style: CvStyle, opts: CvOptions): string {
+  const lines: string[] = [];
+  lines.push(profile.name);
+  lines.push(deriveHeadline(profile, opts.headline));
+  const contact = [opts.email, opts.phone, opts.city, opts.linkedin].filter(Boolean);
+  if (contact.length > 0) lines.push(contact.join(" · "));
+  lines.push("");
+
+  const pushSummary = () => {
+    if (profile.summary) {
+      lines.push("PERFIL PROFESIONAL");
+      lines.push(profile.summary);
+      lines.push("");
+    }
+  };
+  const pushSkills = (heading = "COMPETENCIAS CLAVE") => {
+    if (profile.skills.length > 0) {
+      lines.push(heading);
+      profile.skills.forEach((s) => lines.push(`- ${s}`));
+      lines.push("");
+    }
+  };
+  const pushEvidenceFlat = () => {
+    if (profile.evidence.length > 0) {
+      lines.push("EXPERIENCIA Y LOGROS");
+      profile.evidence.forEach((e) => lines.push(`- ${e.skill}. ${e.quote}`));
+      lines.push("");
+    }
+  };
+  const pushEvidenceGrouped = () => {
+    if (profile.evidence.length === 0) return;
+    lines.push("LOGROS POR COMPETENCIA");
+    const grouped = new Map<string, string[]>();
+    for (const e of profile.evidence) {
+      if (!grouped.has(e.skill)) grouped.set(e.skill, []);
+      grouped.get(e.skill)!.push(e.quote);
+    }
+    for (const [skill, quotes] of grouped) {
+      lines.push(`-- ${skill}`);
+      quotes.forEach((q) => lines.push(`   • ${q}`));
+    }
+    lines.push("");
+  };
+  const pushTraits = () => {
+    if (profile.traits.length > 0) {
+      lines.push("RASGOS PROFESIONALES");
+      profile.traits.forEach((t) => lines.push(`- ${t}`));
+      lines.push("");
+    }
+  };
+  const pushEducation = () => {
+    if (opts.education?.trim()) {
+      lines.push("EDUCACIÓN");
+      lines.push(opts.education.trim());
+      lines.push("");
+    }
+  };
+  const pushCerts = () => {
+    if (opts.certifications?.trim()) {
+      lines.push("CERTIFICACIONES Y CURSOS");
+      lines.push(opts.certifications.trim());
+      lines.push("");
+    }
+  };
+  const pushLanguages = () => {
+    lines.push("IDIOMAS");
+    buildLanguagesList(opts).forEach((l) => lines.push(`- ${l}`));
+  };
+
+  switch (style) {
+    case "chronological":
+      pushSummary();
+      pushEvidenceFlat();
+      pushEducation();
+      pushCerts();
+      pushSkills("HABILIDADES");
+      pushTraits();
+      pushLanguages();
+      break;
+    case "functional":
+      pushSummary();
+      pushEvidenceGrouped();
+      pushTraits();
+      pushEducation();
+      pushCerts();
+      pushLanguages();
+      break;
+    case "hybrid":
+      pushSummary();
+      pushSkills("COMPETENCIAS DESTACADAS");
+      pushEvidenceGrouped();
+      pushTraits();
+      pushEducation();
+      pushCerts();
+      pushLanguages();
+      break;
+    case "creative":
+    case "minimalist":
+    default:
+      pushSummary();
+      pushSkills();
+      pushEvidenceFlat();
+      pushTraits();
+      pushEducation();
+      pushCerts();
+      pushLanguages();
+      break;
+  }
+
+  return lines.join("\n").trim();
+}

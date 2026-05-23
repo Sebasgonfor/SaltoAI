@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
+import { RoleCTA } from '@/components/auth/role-cta';
 import { ArrowRight, Sparkles, MessageSquareQuote, Layers, Network } from 'lucide-react';
 
 export default function LandingPage() {
@@ -19,12 +20,17 @@ export default function LandingPage() {
           <Link href="#flujo" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">Cómo funciona</Link>
           <Link href="#ia" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">La IA</Link>
           <div className="h-5 w-px bg-slate-200 mx-2" />
-          <Link href="/joven/chat">
-            <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">Soy joven</Button>
-          </Link>
-          <Link href="/empresa/publicar">
-            <Button size="sm">Soy empresa</Button>
-          </Link>
+          <RoleCTA
+            role="joven"
+            href="/joven/chat"
+            variant="outline"
+            className="h-9 px-3 text-sm border-0 bg-transparent text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+          >
+            Soy joven
+          </RoleCTA>
+          <RoleCTA role="empresa" href="/empresa/chat" className="h-9 px-3 text-sm">
+            Soy empresa
+          </RoleCTA>
           <div className="h-5 w-px bg-slate-200 mx-2" />
           <UserButton />
         </nav>
@@ -50,24 +56,29 @@ export default function LandingPage() {
                 </p>
 
                 <div className="mt-12 flex flex-col sm:flex-row gap-3">
-                  <Link href="/joven/chat" className="group">
-                    <Button size="lg" className="h-14 px-7 text-base bg-slate-900 hover:bg-slate-800 gap-3 group-hover:gap-4 transition-all">
-                      <div className="text-left">
-                        <div className="font-semibold">Quiero mi primera oportunidad</div>
-                        <div className="text-xs font-normal text-slate-400">Cuenta tu historia · 5 minutos</div>
-                      </div>
-                      <ArrowRight size={18} />
-                    </Button>
-                  </Link>
-                  <Link href="/empresa/publicar" className="group">
-                    <Button size="lg" variant="outline" className="h-14 px-7 text-base border-2 border-emerald-500 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-50 gap-3 group-hover:gap-4 transition-all">
-                      <div className="text-left">
-                        <div className="font-semibold">Necesito talento junior</div>
-                        <div className="text-xs font-normal text-emerald-700/70">3 candidatos · no 200 CVs</div>
-                      </div>
-                      <ArrowRight size={18} />
-                    </Button>
-                  </Link>
+                  <RoleCTA
+                    role="joven"
+                    href="/joven/chat"
+                    className="h-14 px-7 text-base bg-slate-900 hover:bg-slate-800 gap-3 transition-all"
+                  >
+                    <div className="text-left">
+                      <div className="font-semibold">Quiero mi primera oportunidad</div>
+                      <div className="text-xs font-normal text-slate-400">Cuenta tu historia · 5 minutos</div>
+                    </div>
+                    <ArrowRight size={18} />
+                  </RoleCTA>
+                  <RoleCTA
+                    role="empresa"
+                    href="/empresa/chat"
+                    variant="outline"
+                    className="h-14 px-7 text-base border-2 border-emerald-500 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-50 gap-3 transition-all"
+                  >
+                    <div className="text-left">
+                      <div className="font-semibold">Necesito talento junior</div>
+                      <div className="text-xs font-normal text-emerald-700/70">3 candidatos · no 200 CVs</div>
+                    </div>
+                    <ArrowRight size={18} />
+                  </RoleCTA>
                 </div>
 
                 <div className="mt-14 flex items-center gap-6 text-sm text-slate-500">
@@ -316,16 +327,21 @@ export default function LandingPage() {
               El primer empleo no debería depender de un CV que aún no puedes tener. Salto hace que dependa de tu potencial.
             </p>
             <div className="mt-12 flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/joven/chat">
-                <Button size="lg" className="h-14 px-8 text-base bg-white text-slate-900 hover:bg-slate-100 gap-3">
-                  Empezar mi entrevista <ArrowRight size={18} />
-                </Button>
-              </Link>
-              <Link href="/empresa/publicar">
-                <Button size="lg" variant="outline" className="h-14 px-8 text-base bg-transparent border-2 border-emerald-400/40 text-emerald-50 hover:bg-emerald-900/40 hover:border-emerald-400 gap-3">
-                  Publicar mi necesidad <ArrowRight size={18} />
-                </Button>
-              </Link>
+              <RoleCTA
+                role="joven"
+                href="/joven/chat"
+                className="h-14 px-8 text-base bg-white text-slate-900 hover:bg-slate-100 gap-3"
+              >
+                Empezar mi entrevista <ArrowRight size={18} />
+              </RoleCTA>
+              <RoleCTA
+                role="empresa"
+                href="/empresa/chat"
+                variant="outline"
+                className="h-14 px-8 text-base bg-transparent border-2 border-emerald-400/40 text-emerald-50 hover:bg-emerald-900/40 hover:border-emerald-400 gap-3"
+              >
+                Publicar mi necesidad <ArrowRight size={18} />
+              </RoleCTA>
             </div>
           </div>
         </section>
