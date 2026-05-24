@@ -447,11 +447,11 @@ export default function ChatEmpresa() {
             />
             <span className="text-sm text-slate-700 leading-relaxed">
               Declaro que tengo facultad para contratar en nombre de la empresa y acepto los{' '}
-              <Link href="/legal/terminos" className="text-emerald-700 underline">
+              <Link href="/legal/terminos" className="text-emerald-700 underline" target="_blank" rel="noopener noreferrer">
                 Términos de uso
               </Link>{' '}
               y la{' '}
-              <Link href="/legal/privacidad" className="text-emerald-700 underline">
+              <Link href="/legal/privacidad" className="text-emerald-700 underline" target="_blank" rel="noopener noreferrer">
                 Política de Privacidad
               </Link>{' '}
               de Salto, incluyendo el tratamiento de datos personales de candidatos.
