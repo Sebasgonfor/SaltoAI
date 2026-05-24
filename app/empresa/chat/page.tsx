@@ -29,6 +29,14 @@ import type { ChatMessage } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { useLiveInterview } from '@/hooks/use-live-interview';
 import { CLOSING_MESSAGE_EMPRESA } from '@/lib/interview-prompt';
+import {
+  validateCompanyName,
+  validateTaxId,
+  validatePersonName,
+  validateDocId,
+  type DocType,
+  DOC_TYPE_LABELS,
+} from '@/lib/input-validation';
 
 const MAX_TURNS = 6;
 
@@ -71,6 +79,7 @@ interface CompanyLegal {
   taxId: string;
   legalRepName: string;
   legalRepDocId: string;
+  legalRepDocType: DocType;
   acceptedTerms: boolean;
   acceptedAt: string;
 }
@@ -82,6 +91,8 @@ interface ChatPersistedState {
   messages: ChatMessage[];
   input: string;
 }
+
+// Eliminar validaciones locales — ahora viven en lib/input-validation.ts
 
 function storageKey(uid: string | null | undefined): string {
   return `salto_empresa_chat_${uid || 'anon'}`;
@@ -121,21 +132,6 @@ function buildOpeningMessage(name: string): ChatMessage {
   };
 }
 
-// Validaciones mínimas, no estrictas por jurisdicción. El backend valida el
-// resto. Apuntamos a frenar envíos vacíos / obviamente falsos, sin bloquear
-// formatos válidos de CO/ES/MX/etc.
-function validateTaxId(v: string): string | null {
-  const trimmed = v.trim();
-  if (trimmed.length < 6) return 'El identificador fiscal parece muy corto.';
-  if (!/[0-9]/.test(trimmed)) return 'El identificador fiscal debe tener al menos un número.';
-  return null;
-}
-
-function validateDocId(v: string): string | null {
-  const trimmed = v.trim();
-  if (trimmed.length < 5) return 'El documento del representante parece muy corto.';
-  return null;
-}
 
 export default function ChatEmpresa() {
   const router = useRouter();
@@ -148,6 +144,7 @@ export default function ChatEmpresa() {
     taxId: '',
     legalRepName: '',
     legalRepDocId: '',
+    legalRepDocType: 'CC',
     acceptedTerms: false,
   });
   const [formError, setFormError] = useState<string | null>(null);
@@ -212,35 +209,33 @@ export default function ChatEmpresa() {
   };
 
   const startInterview = () => {
-    const name = form.companyName.trim();
-    const repName = form.legalRepName.trim();
-    if (name.length < 2) {
-      setFormError('Escribe la razón social o nombre comercial de la empresa.');
-      return;
-    }
+    const companyErr = validateCompanyName(form.companyName);
+    if (companyErr) { setFormError(companyErr); return; }
+
     const taxErr = validateTaxId(form.taxId);
-    if (taxErr) {
-      setFormError(taxErr);
-      return;
-    }
-    if (repName.length < 2) {
-      setFormError('Escribe el nombre completo del representante legal.');
-      return;
-    }
-    const docErr = validateDocId(form.legalRepDocId);
-    if (docErr) {
-      setFormError(docErr);
-      return;
-    }
+    if (taxErr) { setFormError(taxErr); return; }
+
+    const repErr = validatePersonName(form.legalRepName, {
+      requireFullName: true,
+      fieldLabel: 'El nombre del representante',
+    });
+    if (repErr) { setFormError(repErr); return; }
+
+    const docErr = validateDocId(form.legalRepDocId, form.legalRepDocType);
+    if (docErr) { setFormError(docErr); return; }
+
     if (!form.acceptedTerms) {
       setFormError('Tienes que aceptar los Términos y la Política de Privacidad para continuar.');
       return;
     }
+
+    const repName = form.legalRepName.trim();
     const legalRecord: CompanyLegal = {
-      companyName: name,
+      companyName: form.companyName.trim(),
       taxId: form.taxId.trim(),
       legalRepName: repName,
       legalRepDocId: form.legalRepDocId.trim(),
+      legalRepDocType: form.legalRepDocType,
       acceptedTerms: true,
       acceptedAt: new Date().toISOString(),
     };
@@ -459,13 +454,29 @@ export default function ChatEmpresa() {
                 <label className="block text-sm font-semibold text-slate-900 mb-2">
                   Documento de identidad
                 </label>
-                <Input
-                  placeholder="Ej. C.C. 1.001.234.567"
-                  value={form.legalRepDocId}
-                  onChange={(e) => setForm({ ...form, legalRepDocId: e.target.value })}
-                  className="h-12 text-base"
-                  autoComplete="off"
-                />
+                <div className="flex gap-2">
+                  <select
+                    value={form.legalRepDocType}
+                    onChange={(e) => setForm({ ...form, legalRepDocType: e.target.value as DocType })}
+                    className="h-11 sm:h-12 text-sm rounded-xl border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-shrink-0"
+                  >
+                    {(Object.entries(DOC_TYPE_LABELS) as [DocType, string][]).map(([k, v]) => (
+                      <option key={k} value={k}>{k} — {v}</option>
+                    ))}
+                  </select>
+                  <Input
+                    placeholder={
+                      form.legalRepDocType === 'CC' ? 'Ej. 1001234567' :
+                      form.legalRepDocType === 'CE' ? 'Ej. E123456' :
+                      form.legalRepDocType === 'PPN' ? 'Ej. AB123456' :
+                      'Ej. 900123456'
+                    }
+                    value={form.legalRepDocId}
+                    onChange={(e) => setForm({ ...form, legalRepDocId: e.target.value })}
+                    className="h-11 sm:h-12 text-sm sm:text-base flex-1"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -945,6 +956,44 @@ export default function ChatEmpresa() {
               </div>
             </div>
           </div>
+
+          {/* Escape hatch: cuando los slots están cubiertos pero el backend
+              aún exige MIN_USER_TURNS, el agente dice "voy a estructurar..."
+              pero el flow no avanza (done=false). El founder ve el mensaje
+              de cierre del agente y se queda esperando.
+              Este botón le da control: si los slots están cubiertos, puede
+              forzar la generación manual. Aparece cuando:
+                · detected.size >= 4 (4 de 5 slots — suficiente contexto)
+                · userTurns >= 1
+                · sesión legal completa
+                · no estamos cerrando o loading. */}
+          {detected.size >= 4 && userTurns >= 1 && legal && !closing && !loading && (
+            <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-2xl p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Sparkles size={14} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-emerald-900 leading-relaxed">
+                  Ya tengo {detected.size}/{SLOTS.length} señales y{' '}
+                  <strong>{wordsCount} palabras</strong> de contexto. Si querés
+                  cerrar acá y ver candidatos, generá la necesidad ahora.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => {
+                  // Si estábamos en modo voz, desconectamos primero para
+                  // que el hook no siga capturando audio cuando la página
+                  // navegue a /empresa/matches.
+                  if (interviewMode === 'voice' && live.isActive) {
+                    disconnectLiveRef.current?.();
+                  }
+                  void finalizeNeed(displayMessages);
+                }}
+              >
+                <Sparkles size={14} /> Estructurar y ver candidatos
+              </Button>
+            </div>
+          )}
 
           <div className="bg-white border border-slate-200 rounded-2xl p-4 flex gap-3">
             <FileText size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
