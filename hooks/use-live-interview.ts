@@ -42,6 +42,20 @@ export function useLiveInterview(options: {
   closingKeywords?: string[];
   /** Message sent to the model to force-close after MAX_USER_TURNS. Defaults to joven CLOSING_MESSAGE. */
   closingMessage?: string;
+  /**
+   * Hard floor de rondas del usuario antes de permitir que el agente
+   * cierre la entrevista (matching de closing keywords). Si el modelo
+   * dice algo de cierre antes de este número, lo IGNORAMOS y la sesión
+   * sigue activa esperando que el user hable más.
+   *
+   * Bug que esto previene: el agente Live de Gemini es no-determinístico
+   * y a veces dice frases tipo "construir tu perfil" después de solo
+   * 2 turnos del user — el closing dispara prematuro, finishInterview
+   * corre con conversation pobre, y el perfil queda con 2 skills / 1
+   * evidencia. Con minUserTurnsBeforeClose=5 (= MIN_USER_TURNS del
+   * sistema), garantizamos los turnos mínimos.
+   */
+  minUserTurnsBeforeClose?: number;
   onInterviewComplete?: (messages: ChatMessage[]) => void;
 }) {
   const [status, setStatus] = useState<LiveInterviewStatus>('idle');
@@ -70,10 +84,12 @@ export function useLiveInterview(options: {
   const onCompleteRef = useRef(options.onInterviewComplete);
   const closingKeywordsRef = useRef(options.closingKeywords);
   const closingMessageRef = useRef(options.closingMessage);
+  const minUserTurnsBeforeCloseRef = useRef(options.minUserTurnsBeforeClose ?? 0);
 
   useEffect(() => { onCompleteRef.current = options.onInterviewComplete; }, [options.onInterviewComplete]);
   useEffect(() => { closingKeywordsRef.current = options.closingKeywords; }, [options.closingKeywords]);
   useEffect(() => { closingMessageRef.current = options.closingMessage; }, [options.closingMessage]);
+  useEffect(() => { minUserTurnsBeforeCloseRef.current = options.minUserTurnsBeforeClose ?? 0; }, [options.minUserTurnsBeforeClose]);
 
   const checkIsClosingMessage = useCallback((text: string): boolean => {
     const keywords = closingKeywordsRef.current;
@@ -150,6 +166,21 @@ export function useLiveInterview(options: {
       setLiveAgentText('');
 
       if (checkIsClosingMessage(text) && !closingHandledRef.current) {
+        // Guard de min turnos: el modelo Live a veces dice frases de cierre
+        // prematuro (Gemini no es determinístico). Si todavía no llegamos
+        // al hard floor configurado, NO disparamos onComplete y NO marcamos
+        // closingHandledRef — la sesión sigue activa, el user puede seguir
+        // hablando, y un futuro turn donde el agente vuelva a decir frase
+        // de cierre POST mínimo, sí cierra.
+        if (userTurnsRef.current < minUserTurnsBeforeCloseRef.current) {
+          if (typeof window !== 'undefined') {
+            // eslint-disable-next-line no-console
+            console.info(
+              `[live] closing keyword detectado prematuro (userTurns=${userTurnsRef.current} < min=${minUserTurnsBeforeCloseRef.current}); ignorando, sigue la entrevista.`,
+            );
+          }
+          return;
+        }
         closingHandledRef.current = true;
         onCompleteRef.current?.(messagesRef.current);
       }
