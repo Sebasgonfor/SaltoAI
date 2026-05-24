@@ -512,6 +512,17 @@ export function useLiveInterview(options: {
     pause,
     resume,
     clearError: () => setError(null),
+    resetMessages: () => {
+      messagesRef.current = [];
+      setMessages([]);
+      userTurnsRef.current = 0;
+      setUserTurns(0);
+      setLiveUserText('');
+      setLiveAgentText('');
+      userTranscriptRef.current = '';
+      agentTranscriptRef.current = '';
+      closingHandledRef.current = false;
+    },
     isPaused: status === 'paused',
     isActive:
       status === 'listening' ||

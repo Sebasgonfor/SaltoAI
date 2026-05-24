@@ -202,7 +202,8 @@ export default function ChatEmpresa() {
       window.confirm('¿Reiniciar la conversación? Se borra la entrevista actual y empiezas de nuevo con los mismos datos de empresa.');
     if (!ok) return;
     live.disconnect();
-    setMessages(legal ? [buildOpeningMessage(form.legalRepName)] : []);
+    live.resetMessages();
+    setMessages([]);
     setInput('');
     setSubmitError(null);
     setLoading(false);
