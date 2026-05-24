@@ -13,6 +13,25 @@ import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
+
+const GEMINI_TIMEOUT_MS = 18_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout:${label}:${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
 
 const MIN_USER_TURNS = 3;
 const MAX_USER_TURNS = 5;
@@ -272,14 +291,29 @@ export async function POST(req: NextRequest) {
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devolvé la SIGUIENTE pregunta (única, dirigida a una señal pendiente, conectada a lo que el joven dijo), o marcá done=true si ya hay 4+ señales cubiertas con detalle.`;
 
-    const response = await gemini().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: userPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+    let response;
+    try {
+      response = await withTimeout(
+        gemini().models.generateContent({
+          model: GEMINI_MODEL,
+          contents: userPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+          },
+        }),
+        GEMINI_TIMEOUT_MS,
+        "gemini.generateContent"
+      );
+    } catch (err) {
+      if ((err as Error)?.message?.startsWith("timeout:")) {
+        log.warn("gemini.timeout", { message: (err as Error).message, userTurns });
+        const resp = fallbackResponse(messages);
+        log.end({ status: 200, extra: { mode: "fallback_timeout", done: resp.done, userTurns } });
+        return NextResponse.json({ ...resp, edge: "gemini_timeout" });
+      }
+      throw err;
+    }
 
     const parsed = JSON.parse(response.text || "{}");
     let done = !!parsed.done;

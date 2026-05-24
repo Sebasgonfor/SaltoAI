@@ -313,12 +313,19 @@ export default function ChatEmpresa() {
     setLoading(true);
     setSubmitError(null);
 
+    // AbortController para que el spinner no quede colgado si el backend
+    // (o Vercel) tarda más del timeout duro de la lambda (30s + margen).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35_000);
+
     try {
       const res = await fetch('/api/entrevista-empresa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       const agentMsg: ChatMessage = {
         role: 'agent',
@@ -332,11 +339,23 @@ export default function ChatEmpresa() {
         await finalizeNeed(updated);
       }
     } catch (err) {
-      console.error(err);
+      clearTimeout(timeoutId);
+      const aborted = (err as Error)?.name === 'AbortError';
+      console.error('entrevista-empresa.error', err);
       setMessages((prev) => [
         ...prev,
-        { role: 'agent', content: 'Tuvimos un problema. ¿Podés contarme otra vez?' },
+        {
+          role: 'agent',
+          content: aborted
+            ? 'Estoy demorando más de la cuenta. Probá enviar la respuesta otra vez en un momento.'
+            : 'Tuvimos un problema. ¿Podés contarme otra vez?',
+        },
       ]);
+      setSubmitError(
+        aborted
+          ? 'El servidor demoró demasiado. Reintentá en unos segundos.'
+          : 'No pudimos contactar al servidor. Revisá tu conexión y reintentá.'
+      );
       setLoading(false);
     }
   };

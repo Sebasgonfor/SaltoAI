@@ -13,6 +13,28 @@ import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
+// Subimos el timeout de la lambda en Vercel. Hobby permite hasta 60s; con 30
+// cubrimos cold-starts de Gemini sin pegarle al techo del plan.
+export const maxDuration = 30;
+
+/** Timeout duro del call a Gemini. Si se excede, caemos al banco de preguntas. */
+const GEMINI_TIMEOUT_MS = 18_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout:${label}:${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
 
 const MIN_USER_TURNS = 4;
 const MAX_USER_TURNS = 7;
@@ -237,14 +259,31 @@ export async function POST(req: NextRequest) {
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devolvé la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marcá done=true si ya hay 5+ slots cubiertos con detalle.`;
 
-    const response = await gemini().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: userPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+    let response;
+    try {
+      response = await withTimeout(
+        gemini().models.generateContent({
+          model: GEMINI_MODEL,
+          contents: userPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+          },
+        }),
+        GEMINI_TIMEOUT_MS,
+        "gemini.generateContent"
+      );
+    } catch (err) {
+      // Si Gemini se cuelga (cold start, sobrecarga), no dejamos colgar al
+      // founder: respondemos con el banco determinístico y seguimos.
+      if ((err as Error)?.message?.startsWith("timeout:")) {
+        log.warn("gemini.timeout", { message: (err as Error).message, userTurns });
+        const resp = fallbackResponse(messages);
+        log.end({ status: 200, extra: { mode: "fallback_timeout", done: resp.done, userTurns } });
+        return NextResponse.json({ ...resp, edge: "gemini_timeout" });
+      }
+      throw err;
+    }
 
     const parsed = JSON.parse(response.text || "{}");
     let done = !!parsed.done;

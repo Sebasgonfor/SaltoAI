@@ -232,6 +232,11 @@ function ChatJoven() {
     setInput('');
     setLoading(true);
 
+    // AbortController para que el spinner no quede colgado si el backend
+    // tarda más del timeout duro de la lambda (30s + margen).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35_000);
+
     try {
       const res = await fetch('/api/entrevista', {
         method: 'POST',
@@ -240,7 +245,9 @@ function ChatJoven() {
           messages: history,
           firstName: firstNameFrom(basics.name),
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       const agentMsg: ChatMessage = {
@@ -286,10 +293,17 @@ function ChatJoven() {
         }
       }
     } catch (err) {
-      console.error(err);
+      clearTimeout(timeoutId);
+      const aborted = (err as Error)?.name === 'AbortError';
+      console.error('entrevista.error', err);
       setMessages((prev) => [
         ...prev,
-        { role: 'agent', content: 'Tuvimos un problema. ¿Puedes contarme otra vez?' },
+        {
+          role: 'agent',
+          content: aborted
+            ? 'Estoy demorando más de la cuenta. Probá enviar la respuesta otra vez en un momento.'
+            : 'Tuvimos un problema. ¿Puedes contarme otra vez?',
+        },
       ]);
       setLoading(false);
     }
