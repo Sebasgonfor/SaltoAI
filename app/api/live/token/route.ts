@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
             responseModalities: [Modality.AUDIO],
             systemInstruction: buildLiveSystemInstruction(firstName || undefined),
             speechConfig: {
-              languageCode: "es-CO",
+              // Native audio Live model only accepts BCP-47 codes it supports (es-CO closes the socket).
+              languageCode: "es-US",
               voiceConfig: {
                 prebuiltVoiceConfig: { voiceName: "Kore" },
               },

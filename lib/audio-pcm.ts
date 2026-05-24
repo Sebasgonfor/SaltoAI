@@ -1,6 +1,16 @@
 export const LIVE_INPUT_SAMPLE_RATE = 16000;
 export const LIVE_OUTPUT_SAMPLE_RATE = 24000;
 
+/** Parse sample rate from Live API mimeType, e.g. "audio/pcm;rate=24000". */
+export function parsePcmSampleRate(mimeType: string, fallback = LIVE_OUTPUT_SAMPLE_RATE): number {
+  const match = mimeType.match(/rate=(\d+)/i);
+  if (match) {
+    const rate = Number(match[1]);
+    if (rate > 0) return rate;
+  }
+  return fallback;
+}
+
 export function resampleFloat32(input: Float32Array, fromRate: number, toRate: number): Float32Array {
   if (fromRate === toRate) return input;
   const ratio = fromRate / toRate;

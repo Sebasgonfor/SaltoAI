@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Sparkles, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio } from 'lucide-react';
+import { Bot, User, Sparkles, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio, Pause, Play } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { RoleGate } from '@/components/auth/role-gate';
@@ -151,6 +151,8 @@ function ChatJoven() {
     error: liveError,
     connect: connectLive,
     disconnect: disconnectLive,
+    pause: pauseLive,
+    resume: resumeLive,
     clearError: clearLiveError,
     isActive: liveActive,
   } = useLiveInterview({
@@ -416,56 +418,28 @@ function ChatJoven() {
     await finishInterview(updated);
   };
 
-  const toggleLiveSession = async () => {
+  const startLiveSession = async () => {
+    if (closing || liveActive || liveStatus === 'connecting') return;
+    clearLiveError();
+    await connectLive();
+  };
+
+  const endLiveSession = () => {
     if (closing) return;
     clearLiveError();
-    if (liveActive || liveStatus === 'connecting') {
-      disconnectLive();
-    } else {
-      await connectLive();
-    }
+    disconnectLive();
   };
-  if (phase === 'basics') {
-    return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10 lg:py-16 w-full">
-        <header className="mb-10 text-center">
-          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-            <UserCircle2 size={28} strokeWidth={1.75} />
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">Paso 1 de 2</div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            Antes de tu historia, lo básico.
-          </h1>
-          <p className="text-slate-600 mt-3 leading-relaxed max-w-md mx-auto">
-            Nombre y edad van en tu perfil y en el CV para ATS. El género lo eliges tú — no lo adivinamos por tu nombre.
-          </p>
-        </header>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-2">Nombre completo</label>
-            <Input
-              placeholder="Ej. Camila Silva"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              className="h-11 sm:h-12 text-sm sm:text-base"
-              autoComplete="name"
-            />
-          </div>
+  const pauseLiveSession = () => {
+    if (closing || (liveStatus !== 'listening' && liveStatus !== 'agentSpeaking')) return;
+    pauseLive();
+  };
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-2">Edad</label>
-            <Input
-              type="number"
-              min={16}
-              max={35}
-              placeholder="Ej. 21"
-              value={formAge}
-              onChange={(e) => setFormAge(e.target.value)}
-              className="h-11 sm:h-12 text-sm sm:text-base w-full sm:w-32"
-            />
-          </div>
-
+  const resumeLiveSession = async () => {
+    if (closing || liveStatus !== 'paused') return;
+    clearLiveError();
+    await resumeLive();
+  };
   const switchInterviewMode = (mode: InterviewMode) => {
     if (closing || loading || liveActive || liveStatus === 'connecting') return;
     if (userTurns > 0) return;
@@ -718,6 +692,12 @@ function ChatJoven() {
                         El agente está hablando
                       </>
                     )}
+                    {liveStatus === 'paused' && (
+                      <>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full" />
+                        Pausado — tocá Retomar para continuar
+                      </>
+                    )}
                     {liveStatus === 'idle' && !liveActive && (
                       <span>Tocá el botón para iniciar la conversación por voz</span>
                     )}
@@ -728,26 +708,97 @@ function ChatJoven() {
                       <span className="text-rose-600">Error de conexión — probá de nuevo o usá modo texto</span>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    size="lg"
-                    variant={liveActive ? 'default' : 'outline'}
-                    className={`h-20 w-20 rounded-full p-0 flex-shrink-0 ${
-                      liveActive
-                        ? liveStatus === 'agentSpeaking'
-                          ? 'bg-violet-600 hover:bg-violet-700 animate-pulse'
-                          : 'bg-emerald-600 hover:bg-emerald-700'
-                        : 'border-2 border-emerald-300'
-                    }`}
-                    onClick={() => void toggleLiveSession()}
-                    disabled={closing || atTurnLimit}
-                    title={liveActive ? 'Finalizar sesión de voz' : 'Iniciar conversación por voz'}
-                    aria-label={liveActive ? 'Finalizar sesión de voz' : 'Iniciar conversación por voz'}
-                  >
-                    {liveActive ? <PhoneOff size={28} /> : <Phone size={28} />}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    {(liveStatus === 'idle' || liveStatus === 'closed' || liveStatus === 'error') && !liveActive && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-emerald-300"
+                        onClick={() => void startLiveSession()}
+                        disabled={closing || atTurnLimit}
+                        title="Iniciar conversación por voz"
+                        aria-label="Iniciar conversación por voz"
+                      >
+                        <Phone size={28} />
+                      </Button>
+                    )}
+                    {(liveStatus === 'listening' || liveStatus === 'agentSpeaking') && (
+                      <>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="h-16 w-16 rounded-full p-0 flex-shrink-0 border-slate-300"
+                          onClick={pauseLiveSession}
+                          disabled={closing || atTurnLimit}
+                          title="Pausar conversación"
+                          aria-label="Pausar conversación"
+                        >
+                          <Pause size={24} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="default"
+                          className={`h-20 w-20 rounded-full p-0 flex-shrink-0 ${
+                            liveStatus === 'agentSpeaking'
+                              ? 'bg-violet-600 hover:bg-violet-700 animate-pulse'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
+                          onClick={endLiveSession}
+                          disabled={closing || atTurnLimit}
+                          title="Finalizar sesión de voz"
+                          aria-label="Finalizar sesión de voz"
+                        >
+                          <PhoneOff size={28} />
+                        </Button>
+                      </>
+                    )}
+                    {liveStatus === 'paused' && (
+                      <>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="default"
+                          className="h-20 w-20 rounded-full p-0 flex-shrink-0 bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => void resumeLiveSession()}
+                          disabled={closing || atTurnLimit}
+                          title="Retomar conversación"
+                          aria-label="Retomar conversación"
+                        >
+                          <Play size={28} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="h-16 w-16 rounded-full p-0 flex-shrink-0 border-rose-300 text-rose-600 hover:bg-rose-50"
+                          onClick={endLiveSession}
+                          disabled={closing || atTurnLimit}
+                          title="Finalizar sesión de voz"
+                          aria-label="Finalizar sesión de voz"
+                        >
+                          <PhoneOff size={24} />
+                        </Button>
+                      </>
+                    )}
+                    {liveStatus === 'connecting' && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-amber-300"
+                        disabled
+                        aria-label="Conectando"
+                      >
+                        <Phone size={28} className="opacity-50" />
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 text-center max-w-sm leading-relaxed">
                     Modo voz en tiempo real: hablá naturalmente, el agente responde con voz de IA y ves la transcripción en vivo.
+                    Usá audífonos para mejor calidad.
                   </p>
                 </div>
               </>
