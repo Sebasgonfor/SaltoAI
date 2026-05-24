@@ -314,9 +314,10 @@ export default function ChatEmpresa() {
     setSubmitError(null);
 
     // AbortController para que el spinner no quede colgado si el backend
-    // (o Vercel) tarda más del timeout duro de la lambda (30s + margen).
+    // se cae. Con flash-lite + thinking off el p99 server-side son ~3s; 15s
+    // es margen suficiente para que el fallback determinístico también pase.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35_000);
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
 
     try {
       const res = await fetch('/api/entrevista-empresa', {

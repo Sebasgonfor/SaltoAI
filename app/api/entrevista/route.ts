@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
+import { gemini, GEMINI_LITE_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import {
   countUserTurns,
@@ -15,7 +15,8 @@ import type { ChatMessage } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const GEMINI_TIMEOUT_MS = 18_000;
+// Con flash-lite + thinking off una respuesta normal son 1-3s; 10s es margen amplio.
+const GEMINI_TIMEOUT_MS = 10_000;
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -295,11 +296,15 @@ export async function POST(req: NextRequest) {
     try {
       response = await withTimeout(
         gemini().models.generateContent({
-          model: GEMINI_MODEL,
+          // Lite + thinkingBudget=0 → ~3-4x más rápido. La tarea (próxima
+          // pregunta apuntando a una señal pendiente) no necesita razonamiento
+          // profundo y el schema mantiene la salida disciplinada.
+          model: GEMINI_LITE_MODEL,
           contents: userPrompt,
           config: {
             responseMimeType: "application/json",
             responseSchema: schema,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
         GEMINI_TIMEOUT_MS,

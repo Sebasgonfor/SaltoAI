@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
+import { gemini, GEMINI_LITE_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import {
   countUserTurns,
@@ -17,8 +17,12 @@ export const runtime = "nodejs";
 // cubrimos cold-starts de Gemini sin pegarle al techo del plan.
 export const maxDuration = 30;
 
-/** Timeout duro del call a Gemini. Si se excede, caemos al banco de preguntas. */
-const GEMINI_TIMEOUT_MS = 18_000;
+/**
+ * Timeout duro del call a Gemini. Con flash-lite + thinking off una respuesta
+ * normal son 1-3s; 10s es margen amplio. Si se excede, caemos al banco de
+ * preguntas para no hacer esperar al founder.
+ */
+const GEMINI_TIMEOUT_MS = 10_000;
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -263,11 +267,16 @@ export async function POST(req: NextRequest) {
     try {
       response = await withTimeout(
         gemini().models.generateContent({
-          model: GEMINI_MODEL,
+          // Lite es ~3-4x más rápido que flash para Q&A turn-by-turn y la
+          // tarea (elegir slot pendiente + redactar una pregunta) no necesita
+          // razonamiento profundo. thinkingBudget=0 desactiva el modo "thinking"
+          // que viene on por default en la familia 2.5 y agrega varios segundos.
+          model: GEMINI_LITE_MODEL,
           contents: userPrompt,
           config: {
             responseMimeType: "application/json",
             responseSchema: schema,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
         GEMINI_TIMEOUT_MS,
