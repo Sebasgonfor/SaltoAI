@@ -135,17 +135,66 @@ export async function extractDocumentSkills(
     };
   }
 
-  // 1. Bajamos el archivo. Si Cloudinary falla, no tiene sentido seguir.
+  // 1. Bajamos el archivo desde Cloudinary. Validamos AGRESIVAMENTE:
+  //    - HTTP debe ser 200 (no 401/403/404)
+  //    - Content-Type debe coincidir con el formato esperado (no HTML/JSON
+  //      como cuando Cloudinary devuelve una página de error)
+  //    - Tamaño debe ser >0 (no empty body)
   let buf: Buffer;
+  let actualContentType: string;
   try {
     const fetched = await fetch(url);
+    actualContentType = fetched.headers.get("content-type") ?? "";
+
     if (!fetched.ok) {
+      // 401/403 típicamente significa que Cloudinary tiene "PDF and ZIP
+      // delivery" deshabilitado en Settings → Security. Devolvemos la
+      // instrucción específica al user.
+      if (fetched.status === 401 || fetched.status === 403) {
+        return {
+          ok: false,
+          errorReason:
+            "Cloudinary bloqueó el acceso al documento (HTTP " +
+            fetched.status +
+            "). Esto suele ser porque 'PDF and ZIP files delivery' está DESACTIVADO en tu cuenta de Cloudinary. Andá a Settings → Security en console.cloudinary.com y habilítalo. Después subí el documento de nuevo.",
+        };
+      }
       return {
         ok: false,
-        errorReason: `No pudimos descargar el documento (HTTP ${fetched.status}).`,
+        errorReason: `No pudimos descargar el documento de Cloudinary (HTTP ${fetched.status}). URL: ${url.slice(0, 100)}…`,
       };
     }
-    buf = Buffer.from(await fetched.arrayBuffer());
+
+    const ab = await fetched.arrayBuffer();
+    buf = Buffer.from(ab);
+
+    if (buf.length === 0) {
+      return {
+        ok: false,
+        errorReason: "Cloudinary devolvió un archivo vacío (0 bytes). Resubí el documento.",
+      };
+    }
+
+    // Detección de respuesta HTML/error encubierta: si pedimos un PDF y
+    // Cloudinary nos devuelve text/html, casi seguro es una página de error
+    // (paywall, restricción, página de "PDF delivery disabled"). NO lo
+    // mandamos a Gemini porque va a interpretar HTML como PDF y fallar.
+    const fmt = format.toLowerCase();
+    const expectedPrefix = fmt === "pdf" ? "application" : "image";
+    if (
+      actualContentType &&
+      !actualContentType.startsWith(expectedPrefix) &&
+      !actualContentType.startsWith("application/octet-stream") // raw uploads pueden venir así
+    ) {
+      return {
+        ok: false,
+        errorReason:
+          `Cloudinary devolvió Content-Type "${actualContentType}" en vez del esperado (${expectedPrefix}/*). ` +
+          (fmt === "pdf"
+            ? "Probablemente 'PDF and ZIP files delivery' está DESACTIVADO en tu Cloudinary (Settings → Security). Habilítalo y resubí."
+            : "Verificá que la URL del archivo esté disponible públicamente."),
+      };
+    }
   } catch (e) {
     return {
       ok: false,
@@ -202,19 +251,27 @@ export async function extractDocumentSkills(
 
   // 3. Parse tolerante.
   if (!responseText.trim()) {
+    console.warn(
+      "[document-extractor] Gemini devolvió response.text vacío. format=" + format +
+        " bufSize=" + buf.length +
+        " contentType=" + actualContentType,
+    );
     return {
       ok: false,
       errorReason:
-        "La IA devolvió una respuesta vacía. El documento puede ser ilegible (escaneado de baja calidad, foto borrosa, etc).",
+        "La IA devolvió una respuesta vacía. Si subiste un PDF, asegúrate de que el texto sea seleccionable (no un escaneo / foto). Si es una foto del documento, que esté bien iluminada y sin rotar.",
     };
   }
   const parsed = tryParseJsonTolerant(responseText);
   if (!parsed) {
-    console.warn("[document-extractor] No pudimos parsear JSON. Raw:", responseText.slice(0, 500));
+    console.warn(
+      "[document-extractor] No pudimos parsear JSON. Raw (500c):",
+      responseText.slice(0, 500),
+    );
     return {
       ok: false,
       errorReason:
-        "La IA devolvió una respuesta que no pudimos procesar. Probablemente el documento no es legible.",
+        `La IA devolvió un texto que no pudimos procesar como JSON. Primeros 200 caracteres: "${responseText.slice(0, 200).replace(/\s+/g, " ").trim()}". Reintentá; si persiste, sube otro archivo.`,
     };
   }
 
