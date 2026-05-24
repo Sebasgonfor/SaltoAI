@@ -11,7 +11,7 @@ import type { MicroTask } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const STRUCTURE_PROMPT = `Eres el estructurador de micro-tareas pagadas de Salto.
+const STRUCTURE_PROMPT = `Eres el estructurador de micro-tareas pagadas de SaltoAI.
 Recibes:
 1. El contexto del candidato (perfil de evidencia ya extraído).
 2. La intención libre de la empresa: qué quiere probar y cuánto va a pagar.
@@ -29,7 +29,7 @@ Reglas:
 CRÍTICO:
 - NO inventes detalles del negocio que la empresa no haya mencionado. Si falta contexto, usa "según el contexto que nos diste" en el brief.
 - NO redactes en lenguaje legal/contractual. Es una micro-tarea, no un contrato laboral.
-- El brief debe tener tono de founder hablándole a un junior, no de RRHH corporativa.
+- El brief debe tener tono de founder hablandole a un junior, no de RRHH corporativa.
 - Idioma: español LATAM natural.`;
 
 const criterionSchema = {
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const previousCount = await countMicroTasksBetween(body.companyId, body.profileId);
     const exploitationWarning =
       previousCount >= 2
-        ? "Ya propusiste 2 o más micro-tareas a este candidato. Si confías en su trabajo, considera ofrecerle una contratación formal — Salto monitorea uso recurrente sin oferta para proteger a los jóvenes."
+        ? "Ya propusiste 2 o más micro-tareas a este candidato. Si confías en su trabajo, considera ofrecerle una contratación formal — SaltoAI monitorea uso recurrente sin oferta para proteger a los jóvenes."
         : null;
 
     let structured: ReturnType<typeof mockStructure>;

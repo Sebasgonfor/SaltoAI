@@ -7,6 +7,7 @@ import {
   float32ToPcm16Base64,
   resampleFloat32,
   pcm16Base64ToFloat32,
+  parsePcmSampleRate,
   LIVE_INPUT_SAMPLE_RATE,
   LIVE_OUTPUT_SAMPLE_RATE,
 } from '@/lib/audio-pcm';
@@ -21,6 +22,7 @@ export type LiveInterviewStatus =
   | 'connecting'
   | 'listening'
   | 'agentSpeaking'
+  | 'paused'
   | 'error'
   | 'closed';
 
@@ -42,6 +44,7 @@ export function useLiveInterview(options: {
 
   const sessionRef = useRef<Session | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackGainRef = useRef<GainNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -53,6 +56,8 @@ export function useLiveInterview(options: {
   const closingHandledRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
   const statusRef = useRef<LiveInterviewStatus>('idle');
+  const sessionAliveRef = useRef(false);
+  const micPausedRef = useRef(false);
   const onCompleteRef = useRef(options.onInterviewComplete);
 
   useEffect(() => {
@@ -81,8 +86,11 @@ export function useLiveInterview(options: {
   }, []);
 
   const schedulePcmPlayback = useCallback((base64: string, sampleRate: number) => {
+    if (statusRef.current === 'paused') return;
+
     const ctx = audioContextRef.current;
-    if (!ctx || !base64) return;
+    const gain = playbackGainRef.current;
+    if (!ctx || !gain || !base64) return;
 
     const floats = pcm16Base64ToFloat32(base64);
     if (floats.length === 0) return;
@@ -92,7 +100,7 @@ export function useLiveInterview(options: {
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(ctx.destination);
+    source.connect(gain);
 
     const startAt = Math.max(ctx.currentTime, nextPlayTimeRef.current);
     source.start(startAt);
@@ -104,7 +112,8 @@ export function useLiveInterview(options: {
       if (
         activeSourcesRef.current.length === 0 &&
         statusRef.current !== 'connecting' &&
-        statusRef.current !== 'closed'
+        statusRef.current !== 'closed' &&
+        statusRef.current !== 'paused'
       ) {
         setStatus('listening');
       }
@@ -138,20 +147,24 @@ export function useLiveInterview(options: {
     userTurnsRef.current += 1;
     setUserTurns(userTurnsRef.current);
 
-    if (userTurnsRef.current >= MAX_USER_TURNS && sessionRef.current && !closingHandledRef.current) {
-      sessionRef.current.sendClientContent({
-        turns: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: `Llegamos al turno ${MAX_USER_TURNS}. Cerrá la entrevista con el mensaje: "${CLOSING_MESSAGE}"`,
-              },
-            ],
-          },
-        ],
-        turnComplete: true,
-      });
+    if (userTurnsRef.current >= MAX_USER_TURNS && sessionAliveRef.current && sessionRef.current && !closingHandledRef.current) {
+      try {
+        sessionRef.current.sendClientContent({
+          turns: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: `Llegamos al turno ${MAX_USER_TURNS}. Cerrá la entrevista con el mensaje: "${CLOSING_MESSAGE}"`,
+                },
+              ],
+            },
+          ],
+          turnComplete: true,
+        });
+      } catch {
+        /* socket already closing */
+      }
     }
   }, [appendMessage]);
 
@@ -162,7 +175,9 @@ export function useLiveInterview(options: {
 
       if (sc.interrupted) {
         stopPlayback();
-        if (statusRef.current !== 'closed') setStatus('listening');
+        if (statusRef.current !== 'closed' && statusRef.current !== 'paused') {
+          setStatus('listening');
+        }
       }
 
       if (sc.inputTranscription?.text) {
@@ -184,17 +199,13 @@ export function useLiveInterview(options: {
       const parts = sc.modelTurn?.parts;
       if (parts) {
         for (const part of parts) {
+          if (part.thought === true) continue;
           const data = part.inlineData?.data;
           const mime = part.inlineData?.mimeType ?? '';
           if (data && mime.includes('audio')) {
-            schedulePcmPlayback(data, LIVE_OUTPUT_SAMPLE_RATE);
+            schedulePcmPlayback(data, parsePcmSampleRate(mime, LIVE_OUTPUT_SAMPLE_RATE));
           }
         }
-      }
-
-      const audioData = msg.data;
-      if (audioData) {
-        schedulePcmPlayback(audioData, LIVE_OUTPUT_SAMPLE_RATE);
       }
 
       if (sc.turnComplete) {
@@ -210,7 +221,11 @@ export function useLiveInterview(options: {
           onCompleteRef.current?.(messagesRef.current);
         }
 
-        if (statusRef.current !== 'closed' && activeSourcesRef.current.length === 0) {
+        if (
+          statusRef.current !== 'closed' &&
+          statusRef.current !== 'paused' &&
+          activeSourcesRef.current.length === 0
+        ) {
           setStatus('listening');
         }
       }
@@ -218,46 +233,101 @@ export function useLiveInterview(options: {
     [finalizeAgentTurn, finalizeUserTurn, schedulePcmPlayback, stopPlayback]
   );
 
-  const cleanupAudio = useCallback(() => {
+  const stopMicCapture = useCallback(() => {
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     processorRef.current = null;
     sourceRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+  }, []);
+
+  const cleanupAudio = useCallback(() => {
+    stopMicCapture();
+    playbackGainRef.current = null;
     if (audioContextRef.current) {
       void audioContextRef.current.close();
       audioContextRef.current = null;
     }
-  }, []);
+  }, [stopMicCapture]);
 
   const disconnect = useCallback(() => {
+    sessionAliveRef.current = false;
+    micPausedRef.current = false;
+    statusRef.current = 'closed';
+
+    stopMicCapture();
     stopPlayback();
-    cleanupAudio();
+
+    const session = sessionRef.current;
+    sessionRef.current = null;
     try {
-      sessionRef.current?.close();
+      session?.close();
     } catch {
       /* ignore */
     }
-    sessionRef.current = null;
+
+    playbackGainRef.current = null;
+    if (audioContextRef.current) {
+      void audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
     userTranscriptRef.current = '';
     agentTranscriptRef.current = '';
     setLiveUserText('');
     setLiveAgentText('');
     setStatus('closed');
-  }, [cleanupAudio, stopPlayback]);
+  }, [stopMicCapture, stopPlayback]);
+
+  const pause = useCallback(() => {
+    if (
+      !sessionAliveRef.current ||
+      statusRef.current === 'paused' ||
+      statusRef.current === 'connecting' ||
+      statusRef.current === 'closed' ||
+      statusRef.current === 'idle'
+    ) {
+      return;
+    }
+
+    micPausedRef.current = true;
+    stopPlayback();
+
+    try {
+      sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true });
+    } catch {
+      /* ignore */
+    }
+
+    statusRef.current = 'paused';
+    setStatus('paused');
+  }, [stopPlayback]);
+
+  const resume = useCallback(async () => {
+    if (statusRef.current !== 'paused' || !sessionAliveRef.current) return;
+
+    micPausedRef.current = false;
+    const ctx = audioContextRef.current;
+    if (ctx) {
+      await ctx.resume();
+    }
+    setStatus('listening');
+  }, []);
 
   const connect = useCallback(async () => {
     if (
       statusRef.current === 'connecting' ||
       statusRef.current === 'listening' ||
-      statusRef.current === 'agentSpeaking'
+      statusRef.current === 'agentSpeaking' ||
+      statusRef.current === 'paused'
     ) {
       return;
     }
 
     setError(null);
     setStatus('connecting');
+    micPausedRef.current = false;
     userTurnsRef.current = 0;
     setUserTurns(0);
     closingHandledRef.current = false;
@@ -296,16 +366,29 @@ export function useLiveInterview(options: {
         model: data.model,
         callbacks: {
           onopen: () => {
+            sessionAliveRef.current = true;
             setStatus('listening');
           },
           onmessage: handleServerMessage,
           onerror: (e) => {
+            sessionAliveRef.current = false;
             setError(e.message || 'Error en la conexión de voz.');
             setStatus('error');
           },
-          onclose: () => {
+          onclose: (e) => {
+            sessionAliveRef.current = false;
+            micPausedRef.current = false;
+            sessionRef.current = null;
+            const wasError = statusRef.current === 'error';
+            statusRef.current = 'closed';
             cleanupAudio();
-            if (statusRef.current !== 'error') setStatus('closed');
+            const reason = e?.reason?.trim();
+            if (!wasError && reason) {
+              setError(reason);
+              setStatus('error');
+            } else if (!wasError) {
+              setStatus('closed');
+            }
           },
         },
       });
@@ -328,19 +411,27 @@ export function useLiveInterview(options: {
       audioContextRef.current = ctx;
       await ctx.resume();
 
+      const playbackGain = ctx.createGain();
+      playbackGain.connect(ctx.destination);
+      playbackGainRef.current = playbackGain;
+
       const source = ctx.createMediaStreamSource(stream);
       sourceRef.current = source;
 
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
       processor.onaudioprocess = (e) => {
-        if (!sessionRef.current || statusRef.current === 'closed') return;
+        if (!sessionAliveRef.current || !sessionRef.current || micPausedRef.current) return;
         const input = e.inputBuffer.getChannelData(0);
         const resampled = resampleFloat32(input, ctx.sampleRate, LIVE_INPUT_SAMPLE_RATE);
         const b64 = float32ToPcm16Base64(resampled);
-        sessionRef.current.sendRealtimeInput({
-          audio: { data: b64, mimeType: `audio/pcm;rate=${LIVE_INPUT_SAMPLE_RATE}` },
-        });
+        try {
+          sessionRef.current.sendRealtimeInput({
+            audio: { data: b64, mimeType: `audio/pcm;rate=${LIVE_INPUT_SAMPLE_RATE}` },
+          });
+        } catch {
+          sessionAliveRef.current = false;
+        }
       };
 
       const silent = ctx.createGain();
@@ -349,6 +440,8 @@ export function useLiveInterview(options: {
       processor.connect(silent);
       silent.connect(ctx.destination);
     } catch (err) {
+      sessionAliveRef.current = false;
+      micPausedRef.current = false;
       setError(err instanceof Error ? err.message : 'No pudimos conectar modo voz.');
       setStatus('error');
       cleanupAudio();
@@ -363,16 +456,25 @@ export function useLiveInterview(options: {
 
   useEffect(() => {
     return () => {
+      sessionAliveRef.current = false;
+      micPausedRef.current = false;
+      statusRef.current = 'closed';
+      stopMicCapture();
       stopPlayback();
-      cleanupAudio();
+      const session = sessionRef.current;
+      sessionRef.current = null;
       try {
-        sessionRef.current?.close();
+        session?.close();
       } catch {
         /* ignore */
       }
-      sessionRef.current = null;
+      playbackGainRef.current = null;
+      if (audioContextRef.current) {
+        void audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
     };
-  }, [cleanupAudio, stopPlayback]);
+  }, [stopMicCapture, stopPlayback]);
 
   return {
     status,
@@ -383,8 +485,14 @@ export function useLiveInterview(options: {
     error,
     connect,
     disconnect,
+    pause,
+    resume,
     clearError: () => setError(null),
+    isPaused: status === 'paused',
     isActive:
-      status === 'listening' || status === 'agentSpeaking' || status === 'connecting',
+      status === 'listening' ||
+      status === 'agentSpeaking' ||
+      status === 'connecting' ||
+      status === 'paused',
   };
 }

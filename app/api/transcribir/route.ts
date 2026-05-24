@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     if (audioBase64.length > MAX_BASE64_CHARS) {
       log.end({ status: 413, extra: { reason: "audio_too_large" } });
       return NextResponse.json(
-        { error: "El audio es demasiado largo. Grabá una respuesta más corta.", code: "audio_too_large" },
+        { error: "El audio es demasiado largo. Graba una respuesta más corta.", code: "audio_too_large" },
         { status: 413 }
       );
     }
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       log.end({ status: 503, extra: { reason: "no_gemini_key" } });
       return NextResponse.json(
         {
-          error: "El dictado por voz no está disponible ahora. Escribí tu respuesta.",
+          error: "El dictado por voz no está disponible ahora. Escribe tu respuesta.",
           code: "no_gemini_key",
         },
         { status: 503 }

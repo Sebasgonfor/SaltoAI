@@ -144,7 +144,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-2 flex items-center gap-1.5">
-            <Target size={11} /> Qué tenés que entregar
+            <Target size={11} /> Qué tienes que entregar
           </div>
           <p className="text-slate-800 leading-relaxed">{task.expectedDeliverable}</p>
         </div>
@@ -168,10 +168,10 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         <section className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-6 md:p-8">
           <h2 className="font-display font-bold text-xl text-slate-900 mb-1">Tu entrega</h2>
           <p className="text-sm text-slate-600 mb-4">
-            Podés pegar tu trabajo directamente, o un link a Google Drive / Notion / lo que uses. Sé concreto y mostrá tu razonamiento si vale la pena.
+            Puedes pegar tu trabajo directamente, o un link a Google Drive / Notion / lo que uses. Sé concreto y muestra tu razonamiento si vale la pena.
           </p>
           <Textarea
-            placeholder="Pegá tu entregable acá. Si es un archivo externo, incluí el link y un resumen corto."
+            placeholder="Pega tu entregable aquí. Si es un archivo externo, incluye el link y un resumen corto."
             className="min-h-40 bg-white text-[15px] leading-relaxed"
             value={deliverable}
             onChange={(e) => setDeliverable(e.target.value)}
@@ -215,7 +215,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         <section className="bg-slate-950 text-white rounded-2xl p-6 md:p-8">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles size={14} className="text-emerald-400" />
-            <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Pre-evaluación de Salto IA</span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Pre-evaluación de SaltoAI</span>
           </div>
           <div className="flex items-baseline gap-3 mb-5">
             <span className="font-display font-bold text-6xl text-emerald-400 tabular-nums leading-none">

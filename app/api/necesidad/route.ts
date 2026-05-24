@@ -10,12 +10,12 @@ import type { CompanyLegal, CompanyNeed } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const STRUCTURE_PROMPT = `Eres el estructurador de necesidades de Salto.
+const STRUCTURE_PROMPT = `Eres el estructurador de necesidades de SaltoAI.
 Un founder de una empresa temprana describió en lenguaje libre qué necesita. Tu trabajo es estructurar eso en señales comparables para el motor de matching.
 
 Reglas:
 - role: 1 línea, claro, sin jerga corporativa. Ej: "Persona para atención al cliente y redes en local de comida."
-- context: condiciones operativas reales (equipo pequeño, sin protocolos, ritmo rápido, multitarea, recursos limitados, etc.). Si el founder no describió contexto, dejá un string vacío — NO inventes ritmo o cultura.
+- context: condiciones operativas reales (equipo pequeño, sin protocolos, ritmo rápido, multitarea, recursos limitados, etc.). Si el founder no describió contexto, deja un string vacío — NO inventes ritmo o cultura.
 - requiredSkills: skills concretas que el rol exige. 3-6.
 - desiredTraits: rasgos conductuales que el contexto exige (ej. tolerancia al caos, autodidactismo, orientación a resultados). 2-5.
 - hardConstraints: restricciones duras y verificables (ubicación, disponibilidad horaria, idioma, edad mínima legal). 0-3. Si no hay, vacío.
@@ -56,11 +56,15 @@ function buildEmbeddingText(n: Omit<CompanyNeed, "id" | "createdAt" | "embedding
 export async function POST(req: NextRequest) {
   const log = startLog(req, "necesidad");
   try {
-    const { companyName, rawDescription, legal } = (await req.json()) as {
-      companyName: string;
-      rawDescription: string;
-      legal?: CompanyLegal;
-    };
+    const { companyName, rawDescription, legal, ownerUid, ownerEmail, ownerName } =
+      (await req.json()) as {
+        companyName: string;
+        rawDescription: string;
+        legal?: CompanyLegal;
+        ownerUid?: string;
+        ownerEmail?: string | null;
+        ownerName?: string | null;
+      };
     if (!companyName?.trim() || !rawDescription?.trim()) {
       log.end({ status: 400, extra: { reason: "fields_required" } });
       return NextResponse.json(
@@ -109,7 +113,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Tu descripción no tiene señales suficientes para construir el match. Contá qué hace la persona, el contexto del equipo y qué rasgos conductuales importan.",
+              "Tu descripción no tiene señales suficientes para construir el match. Cuenta qué hace la persona, el contexto del equipo y qué rasgos conductuales importan.",
             code: "no_signals_extracted",
           },
           { status: 422 }
@@ -122,6 +126,13 @@ export async function POST(req: NextRequest) {
       rawDescription: rawDescription.trim(),
       ...structured,
       ...(legal && legal.acceptedTerms ? { legal } : {}),
+      // Sin ownerUid la necesidad se guarda en Firestore pero NUNCA aparece
+      // en el dashboard del founder (listNeedsByOwner filtra por uid). Era
+      // el bug del usuario "no se guardó" — sí se guardaba, pero quedaba
+      // huérfana y no la encontraba.
+      ...(ownerUid ? { ownerUid } : {}),
+      ...(ownerEmail ? { ownerEmail } : {}),
+      ...(ownerName ? { ownerName } : {}),
     };
 
     const embedding = await embed(buildEmbeddingText(base));

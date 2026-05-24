@@ -78,7 +78,7 @@ export const CV_STYLES: CvStyleMeta[] = [
     label: "Funcional",
     tagline: "Agrupado por competencia, sin fechas",
     description:
-      "Tu evidencia laboral se ordena por habilidad, no por timeline. Ideal cuando tu trayectoria es informal y querés que cada skill brille con sus logros.",
+      "Tu evidencia laboral se ordena por habilidad, no por timeline. Ideal cuando tu trayectoria es informal y quieres que cada skill brille con sus logros.",
     atsScore: 4,
     bestFor: "Junior sin historial cronológico formal; cambios de carrera.",
   },
@@ -87,7 +87,7 @@ export const CV_STYLES: CvStyleMeta[] = [
     label: "Cronológico",
     tagline: "Experiencia con fechas, formato clásico",
     description:
-      "El formato corporativo estándar: experiencia en orden reverso con períodos. Útil si tenés educación/cursos con fechas concretas para mostrar.",
+      "El formato corporativo estándar: experiencia en orden reverso con períodos. Útil si tienes educación/cursos con fechas concretas para mostrar.",
     atsScore: 5,
     bestFor: "Postulaciones a roles corporativos o sectores tradicionales.",
   },
@@ -200,7 +200,7 @@ function buildContactLine(opts: CvOptions): { html: string; hasContact: boolean 
   }
   return {
     html: `<p class="contact placeholder">[Email] · [Teléfono] · [Ciudad] · [LinkedIn]</p>
-<p class="screen-only contact-hint">Completá tus datos de contacto antes de enviar. Volvé al perfil para pasarlos como parámetros o editá el PDF luego de imprimir.</p>`,
+<p class="screen-only contact-hint">Completa tus datos de contacto antes de enviar. Vuelve al perfil para pasarlos como parámetros o edita el PDF luego de imprimir.</p>`,
     hasContact: false,
   };
 }
@@ -390,7 +390,7 @@ function evidenceListBlock(p: Profile, heading = "Experiencia y logros"): string
     .join("\n");
   return `<section>
   <h2>${heading}</h2>
-  <p class="section-note">Trayectoria informal y proyectos personales · evidencia verificada por Salto IA.</p>
+  <p class="section-note">Trayectoria informal y proyectos personales · evidencia verificada por SaltoAI.</p>
   <ul class="experience-list">
 ${items}
   </ul>
@@ -481,7 +481,7 @@ function htmlShell(args: {
 <head>
 <meta charset="utf-8" />
 <title>CV — ${args.name}</title>
-<meta name="generator" content="Salto · Perfil de Evidencia · ${args.styleId}" />
+<meta name="generator" content="SaltoAI · Perfil de Evidencia · ${args.styleId}" />
 <meta name="cv-style" content="${args.styleId}" />
 <meta name="profile-id" content="${escapeHtml(args.profileIdMeta || "")}" />
 <style>
@@ -499,7 +499,7 @@ ${autoprintScript({ autoprint: args.autoprint } as CvOptions)}
 function header(p: Profile, opts: CvOptions): string {
   const { html: contactHtml } = buildContactLine(opts);
   return `  <header>
-    <h1>${escapeHtml(p.name || "Candidato/a Salto")}</h1>
+    <h1>${escapeHtml(p.name || "Candidato/a SaltoAI")}</h1>
     <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     ${contactHtml}
   </header>`;
@@ -539,7 +539,7 @@ function renderChronological(p: Profile, opts: CvOptions): string {
     p.evidence.length > 0
       ? `<section>
   <h2>Experiencia y trayectoria</h2>
-  <p class="section-note">Trayectoria informal y proyectos personales — orden por relevancia. Evidencia verificada por Salto IA.</p>
+  <p class="section-note">Trayectoria informal y proyectos personales — orden por relevancia. Evidencia verificada por SaltoAI.</p>
 ${p.evidence
   .map(
     (e) => `  <div class="entry">
@@ -729,16 +729,16 @@ function renderCreative(p: Profile, opts: CvOptions): string {
   `;
 
   // El <main> va PRIMERO en el orden del DOM para que ATS lean el contenido
-  // central antes del sidebar. CSS Grid sigue mostrándolos lado a lado.
+  // central antes del sidebar. CSS Grid sigue muestrandolos lado a lado.
   const inner = `<main class="creative">
   <section class="creative-main" style="grid-column: 2;">
     <header>
-      <h1>${escapeHtml(p.name || "Candidato/a Salto")}</h1>
+      <h1>${escapeHtml(p.name || "Candidato/a SaltoAI")}</h1>
       <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     </header>
     ${tailoredBadge(opts)}
     <p class="creative-warning screen-only">
-      <strong>Aviso:</strong> este formato es visualmente atractivo pero <strong>NO pasa todos los ATS estrictos</strong> (algunos rompen al ver layouts de 2 columnas). Usalo para roles creativos / diseño / marketing. Para postulaciones corporativas, elegí "ATS minimalista" o "Híbrido".
+      <strong>Aviso:</strong> este formato es visualmente atractivo pero <strong>NO pasa todos los ATS estrictos</strong> (algunos rompen al ver layouts de 2 columnas). Usalo para roles creativos / diseño / marketing. Para postulaciones corporativas, elige "ATS minimalista" o "Híbrido".
     </p>
     ${summaryBlock(p)}
     ${evidenceByCompetencyBlock(p)}
@@ -803,7 +803,7 @@ export function renderCv(profile: Profile, style: CvStyle, opts: CvOptions): str
 }
 
 /**
- * Versión plain-text, alineada al estilo elegido. Para campos "Pegá tu CV"
+ * Versión plain-text, alineada al estilo elegido. Para campos "Pega tu CV"
  * de ATS legacy (Computrabajo / OCC / Bumeran). El estilo afecta el ORDEN
  * de las secciones, no el rendering en sí (todo es texto).
  */

@@ -8,7 +8,7 @@ export function SaltoLogo({
   size,
   className,
 }: {
-  /** `full` = icono + "Salto AI". `icon` = solo el símbolo (nav compacta, etc.). */
+  /** `full` = icono + "SaltoAI". `icon` = solo el símbolo (nav compacta, etc.). */
   variant?: 'full' | 'icon';
   /** Altura en px del icono. */
   size?: number;
@@ -20,7 +20,7 @@ export function SaltoLogo({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={ICON_LOGO_SRC}
-      alt="Salto"
+      alt="SaltoAI"
       className={cn(
         'object-contain select-none aspect-square shrink-0',
         variant === 'icon' && !size && 'h-10 w-10',
@@ -42,7 +42,7 @@ export function SaltoLogo({
         className="font-display font-bold tracking-tight text-slate-900 whitespace-nowrap"
         style={{ fontSize: iconSize * 0.55 }}
       >
-        Salto AI
+        SaltoAI
       </span>
     </span>
   );

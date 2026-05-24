@@ -33,7 +33,7 @@ export function isLastAnswerTooShort(messages: ChatMessage[], minWords = 2): boo
 export function isYesNoQuestion(text: string): boolean {
   const t = (text ?? "").toLowerCase().trim();
   if (!t.includes("?")) return false;
-  // Aperturas típicas de pregunta cerrada en español rioplatense/colombiano.
+  // Aperturas típicas de pregunta cerrada en español neutro latinoamericano.
   return /(^|[¿\s])(hubo|hubieron|alguna vez|alguien|tuviste|te pas[óo]|te toc[óo]|sab[ée]s|sabias|sab[ií]as|pod[ée]s|pudiste|fuiste|estuviste|conoces|conoc[ée]s|has |hab[ée]s|hac[ée]s|hiciste|llegaste|recordas|record[áa]s)/i.test(
     t
   );
@@ -49,9 +49,9 @@ export function lastAgentMessage(messages: ChatMessage[]): string {
  * sí/no del agente. NO regaña — pide el ejemplo concreto.
  */
 export const YES_NO_FOLLOWUP_PROMPTS = [
-  "Dale, contame ese momento — ¿qué pasó, qué hiciste, cómo terminó?",
-  "Perfecto. Ahora contame el ejemplo concreto: ¿cuándo fue y qué hiciste exactamente?",
-  "Buenísimo, vamos al caso real. Contame paso a paso qué hiciste y qué cambió.",
+  "Bueno, cuéntame ese momento — ¿qué pasó, qué hiciste, cómo terminó?",
+  "Perfecto. Ahora cuéntame el ejemplo concreto: ¿cuándo fue y qué hiciste exactamente?",
+  "Buenísimo, vamos al caso real. Cuéntame paso a paso qué hiciste y qué cambió.",
 ] as const;
 
 export function pickYesNoFollowup(seed = 0): string {
@@ -85,7 +85,7 @@ export function validateForProfileExtraction(messages: ChatMessage[]): Interview
       ok: false,
       reason: "too_few_words",
       message:
-        "Necesito más detalle para construir tu perfil. Contame qué hiciste exactamente y qué resultado tuvo.",
+        "Necesito más detalle para construir tu perfil. Cuéntame qué hiciste exactamente y qué resultado tuvo.",
     };
   }
   if (isLastAnswerTooShort(messages, 3)) {
@@ -93,7 +93,7 @@ export function validateForProfileExtraction(messages: ChatMessage[]): Interview
       ok: false,
       reason: "too_short",
       message:
-        "Tu última respuesta fue muy corta. Profundizá un poco — paso a paso, qué hiciste y cómo te diste cuenta de que funcionó.",
+        "Tu última respuesta fue muy corta. Profundiza un poco — paso a paso, qué hiciste y cómo te diste cuenta de que funcionó.",
     };
   }
   return { ok: true };
@@ -106,7 +106,7 @@ export function validateNeedDescription(raw: string): InterviewValidity {
     return {
       ok: false,
       reason: "no_user_turns",
-      message: "Necesito una descripción de tu necesidad. Contame qué buscás y en qué contexto.",
+      message: "Necesito una descripción de tu necesidad. Cuéntame qué buscas y en qué contexto.",
     };
   }
   if (words < 8) {
@@ -114,7 +114,7 @@ export function validateNeedDescription(raw: string): InterviewValidity {
       ok: false,
       reason: "too_few_words",
       message:
-        "Tu descripción es muy corta para estructurar el rol. Contame qué hace la persona, el contexto del equipo y qué señales conductuales importan.",
+        "Tu descripción es muy corta para estructurar el rol. Cuéntame qué hace la persona, el contexto del equipo y qué señales conductuales importan.",
     };
   }
   return { ok: true };

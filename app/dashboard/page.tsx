@@ -195,7 +195,7 @@ function getInsight(profile: Profile | null, tasks: MicroTask[]): string {
 
 export default function DashboardPage() {
   // `/dashboard` es la home del JOVEN (sidebar con "Mi perfil", "Oportunidades", etc.).
-  // Sin chequeo de rol, una empresa logueada cae acá y ve una UI que no es suya
+  // Sin chequeo de rol, una empresa logueada cae aquí y ve una UI que no es suya
   // (regresión introducida al lanzar el dashboard sin gating por rol).
   // Solución: si el `account.role` es `empresa`, redirigimos al hub de empresas.
   const { user, account, loading, roleLoading } = useAuth();
@@ -288,7 +288,7 @@ export default function DashboardPage() {
           </button>
           <Link href="/" className="flex items-center gap-2">
             <SaltoLogo variant="full" size={26} />
-            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">Salto</span>
+            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">SaltoAI</span>
           </Link>
         </div>
         <UserButton />
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between p-4 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <SaltoLogo variant="full" size={24} />
-                    <span className="font-display font-semibold text-slate-900 text-sm">Salto</span>
+                    <span className="font-display font-semibold text-slate-900 text-sm">SaltoAI</span>
                   </div>
                   <button
                     type="button"

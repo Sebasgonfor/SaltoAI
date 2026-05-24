@@ -153,7 +153,7 @@ const STATS = [
     decimals: 0,
     unit: 'M COP',
     label: 'Ingresos generados',
-    sublabel: 'Por jóvenes colocados vía Salto',
+    sublabel: 'Por jóvenes colocados vía SaltoAI',
     trend: '+$38M este mes',
     valueColor: 'text-slate-900',
     bg: 'bg-white',
@@ -204,7 +204,7 @@ const STORIES = [
     company: 'Estudio Vela',
     ics: 89,
     quote:
-      'Lo aprendí todo solo viendo tutoriales. Salto fue el primero que le puso un número a eso y lo convirtió en algo real.',
+      'Lo aprendí todo solo viendo tutoriales. SaltoAI fue el primero que le puso un número a eso y lo convirtió en algo real.',
     impact: 'Maneja 4 cuentas de clientes autónomamente',
     from: 'Autodidacta sin título formal',
     gradient: 'from-slate-700 to-slate-900',
@@ -228,7 +228,7 @@ export default function ImpactoDashboard() {
             Barranqui-IA 2026 · Demo en vivo
           </Badge>
           <h1 className="text-3xl sm:text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
-            El impacto de Salto,{' '}
+            El impacto de SaltoAI,{' '}
             <span className="text-emerald-600">en números reales.</span>
           </h1>
           <p className="mt-6 text-lg text-slate-600 max-w-2xl leading-relaxed">
@@ -393,7 +393,7 @@ export default function ImpactoDashboard() {
             <div>
               <div className="font-semibold text-slate-900 mb-2">¿Cómo se mide el time-to-hire?</div>
               <p className="leading-relaxed">
-                Desde la publicación de la necesidad por la empresa hasta que aparece el shortlist de 3 candidatos en la plataforma.
+                Desde la publicación de la necesidad por la empresa hasta que aparece el shortlist de hasta 10 candidatos en la plataforma.
               </p>
             </div>
             <div>
@@ -422,7 +422,7 @@ export default function ImpactoDashboard() {
               <span className="text-emerald-400">sean tuyos también?</span>
             </h2>
             <p className="text-slate-300 leading-relaxed mb-8 max-w-2xl">
-              Salto busca aliados que quieran escalar el impacto. Si representas una empresa, fondo de impacto o ecosistema emprendedor, conversemos.
+              SaltoAI busca aliados que quieran escalar el impacto. Si representas una empresa, fondo de impacto o ecosistema emprendedor, conversemos.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href="/">

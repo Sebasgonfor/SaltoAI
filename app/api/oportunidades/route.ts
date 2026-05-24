@@ -1,102 +1,134 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cosineSimilarity } from "@/lib/embeddings";
-import { getAllNeeds, getProfile } from "@/lib/db";
-import { ICS_WEIGHTS } from "@/lib/types";
-import type { CompanyNeed, ICSBreakdown, OpportunityMatch, Profile } from "@/lib/types";
+import { getAllNeeds, getAllProfiles, getProfile } from "@/lib/db";
+import { scoreCandidates, SHORTLIST_SIZE, RETURN_SIZE } from "@/lib/ics";
+import { startLog } from "@/lib/logger";
+import type { OpportunityMatch, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
-function clamp(n: number, lo = 0, hi = 100): number {
-  if (Number.isNaN(n)) return lo;
-  return Math.max(lo, Math.min(hi, n));
-}
-
-function computeICS(b: ICSBreakdown): number {
-  const raw =
-    ICS_WEIGHTS.skillsFit * b.skillsFit +
-    ICS_WEIGHTS.behavioralFit * b.behavioralFit +
-    ICS_WEIGHTS.learningSignal * b.learningSignal +
-    ICS_WEIGHTS.contextFit * b.contextFit -
-    b.penalties;
-  return Math.round(clamp(raw));
-}
-
-function heuristicOpportunity(profile: Profile, need: CompanyNeed): OpportunityMatch {
-  const norm = (s: string) => s.toLowerCase().trim();
-  const reqSet = new Set(need.requiredSkills.map(norm));
-  const traitSet = new Set(need.desiredTraits.map(norm));
-
-  const skillMatches = profile.skills.filter((s) => {
-    const n = norm(s);
-    for (const r of reqSet) if (n.includes(r) || r.includes(n)) return true;
-    return false;
-  });
-  const traitMatches = profile.traits.filter((t) => {
-    const n = norm(t);
-    for (const r of traitSet) if (n.includes(r) || r.includes(n)) return true;
-    return false;
-  });
-
-  const skillsFit = clamp((skillMatches.length / Math.max(reqSet.size, 1)) * 100);
-  const behavioralFit = clamp((traitMatches.length / Math.max(traitSet.size, 1)) * 100);
-  const evText = profile.evidence.map((e) => e.quote).join(" ").toLowerCase();
-  const learningSignal = clamp(/(aprend|sol[oa]|autodidacta|por mi cuenta)/.test(evText) ? 70 : 45);
-  const contextFit = clamp(traitMatches.length > 0 ? 65 : 45);
-
-  const ics = computeICS({
-    skillsFit,
-    behavioralFit,
-    learningSignal,
-    contextFit,
-    penalties: 0,
-  });
-
-  const reason =
-    skillMatches.length > 0
-      ? `Encajas por ${skillMatches.slice(0, 2).join(" y ")} — alineado con lo que ${need.companyName} busca.`
-      : `Buen encaje conductual con el contexto de ${need.companyName}; vale profundizar en entrevista.`;
-
-  return {
-    needId: need.id!,
-    companyName: need.companyName,
-    role: need.role,
-    ics,
-    reason,
-  };
-}
-
-const RETURN_SIZE = 8;
-
+/**
+ * POST /api/oportunidades — devuelve necesidades compatibles para un joven.
+ *
+ * Antes esta ruta usaba heurística pura (skillsFit por substring, learningSignal
+ * por regex). Eso producía scores inflados (75% para matches que la empresa
+ * vería como 55%). Ahora pasa por la misma `scoreCandidates()` que /api/match:
+ * mismo LLM, mismo fallback, mismo cálculo de ICS. Simetría real.
+ *
+ * Implementación: invertimos el problema — en lugar de "rankea N candidatos
+ * para 1 necesidad", hacemos "rankea N necesidades para 1 candidato". El
+ * scorer no distingue: la pipeline (shortlist semántico → hard filter → LLM
+ * batch → heurística fallback) funciona en ambas direcciones porque la
+ * relación (need, profile) → score es simétrica.
+ */
 export async function POST(req: NextRequest) {
+  const log = startLog(req, "oportunidades");
   try {
     const { profileId } = (await req.json()) as { profileId: string };
     if (!profileId) {
+      log.end({ status: 400, extra: { reason: "profileId_required" } });
       return NextResponse.json({ error: "profileId required" }, { status: 400 });
     }
 
     const profile = await getProfile(profileId);
     if (!profile) {
+      log.end({ status: 404, extra: { profileId } });
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
     const needs = await getAllNeeds();
     if (needs.length === 0) {
+      log.end({ status: 200, extra: { profileId, note: "no_needs" } });
       return NextResponse.json({ profile, opportunities: [], note: "no_needs" });
     }
 
-    const ranked: OpportunityMatch[] = needs
-      .map((need) => {
-        const sim = cosineSimilarity(profile.embedding, need.embedding);
-        const opp = heuristicOpportunity(profile, need);
-        const simBoost = Math.round(sim * 15);
-        return { ...opp, ics: clamp(opp.ics + simBoost) };
-      })
-      .sort((a, b) => b.ics - a.ics)
-      .slice(0, RETURN_SIZE);
+    // 1. Shortlist semántico — top N necesidades más parecidas al embedding del joven.
+    const shortlistNeeds = needs
+      .map((n) => ({ n, sim: cosineSimilarity(profile.embedding, n.embedding) }))
+      .sort((a, b) => b.sim - a.sim)
+      .slice(0, SHORTLIST_SIZE)
+      .map((s) => s.n);
 
-    return NextResponse.json({ profile, opportunities: ranked });
+    // 2. Anchors de calibración: cuando llamamos a scoreCandidates() con UN
+    // solo perfil, el LLM no tiene con qué comparar y tiende a inflar todos
+    // los scores ("93% para todo" cuando la empresa veía "21%"). Pasamos
+    // 3-4 perfiles aleatorios DEL MISMO sistema como referencia comparativa;
+    // sus scores se descartan, solo conservamos el del joven que consulta.
+    // Esto restaura la simetría con /api/match (que ya naturalmente batched).
+    const allProfiles = await getAllProfiles();
+    const otherProfiles: Profile[] = allProfiles
+      .filter((p) => p.id && p.id !== profile.id)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 4);
+
+    // 3. Para cada necesidad del shortlist, calculamos el ICS contra ESTE
+    // joven + anchors. En paralelo con límite de concurrencia.
+    const results = await Promise.all(
+      shortlistNeeds.map(async (need) => {
+        const batch = [profile, ...otherProfiles];
+        const scored = await scoreCandidates(need, batch, { applyHardFilter: false });
+        // Filtramos para devolver SOLO el del joven que consulta.
+        const ours = scored.matches.find((m) => m.profileId === profile.id);
+        return { need, scored, ours };
+      })
+    );
+
+    // 3. Combinamos a OpportunityMatch (lo que espera el frontend del joven).
+    const opportunities: OpportunityMatch[] = [];
+    let llmCount = 0;
+    let degradedCount = 0;
+    const excludedNeedIds: string[] = [];
+
+    for (const { need, scored, ours } of results) {
+      if (!ours) {
+        // El joven cayó fuera del ranking (penalizaciones duras, etc.)
+        if (need.id) excludedNeedIds.push(need.id);
+        continue;
+      }
+      if (scored.rankingMode === "llm") llmCount++;
+      else degradedCount++;
+      opportunities.push({
+        needId: need.id!,
+        companyName: need.companyName,
+        role: need.role,
+        ics: ours.ics,
+        reason: ours.reason,
+        breakdown: ours.breakdown,
+        redFlag: ours.redFlag,
+        topSkills: ours.topSkills,
+      });
+    }
+
+    opportunities.sort((a, b) => b.ics - a.ics);
+    const top = opportunities.slice(0, RETURN_SIZE);
+
+    log.end({
+      status: 200,
+      extra: {
+        profileId,
+        needsTotal: needs.length,
+        shortlistSize: shortlistNeeds.length,
+        opportunitiesReturned: top.length,
+        excludedCount: excludedNeedIds.length,
+        llmCount,
+        degradedCount,
+      },
+    });
+
+    return NextResponse.json({
+      profile,
+      opportunities: top,
+      ...(degradedCount > 0 && {
+        warning:
+          "Algunas oportunidades se calcularon con scoring heurístico. La precisión puede ser menor.",
+      }),
+    });
   } catch (err) {
     console.error("oportunidades error:", err);
-    return NextResponse.json({ error: "No pudimos cargar oportunidades." }, { status: 500 });
+    return NextResponse.json(
+      { error: "No pudimos cargar oportunidades." },
+      { status: 500 }
+    );
   }
 }

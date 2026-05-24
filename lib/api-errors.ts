@@ -3,7 +3,7 @@
  *
  * El free tier de Gemini es 5 req/min. Sin esto, un 429 del provider se
  * traduce en un 500 opaco para el joven. Con esto, el joven ve
- * "estamos a tope, intentá en 30 segundos" y el founder no abandona.
+ * "estamos a tope, intenta en 30 segundos" y el founder no abandona.
  */
 import { NextResponse } from "next/server";
 
@@ -63,7 +63,7 @@ export function classifyProviderError(err: unknown): ApiErrorShape {
     return {
       status: 429,
       code: "rate_limited",
-      error: `Nuestro motor de IA está a tope ahora mismo. Probá de nuevo en ${retry} segundos.`,
+      error: `Nuestro motor de IA está a tope ahora mismo. Prueba de nuevo en ${retry} segundos.`,
       retryAfterSec: retry,
     };
   }
@@ -72,20 +72,20 @@ export function classifyProviderError(err: unknown): ApiErrorShape {
     return {
       status: 503,
       code: "ai_provider_unavailable",
-      error: "El motor de IA no respondió. Reintentá en unos segundos.",
+      error: "El motor de IA no respondió. Reinténtalo en unos segundos.",
     };
   }
   if (status === 400 || status === 422) {
     return {
       status,
       code: "ai_bad_request",
-      error: "No pudimos procesar la entrada. Reformulá con más detalle.",
+      error: "No pudimos procesar la entrada. Reformula con más detalle.",
     };
   }
   return {
     status: 500,
     code: "unknown",
-    error: "Algo salió mal. Reintentá.",
+    error: "Algo salió mal. Reinténtalo.",
   };
 }
 

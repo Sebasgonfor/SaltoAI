@@ -41,105 +41,129 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 }
 
 const MIN_USER_TURNS = 4;
-const MAX_USER_TURNS = 7;
+const MAX_USER_TURNS = 6;
 
 /**
- * Slots de cobertura del agente para EMPRESA. El objetivo es producir un
- * `rawDescription` rico que el endpoint /api/necesidad pueda estructurar
- * sin inventar. Mantener sincronizado con el panel del chat.
+ * Slots de cobertura para empresa (v2 — rediseño post-audit).
+ *
+ * Cambios vs. v1:
+ *   - "vacante" (NUEVO, primer slot) — la pregunta más importante: ¿qué rol
+ *     específico estás contratando? Antes el agente nunca la hacía y el
+ *     founder podía hablar 5 turnos de su equipo sin nombrar el rol vacante.
+ *   - "actividad_semanal" → "tareas_del_rol" — el LLM lo leía como "qué hace
+ *     el equipo actual"; renombrado y reforzado en el prompt para que sea
+ *     inequívoco "qué haría LA PERSONA NUEVA".
+ *   - "equipo" → "contexto_equipo" — incluye ritmo/ubicación/modalidad
+ *     fusionados (antes había un slot separado "ritmo_contexto" que se
+ *     solapaba con "equipo"). Una sola pregunta más rica.
+ *   - "restricciones_duras" + "dealbreakers" fusionados en "no_negociables"
+ *     — el founder no distingue entre los dos conceptos en la práctica.
+ *   - "fallos_previos" → "experiencia_previa" (OPCIONAL) — si el founder
+ *     dice "es la primera vez que contratamos", el agente lo skipea sin
+ *     forzar. El prompt lo marca como opcional explícitamente.
+ *
+ * Resultado: 5 slots (4 obligatorios + 1 opcional), MAX_USER_TURNS bajado
+ * de 7 a 6 porque la entrevista es más eficiente.
  */
 const TARGET_SLOTS = [
-  "equipo",
-  "actividad_semanal",
-  "ritmo_contexto",
-  "restricciones_duras",
-  "fallos_previos",
-  "dealbreakers",
+  "vacante",
+  "tareas_del_rol",
+  "contexto_equipo",
+  "no_negociables",
+  "experiencia_previa",
 ] as const;
 
 const QUESTION_BANK: Record<(typeof TARGET_SLOTS)[number], string[]> = {
-  equipo: [
-    "Cuéntame primero quiénes son ustedes: ¿cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?",
-    "Antes de hablar del rol — ¿cómo está armado el equipo hoy? ¿Cuántos son, qué hacen y desde cuándo están operando?",
+  vacante: [
+    "Empecemos por lo más importante: ¿qué rol específico estás buscando cubrir, cuántas vacantes son, y por qué este rol justo ahora?",
+    "Dime de entrada qué rol vas a contratar — el cargo concreto, cuántas plazas, y qué disparó la necesidad ahora.",
   ],
-  actividad_semanal: [
-    "Si esta persona ya estuviera trabajando con ustedes la próxima semana, ¿qué cosas concretas haría de lunes a viernes? No me des un cargo, dame las tareas reales.",
-    "Olvidate del título del puesto un segundo. ¿Qué es lo que esta persona haría en un día normal? ¿Y en una semana cargada?",
+  tareas_del_rol: [
+    "Concretemos el día a día de la PERSONA NUEVA (no del equipo actual): ¿qué tareas reales haría de lunes a viernes en su primera semana?",
+    "Si esta persona nueva ya estuviera trabajando contigo la próxima semana, ¿qué cosas concretas haría? Dame las tareas reales, no el cargo.",
   ],
-  ritmo_contexto: [
-    "Describime el ritmo del día a día: cómo se siente, dónde se trabaja (local, oficina, remoto) y en qué horario.",
-    "Contame el contexto operativo: cuán caótico u ordenado es, qué procesos hay escritos y qué se resuelve sobre la marcha. ¿Dónde y cuándo trabajaría?",
+  contexto_equipo: [
+    "Cuéntame el contexto: ¿cuántas personas son hoy, en qué etapa está la empresa, dónde trabaja la persona (presencial/remoto), y cómo es el ritmo (caótico, ordenado, picos)?",
+    "Para entender el entorno: tamaño actual del equipo, etapa de la empresa, ubicación de trabajo y ritmo del día a día (caos vs orden, picos, horario).",
   ],
-  restricciones_duras: [
-    "Decime los requisitos duros y no-negociables: ubicación, idioma, herramienta concreta, jornada, edad mínima legal. Listalos.",
-    "Contame qué no-negociables tiene el rol — ubicación, horario, idioma o herramientas específicas sin las cuales no podría empezar.",
+  no_negociables: [
+    "¿Cuáles son los no-negociables del rol? Pensa en ubicación, idioma, herramienta concreta, jornada, edad mínima legal, o cualquier rasgo SIN el cual no podrías contratar a la persona.",
+    "Dime los deal-breakers de este rol: lo que sí o sí necesita la persona (sea técnico o conductual) — sin lo cual descartas el candidato aunque todo lo demás encaje.",
   ],
-  fallos_previos: [
-    "Contame la última vez que contrataron para algo parecido: qué les costó, qué tipo de persona no funcionó y por qué.",
-    "Si ya intentaron contratar para este rol u otro parecido, contame qué falló. Esa señal nos sirve más que la lista de skills.",
-  ],
-  dealbreakers: [
-    "Decime qué rasgo o actitud sería un deal-breaker para vos, y qué cosas son “nice-to-have” pero no esenciales.",
-    "Si tuvieras que elegir entre dos candidatos parecidos, contame qué rasgo te haría decir “este sí” y cuál “este no”. Diferenciá esencial de deseable.",
+  experiencia_previa: [
+    "Si ya intentaste contratar para algo parecido antes, cuéntame qué falló y qué tipo de persona no funcionó. Si es la primera vez, dímelo directamente y pasamos al cierre.",
+    "Cuéntame de contrataciones previas para roles similares: qué costó, qué tipo de persona no funcionó. Si nunca contrataste antes, dilo y avanzamos.",
   ],
 };
 
 const SLOT_PATTERNS: Record<(typeof TARGET_SLOTS)[number], RegExp> = {
-  equipo: /(\d+\s*persona|somos\s*\d+|equipo (de|chico|peque)|fundador|cofounder|socio)/i,
-  actividad_semanal:
-    /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin)/i,
-  ritmo_contexto:
-    /(r[áa]pido|caos|presi[óo]n|estres|multitarea|cambio|picos?|presencial|remoto|h[íi]brido|horario|turnos?|jornada|barrio|local|oficina|ciudad)/i,
-  restricciones_duras:
-    /(requisito|obligatorio|s[íi] o s[íi]|no-?negociable|jornada completa|tiempo completo|ingl[ée]s|espa[ñn]ol|excel|portugu[ée]s|licencia|mayor de|m[íi]nimo \d+)/i,
-  fallos_previos:
-    /(contratamos|antes|anterior|nos fall[óo]|no funcion[óo]|se fue|renunci[óo]|no aguant[óo]|costo|cost[óo]|intentamos)/i,
-  dealbreakers:
-    /(deal-?breaker|no-?negociable|esencial|imprescindible|deseable|nice|prefer|valoramos|importante que)/i,
+  // vacante: matchea cuando el founder declara el rol concreto que va a contratar.
+  // Cubrimos cargos (dev, vendedor, cajero, community, etc) + verbos típicos
+  // ("buscamos", "necesitamos contratar", "queremos un/a", "el rol es") + el
+  // patrón "una persona/alguien que <verbo>" muy común en early stage.
+  vacante:
+    /(busc[oa]mos|necesit[oa]mos|queremos contratar|el rol es|el puesto|vacante|abrimos posición|una persona que|alguien que|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b)/i,
+  // tareas_del_rol: actividades concretas que hace la persona, no cargos.
+  tareas_del_rol:
+    /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin|escribir|disenar|cocinar|despachar|empacar|hacer rutas|llevar contabilidad|gestion|reportes?|ventas|cierre|prospect)/i,
+  // contexto_equipo: tamaño + etapa + ritmo + ubicación + modalidad, todo junto.
+  // Regex amplio porque cualquiera de esas dimensiones cuenta como "cubierto".
+  contexto_equipo:
+    /(\d+\s*(persona|activ[oa]s?|integrantes?|emplead|colaborad)|somos\s*\d+|equipo|fundador|cofounder|socio|empresa|emprendimiento|startup|r[áa]pido|caos|presi[óo]n|estres|multitarea|presencial|remoto|h[íi]brido|horario|turnos?|jornada|barrio|local|oficina|ciudad|barranquilla|bogot[áa]|medell[ií]n|cali)/i,
+  // no_negociables: restricciones duras + deal-breakers en una sola red.
+  no_negociables:
+    /(requisito|obligatorio|s[íi] o s[íi]|no-?negociable|jornada completa|tiempo completo|ingl[ée]s|espa[ñn]ol|excel|portugu[ée]s|licencia|mayor de|m[íi]nimo \d+|deal-?breaker|esencial|imprescindible|prefer|valoramos|importante que|sin lo cual|descartam|descart[éa]|no aplica|no funcion[óo])/i,
+  // experiencia_previa: el founder cuenta de contrataciones pasadas O declara
+  // explícitamente que es la primera vez (eso TAMBIÉN cuenta como cubierto).
+  experiencia_previa:
+    /(contratamos|antes|anterior|nos fall[óo]|se fue|renunci[óo]|no aguant[óo]|primera vez|nunca (he|hemos) contratado|este es el primer|jam[áa]s contratamos|intentamos antes|el anterior|la anterior|el [úu]ltimo|la [úu]ltima)/i,
 };
 
-const SYSTEM_PROMPT = `Eres el entrevistador de empresas de Salto, plataforma de matching laboral por potencial para LATAM.
+const SYSTEM_PROMPT = `Eres el entrevistador de empresas de SaltoAI, plataforma de matching laboral por potencial para LATAM.
 Tu trabajo NO es vender ni motivar al founder. Tu trabajo es EXTRAER CONTEXTO REAL para que el motor de matching pueda buscar candidatos sin inventar señales.
 
-OBJETIVO DE COBERTURA (clave):
-A lo largo de 4-7 turnos, tus preguntas deben cubrir estos 6 slots:
-1. equipo — cuántos son, qué hacen, etapa de la empresa.
-2. actividad_semanal — qué hace la persona en una semana real (tareas, no cargo).
-3. ritmo_contexto — caos vs orden, picos, presencial/remoto, horario, ubicación.
-4. restricciones_duras — ubicación, idioma, herramientas, jornada, edad mínima legal.
-5. fallos_previos — qué les ha costado en contrataciones anteriores y por qué.
-6. dealbreakers — qué rasgos son esenciales vs nice-to-have.
+OBJETIVO DE COBERTURA (5 slots, en este orden de prioridad):
+
+1. vacante (OBLIGATORIO, primero) — qué rol específico está contratando, cuántas vacantes, por qué este rol ahora. SIN ESTO la entrevista no sirve: todo lo demás depende de qué rol estamos buscando. Si el founder describe a su equipo sin nombrar el rol vacante, redirígelo a esta pregunta.
+
+2. tareas_del_rol (OBLIGATORIO) — qué haría la PERSONA NUEVA en su semana de trabajo (lunes a viernes). CRÍTICO: no es qué hace el equipo actual, es qué haría el candidato a contratar. Si el founder se desvía a describir al equipo existente, redirígelo: "ok, eso es del equipo actual — ¿y la persona nueva, qué haría?".
+
+3. contexto_equipo (OBLIGATORIO) — tamaño del equipo, etapa de la empresa, modalidad (presencial/remoto/híbrido), ubicación, ritmo (caótico/ordenado/picos). Una pregunta abierta puede cubrir varias dimensiones a la vez.
+
+4. no_negociables (OBLIGATORIO) — restricciones duras + deal-breakers fusionados. Ubicación obligada, idioma, herramienta concreta, jornada, edad mínima legal, o rasgo conductual sin el cual descarta. NO desagregar en sub-preguntas — una sola pregunta abierta.
+
+5. experiencia_previa (OPCIONAL) — qué ha fallado en contrataciones anteriores. Si el founder declara que es la primera vez que contratan, eso CUENTA como slot cubierto y NO insistas. Pasa al cierre.
 
 REGLAS DE COBERTURA:
-- NO repitas ángulos. Si un slot ya quedó cubierto, pasá al siguiente — preferí slots aún no cubiertos.
-- Si una respuesta es vaga (sin datos concretos), profundizá UNA VEZ y después saltá al siguiente slot.
-- Hacé puente narrativo con lo que el founder acaba de decir, no salto brusco.
-- No inventes contexto. No proyectes. Si el founder no menciona algo, no lo agregues a tu siguiente pregunta como si lo hubiera dicho.
+- Sigue el ORDEN: vacante primero, tareas_del_rol después. Si el founder responde algo distinto al slot que preguntaste, agradece lo dicho y redirige amablemente al slot pendiente.
+- NO repitas ángulos. Si un slot ya quedó cubierto, pasa al siguiente.
+- Si una respuesta es vaga (sin datos concretos), profundiza UNA VEZ con un follow-up, después pasa al siguiente slot — no te trabes.
+- Haz puente narrativo con lo que el founder acaba de decir, no salto brusco.
+- No inventes contexto. Si el founder no menciona algo, no lo agregues a tu siguiente pregunta como si lo hubiera dicho.
 
 ESTILO:
-- Español natural rioplatense/colombiano, cercano, no corporativo.
+- Español natural neutro latinoamericano, cercano, no corporativo.
 - UNA pregunta a la vez, corta y específica (máx 2 oraciones).
-- Tuteo o "vos", consistente.
+- Tuteo neutro con "tú", consistente. PROHIBIDO el voseo rioplatense (formas como "vos", "tenés", "contame", "decime", "fijate", "podés", "querés", "sabés", "hacés", "preferís"). Usa siempre conjugaciones estándar de "tú" ("tienes", "cuéntame", "dime", "fíjate", "puedes", "quieres", "sabes", "haces", "prefieres").
 
 PROHIBIDO PREGUNTAS SÍ/NO:
-- Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabés…?", "¿Han contratado…?", "¿Hay…?".
-- Esas preguntas se contestan con "sí" o "no" y matan la entrevista.
-- Toda pregunta debe empezar con QUÉ, CÓMO, CUÁNDO, CUÁNTOS, CUÁL o un imperativo tipo "Contame…", "Pensá en…", "Dame un ejemplo de…".
-- Si querés explorar si algo ocurrió, pedí directamente el ejemplo: "Contame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
+- Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabes…?", "¿Han contratado…?", "¿Hay…?".
+- Toda pregunta debe empezar con QUÉ, CÓMO, CUÁNDO, CUÁNTOS, CUÁL o un imperativo tipo "Cuéntame…", "Piensa en…", "Dame un ejemplo de…".
+- Si quieres explorar si algo ocurrió, pide directamente el ejemplo: "Cuéntame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
 
 CIERRE (done=true):
-- Marcá done=true cuando tengas AL MENOS 5 de los 6 slots cubiertos con detalle concreto.
+- Marca done=true cuando tengas los 4 slots OBLIGATORIOS cubiertos (vacante, tareas_del_rol, contexto_equipo, no_negociables) con detalle concreto. El slot experiencia_previa es OPCIONAL — no esperes a cubrirlo si los 4 obligatorios están listos.
 - Nunca marques done=true antes del turno 4 del founder.
-- Después del turno 7, marcá done=true sí o sí (cap).
-- Cuando done=true, en nextQuestion devolvé un cierre breve: "Listo, con esto puedo armar la búsqueda. Voy a estructurar tu necesidad y traer 3 candidatos."
+- Después del turno 6, marca done=true sí o sí (cap).
+- Cuando done=true, en nextQuestion devuelve un cierre breve: "Listo, con esto puedo armar la búsqueda. Voy a estructurar tu necesidad y buscar candidatos."
 
 Devuelve JSON con:
 {
-  "nextQuestion": "tu pregunta — UNA, conectada y dirigida a un slot aún no cubierto",
+  "nextQuestion": "tu pregunta — UNA, dirigida al PRÓXIMO slot pendiente en orden de prioridad",
   "done": boolean,
-  "targetedSlot": "uno de: equipo | actividad_semanal | ritmo_contexto | restricciones_duras | fallos_previos | dealbreakers",
+  "targetedSlot": "uno de: vacante | tareas_del_rol | contexto_equipo | no_negociables | experiencia_previa",
   "slotsCovered": ["lista de slots YA cubiertos con detalle concreto"],
-  "reasoning": "una frase interna: por qué elegiste este slot"
+  "reasoning": "una frase interna: qué slot elegiste y por qué"
 }`;
 
 const schema = {
@@ -169,14 +193,32 @@ function alreadyAskedTokens(messages: ChatMessage[]): string {
     .join(" || ");
 }
 
+/**
+ * Los 4 obligatorios — el quinto (`experiencia_previa`) es opcional y solo
+ * se pregunta si hay margen de turnos. El fallback determinístico respeta
+ * este orden estricto para que la entrevista sin LLM siga teniendo sentido
+ * narrativo: primero el rol, luego las tareas, luego el contexto, luego los
+ * no-negociables.
+ */
+const REQUIRED_SLOTS = [
+  "vacante",
+  "tareas_del_rol",
+  "contexto_equipo",
+  "no_negociables",
+] as const;
+
 function pickFallbackQuestion(messages: ChatMessage[]): {
   question: string;
   slot: string;
 } {
   const covered = new Set(detectSlots(messages));
   const askedBlob = alreadyAskedTokens(messages);
-  const uncovered = TARGET_SLOTS.filter((s) => !covered.has(s));
-  const order = uncovered.length > 0 ? uncovered : [...TARGET_SLOTS];
+
+  // Prioridad estricta: primero los slots OBLIGATORIOS en orden, luego el
+  // opcional (experiencia_previa) solo si todos los obligatorios están listos.
+  const orderRequired = REQUIRED_SLOTS.filter((s) => !covered.has(s));
+  const orderOptional = !covered.has("experiencia_previa") ? ["experiencia_previa" as const] : [];
+  const order: (typeof TARGET_SLOTS)[number][] = [...orderRequired, ...orderOptional];
 
   for (const slot of order) {
     for (const q of QUESTION_BANK[slot]) {
@@ -186,9 +228,18 @@ function pickFallbackQuestion(messages: ChatMessage[]): {
   }
   return {
     question:
-      "Profundicemos un poco más: contame con un ejemplo concreto cómo se ve un día típico para esta persona.",
-    slot: "actividad_semanal",
+      "Profundicemos un poco más: dame un ejemplo concreto del día a día de la persona nueva.",
+    slot: "tareas_del_rol",
   };
+}
+
+/**
+ * Done = los 4 obligatorios cubiertos. El opcional no es bloqueante.
+ * El caller (POST handler) además respeta MIN_USER_TURNS/MAX_USER_TURNS.
+ */
+function hasAllRequiredSlots(messages: ChatMessage[]): boolean {
+  const covered = new Set(detectSlots(messages));
+  return REQUIRED_SLOTS.every((s) => covered.has(s));
 }
 
 function fallbackResponse(messages: ChatMessage[]) {
@@ -230,7 +281,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         nextQuestion: wasYesNo
           ? pickYesNoFollowup(userTurns)
-          : "Eso es muy poquito para trabajar. Contame con más detalle, dame un ejemplo concreto.",
+          : "Eso es muy poquito para trabajar. Cuéntame con más detalle, dame un ejemplo concreto.",
         done: false,
         targetedSlot: null,
         slotsCovered: detectSlots(messages),
@@ -259,9 +310,9 @@ export async function POST(req: NextRequest) {
       `${SYSTEM_PROMPT}\n\n` +
       `HISTORIAL (turno actual del founder: ${userTurns}/${MAX_USER_TURNS}):\n${transcript}\n\n` +
       `SLOTS YA DETECTADOS POR HEURÍSTICA (informativo, no vinculante): ${heuristicCovered.join(", ") || "ninguno"}\n` +
-      `SLOTS PENDIENTES (priorizá uno de estos): ${remaining.join(", ") || "ninguno — ya están todos"}\n\n` +
+      `SLOTS PENDIENTES (prioriza uno de estos): ${remaining.join(", ") || "ninguno — ya están todos"}\n\n` +
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
-      `Devolvé la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marcá done=true si ya hay 5+ slots cubiertos con detalle.`;
+      `Devuelve la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marca done=true si ya hay 5+ slots cubiertos con detalle.`;
 
     let response;
     try {
@@ -298,11 +349,18 @@ export async function POST(req: NextRequest) {
     let done = !!parsed.done;
     if (userTurns < MIN_USER_TURNS) done = false;
     if (userTurns >= MAX_USER_TURNS) done = true;
+    // Guard adicional: si el LLM marca done=true pero los 4 slots obligatorios
+    // no están cubiertos en la heurística, lo desautorizamos (a menos que ya
+    // hayamos pegado el cap de turnos, donde el cierre es forzoso).
+    if (done && userTurns < MAX_USER_TURNS && !hasAllRequiredSlots(messages)) {
+      log.info("edge.llm_done_blocked_by_required_slots", { userTurns });
+      done = false;
+    }
 
     const out = {
       nextQuestion:
         parsed.nextQuestion ||
-        "Contame un poco más, ¿podés darme un ejemplo concreto?",
+        "Cuéntame un poco más, ¿puedes darme un ejemplo concreto?",
       done,
       targetedSlot: parsed.targetedSlot ?? null,
       slotsCovered: Array.isArray(parsed.slotsCovered)
@@ -336,7 +394,7 @@ export async function POST(req: NextRequest) {
     log.error("entrevista-empresa.exception", { message: (err as Error)?.message });
     log.end({ status: 200, extra: { mode: "degraded" } });
     return NextResponse.json({
-      nextQuestion: "Cuéntame más sobre eso, ¿podés darme un ejemplo concreto?",
+      nextQuestion: "Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?",
       done: false,
       targetedSlot: null,
       slotsCovered: [],

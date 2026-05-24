@@ -3,7 +3,7 @@
 /**
  * Dashboard del founder (`/empresa`) — la "casa" que faltaba.
  *
- * Hasta acá el flujo empresa no tenía hub: el founder publicaba una necesidad,
+ * Hasta aquí el flujo empresa no tenía hub: el founder publicaba una necesidad,
  * caía en `/empresa/matches/{needId}` y desde ahí no había vuelta a la lista.
  * Este page resuelve eso reuniendo en una sola vista:
  *   - Saludo + estado de cuenta.
@@ -324,8 +324,8 @@ export default function EmpresaDashboardPage() {
           {getGreeting(firstName)}
         </h1>
         <p className="text-slate-600 mt-2 max-w-2xl">
-          Acá ves todas tus necesidades publicadas, los candidatos en evaluación y las micro-tareas
-          en curso. Calidad sobre volumen — 3 candidatos por necesidad, no 200 CVs.
+          Aquí ves todas tus necesidades publicadas, los candidatos en evaluación y las micro-tareas
+          en curso. Calidad sobre volumen — 10 candidatos por necesidad, no 200 CVs.
         </p>
       </header>
 
@@ -335,7 +335,7 @@ export default function EmpresaDashboardPage() {
           icon={Layers}
           value={kpis.needsCount}
           label="Necesidades"
-          hint="Publicadas por vos"
+          hint="Publicadas por tú"
           tone="emerald"
         />
         <KpiCard
@@ -364,7 +364,7 @@ export default function EmpresaDashboardPage() {
         <SectionHeader
           title="Mis necesidades"
           count={needs.length}
-          hint="Cada una con su shortlist de 3 candidatos ranked por ICS."
+          hint="Cada una con su shortlist de hasta 10 candidatos ranked por ICS."
         />
 
         {dataLoading ? (
@@ -377,10 +377,10 @@ export default function EmpresaDashboardPage() {
               <Sparkles size={22} strokeWidth={1.75} />
             </div>
             <h3 className="font-display font-bold text-xl text-slate-900 mb-2 tracking-tight">
-              Contanos tu primera necesidad.
+              Cuéntanos tu primera necesidad.
             </h3>
             <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed mb-6">
-              No tenés que escribir un job description perfecto. Contás en lenguaje natural qué te
+              No tienes que escribir un job description perfecto. Cuentas en lenguaje natural qué te
               hace falta y la IA estructura el rol, el contexto y los rasgos que exige.
             </p>
             <div className="flex justify-center">
@@ -431,7 +431,7 @@ export default function EmpresaDashboardPage() {
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
               Cuando entres a un match y propongas una tarea pagada para validar al candidato,
-              aparece acá. Es lo que reemplaza la "entrevista clásica" — pagás por evidencia real,
+              aparece aquí. Es lo que reemplaza la "entrevista clásica" — pagás por evidencia real,
               no por una conversación.
             </p>
           </div>
@@ -456,7 +456,7 @@ export default function EmpresaDashboardPage() {
               </span>
             </div>
             <h3 className="font-display font-bold text-xl md:text-2xl tracking-tight leading-tight max-w-2xl">
-              Calidad, no volumen. 3 candidatos con evidencia, no 200 CVs sin contexto.
+              Calidad, no volumen. 10 candidatos con evidencia, no 200 CVs sin contexto.
             </h3>
           </div>
           <Link href="/empresa/chat">

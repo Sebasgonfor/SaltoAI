@@ -66,7 +66,7 @@ export function RoleGate({ role, children }: Props) {
             onSuccess={() => {}}
           />
           <p className="text-xs text-slate-400 text-center mt-6">
-            Si ya tenés cuenta con otro rol, te llevamos a tu área correcta.
+            Si ya tienes cuenta con otro rol, te llevamos a tu área correcta.
           </p>
         </div>
       </div>
@@ -99,7 +99,7 @@ export function RoleGate({ role, children }: Props) {
           </h1>
           <p className="text-slate-600 mt-4 leading-relaxed">
             Por integridad del matching, un usuario no puede ser candidato y reclutador al mismo
-            tiempo. Si necesitás cambiar de rol, escribinos a{' '}
+            tiempo. Si necesitas cambiar de rol, escribinos a{' '}
             <a className="text-emerald-700 underline" href="mailto:soporte@salto.work">
               soporte@salto.work
             </a>

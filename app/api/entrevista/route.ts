@@ -66,36 +66,36 @@ const TARGET_SIGNALS = [
 
 const QUESTION_BANK: Record<(typeof TARGET_SIGNALS)[number], string[]> = {
   iniciativa: [
-    "Contame una vez que viste algo que estaba mal o faltaba, y decidiste arreglarlo sin que nadie te lo pidiera. ¿Qué fue y cómo arrancaste?",
-    "Pensá en algo que empezaste vos solo/a, sin esperar permiso. ¿Qué hiciste primero?",
+    "Cuéntame una vez que viste algo que estaba mal o faltaba, y decidiste arreglarlo sin que nadie te lo pidiera. ¿Qué fue y cómo arrancaste?",
+    "Piensa en algo que empezaste tú solo/a, sin esperar permiso. ¿Qué hiciste primero?",
   ],
   "aprendizaje autónomo": [
-    "Contame de algo que aprendiste por tu cuenta — YouTube, tutoriales, prueba y error — para resolver una situación concreta. ¿Cómo fue?",
+    "Cuéntame de algo que aprendiste por tu cuenta — YouTube, tutoriales, prueba y error — para resolver una situación concreta. ¿Cómo fue?",
     "Cuando te topaste con algo que no sabías hacer, ¿cómo te las arreglaste para aprenderlo? Dame un ejemplo puntual.",
   ],
   "resolución de problemas": [
-    "Contame un problema feo que se te apareció y nadie sabía cómo resolverlo. ¿Qué hiciste paso a paso?",
-    "Pensá en una vez que algo se complicó y tuviste que improvisar una solución. ¿Cómo la pensaste?",
+    "Cuéntame un problema feo que se te apareció y nadie sabía cómo resolverlo. ¿Qué hiciste paso a paso?",
+    "Piensa en una vez que algo se complicó y tuviste que improvisar una solución. ¿Cómo la pensaste?",
   ],
   "resultados medibles": [
     "Eso que hiciste, ¿en qué cambió la situación? Dame un número, porcentaje o cantidad si lo recordás.",
-    "Contame cómo te diste cuenta de que tu trabajo funcionó. ¿Qué cambió concretamente — ventas, clientes, tiempos, errores?",
+    "Cuéntame cómo te diste cuenta de que tu trabajo funcionó. ¿Qué cambió concretamente — ventas, clientes, tiempos, errores?",
   ],
   "atención al cliente": [
-    "Contame de un cliente difícil o un reclamo que tuviste que resolver. ¿Qué dijo y qué hiciste vos?",
-    "Cuando tratabas con gente — clientes, vecinos, familias — contame una situación tensa que manejaste bien. Detalles.",
+    "Cuéntame de un cliente difícil o un reclamo que tuviste que resolver. ¿Qué dijo y qué hiciste tú?",
+    "Cuando tratabas con gente — clientes, vecinos, familias — cuéntame una situación tensa que manejaste bien. Detalles.",
   ],
   "trabajo en equipo": [
-    "Contame un momento donde tuviste que coordinarte con otra persona o un grupo para que algo saliera. ¿Quién hizo qué?",
-    "Pensá en una vez que trabajaste junto a alguien — familia, amigos, equipo. ¿Cómo se dividieron las cosas?",
+    "Cuéntame un momento donde tuviste que coordinarte con otra persona o un grupo para que algo saliera. ¿Quién hizo qué?",
+    "Piensa en una vez que trabajaste junto a alguien — familia, amigos, equipo. ¿Cómo se dividieron las cosas?",
   ],
   "adaptación al cambio": [
-    "Contame una vez que tuviste que adaptarte de un día para el otro a algo nuevo — un cambio de plan, un imprevisto. ¿Cómo te ajustaste?",
-    "Pensá en una vez que las reglas cambiaron a mitad de camino. ¿Qué hiciste para seguir adelante?",
+    "Cuéntame una vez que tuviste que adaptarte de un día para el otro a algo nuevo — un cambio de plan, un imprevisto. ¿Cómo te ajustaste?",
+    "Piensa en una vez que las reglas cambiaron a mitad de camino. ¿Qué hiciste para seguir adelante?",
   ],
   persistencia: [
-    "Contame algo que intentaste varias veces antes de que saliera. ¿Cuántos intentos y qué te hizo no rendirte?",
-    "Pensá en algo que estuvo a punto de fracasar pero igual lo terminaste. ¿Qué fue y cómo seguiste?",
+    "Cuéntame algo que intentaste varias veces antes de que saliera. ¿Cuántos intentos y qué te hizo no rendirte?",
+    "Piensa en algo que estuvo a punto de fracasar pero igual lo terminaste. ¿Qué fue y cómo seguiste?",
   ],
 };
 
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         nextQuestion: wasYesNo
           ? pickYesNoFollowup(userTurns)
-          : "Eso es muy poquito. Contame con más detalle: ¿qué hiciste vos, qué pasó, en qué cambió la situación?",
+          : "Eso es muy poquito. Cuéntame con más detalle: ¿qué hiciste tú, qué pasó, en qué cambió la situación?",
         done: false,
         targetedSignal: null,
         signalsCovered: detectSignals(messages),
@@ -288,9 +288,9 @@ export async function POST(req: NextRequest) {
       `${SYSTEM_PROMPT}${nameHint}\n\n` +
       `HISTORIAL (turno actual del joven: ${userTurns}/${MAX_USER_TURNS}):\n${transcript}\n\n` +
       `SEÑALES YA DETECTADAS (heurística): ${heuristicCovered.join(", ") || "ninguna"}\n` +
-      `SEÑALES PENDIENTES (priorizá una): ${remaining.join(", ") || "ninguna — ya están todas"}\n\n` +
+      `SEÑALES PENDIENTES (prioriza una): ${remaining.join(", ") || "ninguna — ya están todas"}\n\n` +
       `PREGUNTAS QUE YA HICISTE (NO las repitas):\n${askedSoFar || "(ninguna)"}\n\n` +
-      `Devolvé la SIGUIENTE pregunta o marcá done=true si ya hay 4+ señales cubiertas con detalle.`;
+      `Devuelve la SIGUIENTE pregunta o marca done=true si ya hay 4+ señales cubiertas con detalle.`;
 
     let response;
     try {

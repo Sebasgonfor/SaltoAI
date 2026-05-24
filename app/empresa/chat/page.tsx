@@ -22,39 +22,39 @@ import {
 import type { ChatMessage } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 
-const MAX_TURNS = 7;
+const MAX_TURNS = 6;
 
-// Mismos slots que el endpoint /api/entrevista-empresa. Si cambian allá, cambiar acá.
-const SLOTS: { key: string; label: string; match: RegExp }[] = [
+/**
+ * 5 slots (4 obligatorios + 1 opcional) — sincronizado con
+ * /api/entrevista-empresa/route.ts. Si cambian las regex allá, espejarlas
+ * aquí para que el panel lateral del chat refleje lo que el backend ve.
+ */
+const SLOTS: { key: string; label: string; match: RegExp; optional?: boolean }[] = [
   {
-    key: 'equipo',
-    label: 'Tamaño del equipo',
-    match: /(\d+\s*persona|somos\s*\d+|equipo (de|chico|peque)|fundador|cofounder|socio)/i,
+    key: 'vacante',
+    label: 'Rol a cubrir',
+    match: /(busc[oa]mos|necesit[oa]mos|queremos contratar|el rol es|el puesto|vacante|abrimos posición|una persona que|alguien que|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b)/i,
   },
   {
-    key: 'actividad_semanal',
-    label: 'Actividad semanal',
-    match: /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin)/i,
+    key: 'tareas_del_rol',
+    label: 'Tareas del rol',
+    match: /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin|escribir|disenar|cocinar|despachar|empacar|hacer rutas|llevar contabilidad|gestion|reportes?|ventas|cierre|prospect)/i,
   },
   {
-    key: 'ritmo_contexto',
-    label: 'Ritmo / contexto',
-    match: /(r[áa]pido|caos|presi[óo]n|estres|multitarea|cambio|picos?|presencial|remoto|h[íi]brido|horario|turnos?|jornada|barrio|local|oficina|ciudad)/i,
+    key: 'contexto_equipo',
+    label: 'Contexto del equipo',
+    match: /(\d+\s*(persona|activ[oa]s?|integrantes?|emplead|colaborad)|somos\s*\d+|equipo|fundador|cofounder|socio|empresa|emprendimiento|startup|r[áa]pido|caos|presi[óo]n|estres|multitarea|presencial|remoto|h[íi]brido|horario|turnos?|jornada|barrio|local|oficina|ciudad|barranquilla|bogot[áa]|medell[ií]n|cali)/i,
   },
   {
-    key: 'restricciones_duras',
-    label: 'Restricciones duras',
-    match: /(requisito|obligatorio|s[íi] o s[íi]|no-?negociable|jornada completa|tiempo completo|ingl[ée]s|espa[ñn]ol|excel|portugu[ée]s|licencia|mayor de|m[íi]nimo \d+)/i,
+    key: 'no_negociables',
+    label: 'No negociables',
+    match: /(requisito|obligatorio|s[íi] o s[íi]|no-?negociable|jornada completa|tiempo completo|ingl[ée]s|espa[ñn]ol|excel|portugu[ée]s|licencia|mayor de|m[íi]nimo \d+|deal-?breaker|esencial|imprescindible|prefer|valoramos|importante que|sin lo cual|descartam|descart[éa]|no aplica|no funcion[óo])/i,
   },
   {
-    key: 'fallos_previos',
-    label: 'Fallos previos',
-    match: /(contratamos|antes|anterior|nos fall[óo]|no funcion[óo]|se fue|renunci[óo]|no aguant[óo]|costo|cost[óo]|intentamos)/i,
-  },
-  {
-    key: 'dealbreakers',
-    label: 'Deal-breakers',
-    match: /(deal-?breaker|no-?negociable|esencial|imprescindible|deseable|nice|prefer|valoramos|importante que)/i,
+    key: 'experiencia_previa',
+    label: 'Experiencia previa',
+    optional: true,
+    match: /(contratamos|antes|anterior|nos fall[óo]|se fue|renunci[óo]|no aguant[óo]|primera vez|nunca (he|hemos) contratado|este es el primer|jam[áa]s contratamos|intentamos antes|el anterior|la anterior|el [úu]ltimo|la [úu]ltima)/i,
   },
 ];
 
@@ -105,7 +105,7 @@ function buildOpeningMessage(name: string): ChatMessage {
   const short = name.split(/\s+/)[0] || name;
   return {
     role: 'agent',
-    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, contame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
+    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, cuéntame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
   };
 }
 
@@ -226,7 +226,7 @@ export default function ChatEmpresa() {
     const name = form.companyName.trim();
     const repName = form.legalRepName.trim();
     if (name.length < 2) {
-      setFormError('Escribí la razón social o nombre comercial de la empresa.');
+      setFormError('Escribe la razón social o nombre comercial de la empresa.');
       return;
     }
     const taxErr = validateTaxId(form.taxId);
@@ -235,7 +235,7 @@ export default function ChatEmpresa() {
       return;
     }
     if (repName.length < 2) {
-      setFormError('Escribí el nombre completo del representante legal.');
+      setFormError('Escribe el nombre completo del representante legal.');
       return;
     }
     const docErr = validateDocId(form.legalRepDocId);
@@ -244,7 +244,7 @@ export default function ChatEmpresa() {
       return;
     }
     if (!form.acceptedTerms) {
-      setFormError('Tenés que aceptar los Términos y la Política de Privacidad para continuar.');
+      setFormError('Tienes que aceptar los Términos y la Política de Privacidad para continuar.');
       return;
     }
     const legalRecord: CompanyLegal = {
@@ -288,7 +288,7 @@ export default function ChatEmpresa() {
       if (!res.ok || !data.id) {
         const fallback =
           data?.error ||
-          'No pudimos construir tu necesidad con lo que contaste. Profundizá un poco más con un ejemplo concreto.';
+          'No pudimos construir tu necesidad con lo que contaste. Profundiza un poco más con un ejemplo concreto.';
         setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
         setSubmitError(fallback);
         setClosing(false);
@@ -297,7 +297,7 @@ export default function ChatEmpresa() {
       clearPersisted(user?.uid);
       router.push(`/empresa/matches/${data.id}`);
     } catch {
-      setSubmitError('Error de red. Probá enviar de nuevo en un momento.');
+      setSubmitError('Error de red. Prueba enviar de nuevo en un momento.');
       setClosing(false);
     }
   };
@@ -329,7 +329,7 @@ export default function ChatEmpresa() {
       const data = await res.json();
       const agentMsg: ChatMessage = {
         role: 'agent',
-        content: data.nextQuestion || 'Contame más sobre eso, ¿podés darme un ejemplo concreto?',
+        content: data.nextQuestion || 'Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?',
       };
       const updated = [...history, agentMsg];
       setMessages(updated);
@@ -347,14 +347,14 @@ export default function ChatEmpresa() {
         {
           role: 'agent',
           content: aborted
-            ? 'Estoy demorando más de la cuenta. Probá enviar la respuesta otra vez en un momento.'
-            : 'Tuvimos un problema. ¿Podés contarme otra vez?',
+            ? 'Estoy demorando más de la cuenta. Prueba enviar la respuesta otra vez en un momento.'
+            : 'Tuvimos un problema. ¿Puedes contarme otra vez?',
         },
       ]);
       setSubmitError(
         aborted
-          ? 'El servidor demoró demasiado. Reintentá en unos segundos.'
-          : 'No pudimos contactar al servidor. Revisá tu conexión y reintentá.'
+          ? 'El servidor demoró demasiado. Reinténtalo en unos segundos.'
+          : 'No pudimos contactar al servidor. Revisa tu conexión y reinténtalo.'
       );
       setLoading(false);
     }
@@ -454,7 +454,7 @@ export default function ChatEmpresa() {
               <Link href="/legal/privacidad?from=/empresa/chat" className="text-emerald-700 underline" target="_blank" rel="noopener noreferrer">
                 Política de Privacidad
               </Link>{' '}
-              de Salto, incluyendo el tratamiento de datos personales de candidatos.
+              de SaltoAI, incluyendo el tratamiento de datos personales de candidatos.
             </span>
           </label>
 
@@ -497,7 +497,7 @@ export default function ChatEmpresa() {
             Paso 2 de 2 · Entrevista
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            Contame el contexto real, sin jerga.
+            Cuéntame el contexto real, sin jerga.
           </h1>
           <div className="text-slate-600 mt-2 max-w-xl">
             {legal && (
@@ -611,7 +611,7 @@ export default function ChatEmpresa() {
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex gap-2 items-end">
               <Textarea
-                placeholder="Contame con tus palabras…"
+                placeholder="Cuéntame con tus palabras…"
                 className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -648,7 +648,7 @@ export default function ChatEmpresa() {
               </h2>
               {detected.size === 0 ? (
                 <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl p-4 text-center mt-4">
-                  Contame el caos como es, no la versión LinkedIn.
+                  Cuéntame el caos como es, no la versión LinkedIn.
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 mt-4">
@@ -696,14 +696,14 @@ export default function ChatEmpresa() {
             <FileText size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-slate-600 leading-relaxed">
               Al terminar estructuramos rol, contexto, skills y restricciones, y traemos{' '}
-              <strong className="text-slate-900">3 candidatos con score ICS explicable</strong>.
+              <strong className="text-slate-900">hasta 10 candidatos con score ICS explicable</strong>.
             </p>
           </div>
 
           <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex gap-3">
             <Layers size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 leading-relaxed">
-              <strong className="font-semibold">Tip:</strong> describí el día real. "Atiende caja,
+              <strong className="font-semibold">Tip:</strong> describe el día real. "Atiende caja,
               contesta WhatsApp y arma pedidos" es mucho mejor señal que "perfil multifuncional".
             </p>
           </div>
