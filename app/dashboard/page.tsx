@@ -343,9 +343,12 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* ── MAIN CONTENT ── */}
-        {/* max-w-4xl era angosto: con 3 cards por row la radar quedaba
-            apretada. Subo a 6xl para que los widgets respiren. */}
-        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-6xl">
+        {/* Sin max-w: el dashboard ocupa TODO el espacio disponible al
+            costado del sidebar. `flex-1 min-w-0` ya garantiza que se
+            adapta al ancho restante después del sidebar de 208px (w-52).
+            El padding lateral aumenta en pantallas grandes para que el
+            contenido no quede pegado al borde derecho. */}
+        <main className="flex-1 min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7">
 
           {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
               ya muestra greeting (vía nombre + categoría), avatar circular,
