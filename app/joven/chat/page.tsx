@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, User, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio } from 'lucide-react';
+import { User, Sparkles, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio, Pause, Play } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { RoleGate } from '@/components/auth/role-gate';
@@ -151,6 +151,8 @@ function ChatJoven() {
     error: liveError,
     connect: connectLive,
     disconnect: disconnectLive,
+    pause: pauseLive,
+    resume: resumeLive,
     clearError: clearLiveError,
     isActive: liveActive,
   } = useLiveInterview({
@@ -416,20 +418,28 @@ function ChatJoven() {
     await finishInterview(updated);
   };
 
-  const toggleLiveSession = async () => {
-    if (closing) return;
+  const startLiveSession = async () => {
+    if (closing || liveActive || liveStatus === 'connecting') return;
     clearLiveError();
-    if (liveActive || liveStatus === 'connecting') {
-      disconnectLive();
-    } else {
-      await connectLive();
-    }
+    await connectLive();
   };
 
-  // NOTA: el bloque `if (phase === 'basics')` que existía aquí (con JSX inline
-  // del wizard) era código stale dejado por un refactor a `<BasicsWizard>` —
-  // el merge de feat/data lo dejó "cosido" con la siguiente función y rompió
-  // el parser de TS. El render real del paso 1 vive más abajo (línea ~504).
+  const endLiveSession = () => {
+    if (closing) return;
+    clearLiveError();
+    disconnectLive();
+  };
+
+  const pauseLiveSession = () => {
+    if (closing || (liveStatus !== 'listening' && liveStatus !== 'agentSpeaking')) return;
+    pauseLive();
+  };
+
+  const resumeLiveSession = async () => {
+    if (closing || liveStatus !== 'paused') return;
+    clearLiveError();
+    await resumeLive();
+  };
   const switchInterviewMode = (mode: InterviewMode) => {
     if (closing || loading || liveActive || liveStatus === 'connecting') return;
     if (userTurns > 0) return;
@@ -705,6 +715,12 @@ function ChatJoven() {
                         El agente está hablando
                       </>
                     )}
+                    {liveStatus === 'paused' && (
+                      <>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full" />
+                        Pausado — tocá Retomar para continuar
+                      </>
+                    )}
                     {liveStatus === 'idle' && !liveActive && (
                       <span>Toca el botón para iniciar la conversación por voz</span>
                     )}
@@ -715,26 +731,97 @@ function ChatJoven() {
                       <span className="text-rose-600">Error de conexión — prueba de nuevo o usa modo texto</span>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    size="lg"
-                    variant={liveActive ? 'default' : 'outline'}
-                    className={`h-20 w-20 rounded-full p-0 flex-shrink-0 ${
-                      liveActive
-                        ? liveStatus === 'agentSpeaking'
-                          ? 'bg-violet-600 hover:bg-violet-700 animate-pulse'
-                          : 'bg-emerald-600 hover:bg-emerald-700'
-                        : 'border-2 border-emerald-300'
-                    }`}
-                    onClick={() => void toggleLiveSession()}
-                    disabled={closing || atTurnLimit}
-                    title={liveActive ? 'Finalizar sesión de voz' : 'Iniciar conversación por voz'}
-                    aria-label={liveActive ? 'Finalizar sesión de voz' : 'Iniciar conversación por voz'}
-                  >
-                    {liveActive ? <PhoneOff size={28} /> : <Phone size={28} />}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    {(liveStatus === 'idle' || liveStatus === 'closed' || liveStatus === 'error') && !liveActive && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-emerald-300"
+                        onClick={() => void startLiveSession()}
+                        disabled={closing || atTurnLimit}
+                        title="Iniciar conversación por voz"
+                        aria-label="Iniciar conversación por voz"
+                      >
+                        <Phone size={28} />
+                      </Button>
+                    )}
+                    {(liveStatus === 'listening' || liveStatus === 'agentSpeaking') && (
+                      <>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="h-16 w-16 rounded-full p-0 flex-shrink-0 border-slate-300"
+                          onClick={pauseLiveSession}
+                          disabled={closing || atTurnLimit}
+                          title="Pausar conversación"
+                          aria-label="Pausar conversación"
+                        >
+                          <Pause size={24} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="default"
+                          className={`h-20 w-20 rounded-full p-0 flex-shrink-0 ${
+                            liveStatus === 'agentSpeaking'
+                              ? 'bg-violet-600 hover:bg-violet-700 animate-pulse'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
+                          onClick={endLiveSession}
+                          disabled={closing || atTurnLimit}
+                          title="Finalizar sesión de voz"
+                          aria-label="Finalizar sesión de voz"
+                        >
+                          <PhoneOff size={28} />
+                        </Button>
+                      </>
+                    )}
+                    {liveStatus === 'paused' && (
+                      <>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="default"
+                          className="h-20 w-20 rounded-full p-0 flex-shrink-0 bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => void resumeLiveSession()}
+                          disabled={closing || atTurnLimit}
+                          title="Retomar conversación"
+                          aria-label="Retomar conversación"
+                        >
+                          <Play size={28} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="h-16 w-16 rounded-full p-0 flex-shrink-0 border-rose-300 text-rose-600 hover:bg-rose-50"
+                          onClick={endLiveSession}
+                          disabled={closing || atTurnLimit}
+                          title="Finalizar sesión de voz"
+                          aria-label="Finalizar sesión de voz"
+                        >
+                          <PhoneOff size={24} />
+                        </Button>
+                      </>
+                    )}
+                    {liveStatus === 'connecting' && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-amber-300"
+                        disabled
+                        aria-label="Conectando"
+                      >
+                        <Phone size={28} className="opacity-50" />
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 text-center max-w-sm leading-relaxed">
                     Modo voz en tiempo real: habla naturalmente, el agente responde con voz de IA y ves la transcripción en vivo.
+                    Usa audífonos para mejor calidad.
                   </p>
                 </div>
               </>
