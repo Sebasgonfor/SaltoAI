@@ -528,7 +528,7 @@ export default function ChatEmpresa() {
     // sticky del layout (h-20). El header del chat y el grid se reparten ese
     // espacio sin generar scroll externo en el body. En mobile/pantallas
     // bajas se relaja a min-h para no aplastar el contenido.
-    <div className="md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+    <div className="md:h-[calc(100dvh-80px)] md:overflow-y-auto max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
       <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
