@@ -127,8 +127,8 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
           <Inbox size={28} className="text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
             Cuando una empresa abra tu perfil, vas a ver acá su feedback —
-            sea bueno, sea regular o sea un "no avanzo porque…". Es data
-            accionable para crecer.
+            sea bueno, sea regular o sea un &ldquo;no avanzo porque…&rdquo;.
+            Es data accionable para crecer.
           </p>
         </div>
       ) : (
@@ -172,11 +172,20 @@ function ThreadCard({ thread, profileId, youthUid, onReplyPosted }: ThreadCardPr
   const submitReply = async () => {
     if (!replyText.trim() || submitting) return;
     setSubmitting(true);
+    // targetId único POR PARENT para que el dedup del localStorage no
+    // bloquee el segundo reply del joven. Si usáramos solo `profileId`,
+    // emitSignal vería la key ya marcada y cortaría el segundo reply
+    // silencioso. El endpoint /api/feedback/youth filtra replies por
+    // `parentFeedbackId`, no por `targetId`, así que esta clave compuesta
+    // no rompe el anidado del inbox.
+    const replyTargetId = feedback.id
+      ? `${profileId}__reply_to_${feedback.id}`
+      : `${profileId}__reply_${feedback.timestamp ?? Date.now()}`;
     const ok = await emitSignal({
       touchpoint: 'youth_reply_to_company',
       kind: 'explicit',
       targetType: 'profile',
-      targetId: profileId,
+      targetId: replyTargetId,
       userId: youthUid,
       userRole: 'joven',
       text: replyText.trim(),

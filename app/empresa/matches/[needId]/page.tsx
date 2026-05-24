@@ -21,6 +21,7 @@ import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { NeedRadiography } from '@/components/empresa/need-radiography';
 import { emitSignal } from '@/lib/feedback';
 
 interface MatchResponse {
@@ -228,6 +229,34 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
               {need.companyName}
             </h1>
             <p className="text-lg text-slate-700 max-w-3xl">{need.role}</p>
+            {need.jobNature && (
+              <div className="mt-2 inline-flex items-center gap-2 text-xs">
+                <Badge
+                  variant="outline"
+                  className={
+                    need.jobNature === 'cuantitativa'
+                      ? 'bg-blue-50 text-blue-800 border-blue-200'
+                      : need.jobNature === 'cualitativa'
+                        ? 'bg-violet-50 text-violet-800 border-violet-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                  }
+                  title={
+                    need.jobNature === 'cuantitativa'
+                      ? 'El motor pondera ALTO los resultados medibles del candidato.'
+                      : need.jobNature === 'cualitativa'
+                        ? 'El motor NO castiga al candidato por no traer métricas — valora detalle, constancia y confiabilidad.'
+                        : 'Pesos balanceados; no se favorece ni penaliza la ausencia de métricas.'
+                  }
+                >
+                  Rol {need.jobNature}
+                </Badge>
+                {need.jobNatureReason && (
+                  <span className="text-slate-500 italic max-w-md truncate" title={need.jobNatureReason}>
+                    {need.jobNatureReason}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <Link href="/empresa/chat">
             <Button variant="outline" size="sm">Editar necesidad</Button>
@@ -284,6 +313,14 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         targetId={needId}
         dismissible
       />
+
+      {/* Radiografía — dashboard rico antes de los matches.
+          Convierte la página en una vista de inteligencia operativa:
+          KPIs + salud + histograma + dimensiones + skills coverage +
+          perfil de empresa + engagement. Reduce la fricción para que
+          el founder entienda QUÉ es lo que está mirando antes de ir
+          candidato por candidato. */}
+      <NeedRadiography need={need} matches={matches} needId={needId} />
 
       {/* Aviso (rate-limit en ranking, contexto débil, etc.) */}
       {data.warning && (

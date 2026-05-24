@@ -28,7 +28,7 @@ import { loadFeedbackIndex } from "./feedback-signal";
 import { listDocumentsByProfile } from "./db";
 import type { DocumentSkill } from "./types";
 import {
-  ICS_WEIGHTS,
+  weightsForNeed,
   type CompanyNeed,
   type ICSBreakdown,
   type Match,
@@ -44,13 +44,37 @@ const GEMINI_TIMEOUT_MS = 25_000;
 const RANK_BATCH_PROMPT = `Eres el motor de scoring ICS (Índice de Compatibilidad Salto).
 Recibes UNA necesidad de empresa y N candidatos (shortlist). Devuelves un objeto con un array "results" del MISMO largo y MISMO orden que la lista de candidatos.
 
+CRÍTICO — NATURALEZA DEL ROL (lee esto antes de scorear):
+La necesidad incluye un campo "jobNature" que cambia QUÉ se valora. SaltoAI sirve a una variedad de roles, NO solo a vendedores y growth hackers. Tu evaluación debe adaptarse.
+
+  * jobNature = "cuantitativa" → el valor del rol se mide en NÚMEROS (ventas, leads, % de crecimiento, NPS).
+    Ejemplos: vendedor, growth, marketing digital, community manager con KPI, e-commerce, SDR.
+    EN ESTE CASO valora ALTO: "Resultados medibles" en la evidencia, autodidactismo, iniciativa scrappy.
+    Si el candidato no trae métricas concretas (números, %, cantidades) → learningSignal baja, skillsFit baja.
+
+  * jobNature = "cualitativa" → el valor se mide en CONSISTENCIA, RIGOR Y CUIDADO. NO en números.
+    Ejemplos: contador / contabilidad MIPYME, cajero, diseñador gráfico, archivista, asistente
+    administrativo, operario, recepcionista, conserje, cocinero, mensajero confiable, costurero,
+    encargado de stock.
+    EN ESTE CASO valora ALTO: "Confiabilidad", "Detallismo", "Sentido del orden", "Constancia",
+    "Atención a la regla", "Estabilidad". NO esperes ni penalices la falta de métricas — un
+    contador que dice "cuadré caja todos los días sin un faltante en 8 meses" es ORO, no necesita
+    "triplé las ventas". Un diseñador gráfico que muestra criterio estético y rigor no necesita
+    decir "subí seguidores 200%".
+    PROHIBIDO penalizar learningSignal por ausencia de números — en roles cualitativos, learningSignal
+    debe medir "aprendió a hacer su trabajo BIEN", no "aprendió a hacerlo SOLO con tutoriales".
+
+  * jobNature = "mixta" → balance neutro. Default cuando no hay clasificación clara.
+
 Para cada candidato devuelve:
 - profileId: copia EXACTAMENTE el profileId del candidato en esa posición. NO inventes IDs.
 - skillsFit (0-100): cuán bien las habilidades del candidato cubren los requiredSkills (semánticamente, no por keywords). "Atención al Cliente" cubre "manejo de clientes en local" → suma. CADA candidato trae dos listas de habilidades: "skills" (declaradas en entrevista, auto-reportadas) Y "verifiedSkills" (EXTRAÍDAS DE DOCUMENTOS reales como certificados/diplomas, con cita textual). Las verifiedSkills PESAN MÁS: si una verifiedSkill cubre una requiredSkill, súmale 15-20 puntos extra a skillsFit respecto a si solo estuviera en "skills". Si TODAS las requiredSkills están cubiertas por verifiedSkills, skillsFit debe estar en 85-100.
 - verifiedSkills (relacionadas al rol): de las verifiedSkills del candidato, identifica las que cubren requiredSkills. Devuélvelas en el campo "verifiedRelevant" del response.
-- behavioralFit (0-100): compatibilidad entre traits del candidato y desiredTraits de la empresa.
-- learningSignal (0-100): evidencia REAL de aprendizaje autónomo / resolver sin guía en el campo evidence. Si no hay evidencia clara, bajo (20-40). Si hay caso concreto (aprendió Excel por YouTube, descubrió cómo hacer X solo), alto (70+).
-- contextFit (0-100): cuán bien los traits aguantan el contexto operativo descrito (caos, ritmo rápido, multitarea, presencial, etc.). Si el contexto pide "tolerancia al caos" y el candidato tiene "metódico" pero ningún rasgo de tolerancia al caos, bajo.
+- behavioralFit (0-100): compatibilidad entre traits del candidato y desiredTraits de la empresa. EN ROLES CUALITATIVOS este es el más importante — buscás rasgos como "detallista", "responsable", "constante", "cuidadoso", "metódico", "paciente". Una cita como "cuadré la caja todos los días sin faltantes" o "ordené el stock y no se perdió nada en 6 meses" debe llevar behavioralFit a 80+.
+- learningSignal (0-100):
+  - Roles cuantitativos: evidencia REAL de aprendizaje autónomo / resolver sin guía (aprendió Excel por YouTube, etc). Sin evidencia clara → 20-40. Caso concreto → 70+.
+  - Roles cualitativos: NO PENALICES si el candidato no muestra autodidactismo scrappy. Acá learningSignal mide la capacidad de hacer su trabajo BIEN con instrucciones claras. Si demuestra constancia + ejecución pulcra → 60-80 (no más, porque cualitativo NO necesita iniciativa de inventar la rueda).
+- contextFit (0-100): cuán bien los traits del candidato encajan con el contexto operativo descrito. Si el contexto es caos+multitarea pero el candidato es "metódico ordenado", contextFit bajo. Si el contexto es "MIPYME tranquila, finanzas que ordenar" y el candidato es "detallista paciente", contextFit alto.
 - penalties (0-100): 0 si no hay hardConstraints incumplidos. 30-60 si un hard constraint está claramente incumplido. 100 si es bloqueante (ej. necesidad pide ubicación fija incompatible).
 - reason (1-2 frases): CITANDO evidencia concreta del candidato. Sin halagos genéricos.
 - redFlag (1 frase): nota honesta sobre lo que falta o NO tenemos evidencia. Si no hay nada, "Ninguna señal negativa visible."
@@ -59,6 +83,7 @@ Para cada candidato devuelve:
 CRÍTICO:
 - Compara los candidatos entre sí. NO inflar todos al mismo nivel.
 - NO inventes datos. Si un campo no tiene evidencia, refleja eso en score bajo + redFlag honesto.
+- ADAPTA TU EVALUACIÓN AL jobNature — no penalices al contador callado y detallista por no traer métricas.
 - El array results debe tener el MISMO orden que la lista recibida.`;
 
 const itemSchema = {
@@ -113,12 +138,25 @@ function clamp(n: number, lo = 0, hi = 100): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-export function computeICS(b: ICSBreakdown): number {
+/**
+ * Cálculo del ICS final.
+ *
+ * Acepta `need` opcional para usar los pesos calibrados a la naturaleza del
+ * rol (cuantitativa/cualitativa/mixta). Sin `need`, usa los pesos "mixta"
+ * — retro-compatible con el comportamiento anterior.
+ *
+ * Por qué el cambio: un perfil "callado y detallista" candidato a contador
+ * de MIPYME no debería castigarse por NO traer métricas. Las métricas pesan
+ * en roles cuantitativos (vendedor, growth); en roles cualitativos pesa más
+ * el behavioralFit (cuidado, confiabilidad, consistencia).
+ */
+export function computeICS(b: ICSBreakdown, need?: Pick<CompanyNeed, "jobNature">): number {
+  const w = need ? weightsForNeed(need) : weightsForNeed({});
   const raw =
-    ICS_WEIGHTS.skillsFit * b.skillsFit +
-    ICS_WEIGHTS.behavioralFit * b.behavioralFit +
-    ICS_WEIGHTS.learningSignal * b.learningSignal +
-    ICS_WEIGHTS.contextFit * b.contextFit -
+    w.skillsFit * b.skillsFit +
+    w.behavioralFit * b.behavioralFit +
+    w.learningSignal * b.learningSignal +
+    w.contextFit * b.contextFit -
     b.penalties;
   return Math.round(clamp(raw));
 }
@@ -186,7 +224,7 @@ export function heuristicScore(
   };
 
   return {
-    ics: computeICS(breakdown),
+    ics: computeICS(breakdown, need),
     breakdown,
     reason: skillMatches.length
       ? `Tiene experiencia directa en ${skillMatches.slice(0, 2).join(" y ")}, alineado con lo que pediste.`
@@ -320,6 +358,8 @@ async function rankBatchWithLLM(
     requiredSkills: need.requiredSkills,
     desiredTraits: need.desiredTraits,
     hardConstraints: need.hardConstraints,
+    jobNature: need.jobNature ?? "mixta",
+    jobNatureReason: need.jobNatureReason,
   };
   const candidatesPayload = profiles.map((p) => ({
     profileId: p.id,
@@ -378,7 +418,7 @@ async function rankBatchWithLLM(
       penalties: clamp(Number(it.penalties)),
     };
     map.set(profile.id!, {
-      ics: computeICS(breakdown),
+      ics: computeICS(breakdown, need),
       breakdown,
       reason: it.reason || "",
       redFlag: it.redFlag || "Ninguna señal negativa visible.",

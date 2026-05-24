@@ -17,10 +17,29 @@ Reglas:
 - role: 1 línea, claro, sin jerga corporativa. Ej: "Persona para atención al cliente y redes en local de comida."
 - context: condiciones operativas reales (equipo pequeño, sin protocolos, ritmo rápido, multitarea, recursos limitados, etc.). Si el founder no describió contexto, deja un string vacío — NO inventes ritmo o cultura.
 - requiredSkills: skills concretas que el rol exige. 3-6.
-- desiredTraits: rasgos conductuales que el contexto exige (ej. tolerancia al caos, autodidactismo, orientación a resultados). 2-5.
+- desiredTraits: rasgos conductuales que el contexto exige. ADAPTALOS A LA NATURALEZA DEL ROL: para roles cuantitativos (vendedor, marketing) → "Orientación a resultados", "Tolerancia al caos", "Iniciativa". Para roles cualitativos (contador, cajero, diseñador, archivista) → "Detallista", "Confiable", "Sentido del orden", "Constancia". 2-5 rasgos.
 - hardConstraints: restricciones duras y verificables (ubicación, disponibilidad horaria, idioma, edad mínima legal). 0-3. Si no hay, vacío.
+
+- jobNature: clasifica el rol en una de TRES categorías. Esto cambia cómo el motor evalúa candidatos:
+  * "cuantitativa": el valor del rol se mide en NÚMEROS (ventas, leads, crecimiento, conversión, NPS).
+    Ejemplos: vendedor, growth, marketing, community manager, SDR, e-commerce, ventas B2B/B2C.
+    En este caso, el motor PREMIA evidencia de resultados medibles del candidato.
+  * "cualitativa": el valor del rol se mide en CONSISTENCIA, RIGOR Y CUIDADO. No se cuantifica en %.
+    Ejemplos: contador / contabilidad de MIPYME, cajero, diseñador gráfico, archivista, asistente
+    administrativo, operario, recepcionista, conserje, cocinero, costurero, mensajero confiable.
+    Acá pedir "triplé las ventas" es absurdo — lo que importa es "cuadré caja todos los días sin un faltante",
+    "diseñé X piezas con el tono que pidió el cliente", "manejé el archivo sin perder nada".
+    En este caso, el motor NO debe castigar al candidato por no traer métricas; debe valorar
+    confiabilidad, detalle, orden, consistencia.
+  * "mixta": cuando puede ir hacia cualquier lado o el founder describió poco contexto.
+    Ejemplos: atención al cliente puro, asistente general, redes sociales sin objetivo claro.
+    Default cuando no estás seguro.
+
+- jobNatureReason: 1 frase MAX de por qué clasificaste así. Útil para auditoría humana.
+  Ej: "Cualitativa: rol contable en empresa pequeña, valor está en evitar errores no en métricas."
+
 - NO inventes. Si el founder no mencionó algo, no lo agregues.
-- Idioma: español natural.`;
+- Idioma: español natural neutro latinoamericano.`;
 
 const schema = {
   type: Type.OBJECT,
@@ -30,9 +49,25 @@ const schema = {
     requiredSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
     desiredTraits: { type: Type.ARRAY, items: { type: Type.STRING } },
     hardConstraints: { type: Type.ARRAY, items: { type: Type.STRING } },
+    jobNature: { type: Type.STRING },
+    jobNatureReason: { type: Type.STRING },
   },
-  required: ["role", "context", "requiredSkills", "desiredTraits", "hardConstraints"],
+  required: [
+    "role",
+    "context",
+    "requiredSkills",
+    "desiredTraits",
+    "hardConstraints",
+    "jobNature",
+  ],
 };
+
+function normalizeJobNature(raw: unknown): "cuantitativa" | "cualitativa" | "mixta" {
+  const s = typeof raw === "string" ? raw.toLowerCase().trim() : "";
+  if (s === "cuantitativa") return "cuantitativa";
+  if (s === "cualitativa") return "cualitativa";
+  return "mixta";
+}
 
 function mockStructure(): Omit<CompanyNeed, "id" | "createdAt" | "embedding" | "companyName" | "rawDescription"> {
   return {
@@ -41,6 +76,8 @@ function mockStructure(): Omit<CompanyNeed, "id" | "createdAt" | "embedding" | "
     requiredSkills: ["Gestión de Redes Sociales", "Atención al Cliente", "Ventas B2C"],
     desiredTraits: ["Tolerancia al caos", "Proactividad", "Orientación a resultados"],
     hardConstraints: [],
+    jobNature: "mixta",
+    jobNatureReason: "Mock: clasificación neutra por defecto.",
   };
 }
 
@@ -113,6 +150,9 @@ export async function POST(req: NextRequest) {
         requiredSkills: Array.isArray(parsed.requiredSkills) ? parsed.requiredSkills : [],
         desiredTraits: Array.isArray(parsed.desiredTraits) ? parsed.desiredTraits : [],
         hardConstraints: Array.isArray(parsed.hardConstraints) ? parsed.hardConstraints : [],
+        jobNature: normalizeJobNature(parsed.jobNature),
+        jobNatureReason:
+          typeof parsed.jobNatureReason === "string" ? parsed.jobNatureReason : undefined,
       };
 
       // Edge case: el founder mandó texto pero no se pudo estructurar nada útil.

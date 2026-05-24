@@ -24,7 +24,7 @@ import { Star, Check, MessageCircle, X, AlertTriangle, Send } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/auth-context';
-import { emitSignal, hasEmittedExplicit, markEmitted } from '@/lib/feedback';
+import { emitSignal, hasEmittedExplicit } from '@/lib/feedback';
 
 // ─── CompanyFeedbackToYouth ──────────────────────────────────────────────────
 
@@ -53,15 +53,16 @@ export function CompanyFeedbackToYouth({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // No re-mostrar si ya envió feedback para este perfil (por empresa-uid+profile).
-  // El dedup queda atado al targetId que mandamos al server.
-  const dedupTargetId = `${profileId}__from_${user?.uid ?? 'anon'}`;
-
+  // Dedup alineado con lo que `emitSignal` marca server-side: el targetId
+  // que va al server ES `profileId` (sin sufijo). localStorage ya es
+  // por-browser, así que founders distintos en browsers distintos no
+  // se bloquean entre sí. Y dentro del mismo browser/founder, queremos
+  // exactamente UN feedback por relación founder→joven.
   useEffect(() => {
-    if (hasEmittedExplicit('company_feedback_to_youth', dedupTargetId)) {
+    if (hasEmittedExplicit('company_feedback_to_youth', profileId)) {
       setSubmitted(true);
     }
-  }, [dedupTargetId]);
+  }, [profileId]);
 
   // Si el viewer no es empresa, no renderizamos nada. Defensa en profundidad:
   // el caller ya gatea por viewerIsEmpresa, pero un día puede equivocarse.
@@ -87,11 +88,8 @@ export function CompanyFeedbackToYouth({
         user?.displayName || user?.email?.split('@')[0] || 'Una empresa',
     });
     if (ok) {
-      // El emitSignal marca emitted automáticamente para explicit, pero usa
-      // el `targetId` original (profileId). Forzamos el marker con el
-      // dedupTargetId que incluye el uid del founder para evitar que distintos
-      // founders queden bloqueados entre sí.
-      markEmitted('company_feedback_to_youth', dedupTargetId);
+      // emitSignal ya marcó (company_feedback_to_youth, profileId) en
+      // localStorage — no necesitamos un markEmitted extra.
       setSubmitted(true);
     } else {
       setError('No pudimos enviar tu feedback. Reintenta en un momento.');
@@ -254,13 +252,13 @@ export function PassReasonButton({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dedupTargetId = `${profileId}__from_${user?.uid ?? 'anon'}`;
-
+  // Mismo razonamiento que CompanyFeedbackToYouth: dedup alineado con el
+  // targetId que va al server (profileId), localStorage por-browser.
   useEffect(() => {
-    if (hasEmittedExplicit('company_pass_reason', dedupTargetId)) {
+    if (hasEmittedExplicit('company_pass_reason', profileId)) {
       setSubmitted(true);
     }
-  }, [dedupTargetId]);
+  }, [profileId]);
 
   if (account?.role !== 'empresa') return null;
 
@@ -289,7 +287,7 @@ export function PassReasonButton({
         user?.displayName || user?.email?.split('@')[0] || 'Una empresa',
     });
     if (ok) {
-      markEmitted('company_pass_reason', dedupTargetId);
+      // emitSignal ya marcó (company_pass_reason, profileId).
       setSubmitted(true);
       setOpen(false);
     } else {
