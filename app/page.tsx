@@ -37,7 +37,7 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* HERO */}
-        <section className="relative px-6 pt-24 pb-32 md:pt-32 md:pb-40 overflow-hidden">
+        <section className="relative px-4 sm:px-6 pt-14 pb-20 sm:pt-24 sm:pb-32 md:pt-32 md:pb-40 overflow-hidden">
           <div className="max-w-6xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-8">
@@ -45,7 +45,7 @@ export default function LandingPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />
                   Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI
                 </Badge>
-                <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-display font-bold tracking-tight leading-[0.95] text-balance">
+                <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-[5.5rem] font-display font-bold tracking-tight leading-[0.95] text-balance">
                   Tu primer empleo formal{' '}
                   <span className="text-emerald-600">no debería depender</span>{' '}
                   de un CV que aún no puedes tener.
@@ -54,7 +54,7 @@ export default function LandingPage() {
                   Salto es la plataforma de IA que <strong className="text-slate-900 font-semibold">traduce experiencia informal en evidencia laboral real</strong>, y emparenta jóvenes con empresas tempranas por <strong className="text-slate-900 font-semibold">potencial</strong>, no por años en un papel.
                 </p>
 
-                <div className="mt-12 flex flex-col sm:flex-row gap-3">
+                <div className="mt-8 sm:mt-12 flex flex-col sm:flex-row gap-3">
                   <RoleCTA
                     role="joven"
                     href="/joven/chat"
@@ -90,7 +90,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <aside className="lg:col-span-4 lg:pl-4 lg:pt-4">
+              <aside className="hidden lg:block lg:col-span-4 lg:pl-4 lg:pt-4">
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/40 p-5 rotate-1">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -137,22 +137,22 @@ export default function LandingPage() {
 
         {/* PROBLEMA — LA TIJERA */}
         <section id="problema" className="bg-white border-y border-slate-200">
-          <div className="max-w-6xl mx-auto px-6 py-24">
-            <div className="max-w-2xl mb-16">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+            <div className="max-w-2xl mb-10 sm:mb-16">
               <div className="text-xs uppercase tracking-[0.18em] text-emerald-600 font-semibold mb-4">El problema</div>
-              <h2 className="text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
                 Dos lados rotos que se necesitan mutuamente y no se encuentran.
               </h2>
             </div>
 
             <div className="grid md:grid-cols-2 gap-px bg-slate-200 border border-slate-200 rounded-2xl overflow-hidden">
-              {/* Lado joven */}
-              <div className="bg-white p-10 flex flex-col">
+              {/* Soy joven */}
+              <div className="bg-white p-6 sm:p-10 flex flex-col">
                 <div className="flex items-center gap-2 mb-6">
                   <div className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span className="text-xs uppercase tracking-wider font-semibold text-rose-700">Lado joven</span>
+                  <span className="text-xs uppercase tracking-wider font-semibold text-rose-700">Soy joven</span>
                 </div>
-                <blockquote className="font-display text-2xl md:text-3xl text-slate-900 font-medium leading-snug mb-6">
+                <blockquote className="font-display text-xl sm:text-2xl md:text-3xl text-slate-900 font-medium leading-snug mb-6">
                   "No me contratan porque no tengo experiencia, y no tengo experiencia porque no me contratan."
                 </blockquote>
                 <p className="text-slate-600 leading-relaxed">
@@ -160,13 +160,13 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              {/* Lado empresa */}
-              <div className="bg-slate-50 p-10 flex flex-col">
+              {/* Soy empresa */}
+              <div className="bg-slate-50 p-6 sm:p-10 flex flex-col">
                 <div className="flex items-center gap-2 mb-6">
                   <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-xs uppercase tracking-wider font-semibold text-amber-700">Lado empresa</span>
+                  <span className="text-xs uppercase tracking-wider font-semibold text-amber-700">Soy empresa</span>
                 </div>
-                <blockquote className="font-display text-2xl md:text-3xl text-slate-900 font-medium leading-snug mb-6">
+                <blockquote className="font-display text-xl sm:text-2xl md:text-3xl text-slate-900 font-medium leading-snug mb-6">
                   "Necesito contratar, pero un junior es un riesgo carísimo."
                 </blockquote>
                 <p className="text-slate-600 leading-relaxed">
@@ -185,10 +185,10 @@ export default function LandingPage() {
 
         {/* FLUJO — CÓMO FUNCIONA */}
         <section id="flujo" className="bg-slate-950 text-white relative overflow-hidden">
-          <div className="max-w-6xl mx-auto px-6 py-24">
-            <div className="max-w-2xl mb-16">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+            <div className="max-w-2xl mb-10 sm:mb-16">
               <div className="text-xs uppercase tracking-[0.18em] text-emerald-400 font-semibold mb-4">Cómo funciona</div>
-              <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight leading-tight">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold tracking-tight leading-tight">
                 Historia → Evidencia → Match con desglose explicable.
               </h2>
               <p className="mt-6 text-lg text-slate-300 leading-relaxed">
@@ -240,11 +240,11 @@ export default function LandingPage() {
 
         {/* IA — NO ES UN WRAPPER */}
         <section id="ia" className="bg-white border-y border-slate-200">
-          <div className="max-w-6xl mx-auto px-6 py-24">
-            <div className="grid lg:grid-cols-12 gap-12 items-start">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+            <div className="grid lg:grid-cols-12 gap-8 sm:gap-12 items-start">
               <div className="lg:col-span-5">
                 <div className="text-xs uppercase tracking-[0.18em] text-emerald-600 font-semibold mb-4">La IA, en serio</div>
-                <h2 className="text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight mb-8">
+                <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight mb-6 sm:mb-8">
                   Esto no es un wrapper de ChatGPT.
                 </h2>
                 <p className="text-lg text-slate-600 leading-relaxed mb-6">
@@ -280,7 +280,7 @@ export default function LandingPage() {
                       { label: 'Ajuste de contexto operativo', weight: 15, color: 'bg-amber-300' },
                     ].map(({ label, weight, color }) => (
                       <div key={label} className="flex items-center gap-4">
-                        <span className="w-56 text-sm text-slate-700">{label}</span>
+                        <span className="w-32 sm:w-56 text-sm text-slate-700">{label}</span>
                         <div className="flex-1 h-3 bg-white border border-slate-200 rounded-full overflow-hidden">
                           <div className={`h-full ${color} rounded-full`} style={{ width: `${weight * 2}%` }} />
                         </div>
@@ -317,8 +317,8 @@ export default function LandingPage() {
 
         {/* CTA FINAL */}
         <section className="bg-emerald-950 text-white">
-          <div className="max-w-5xl mx-auto px-6 py-24 text-center">
-            <h2 className="text-4xl md:text-6xl font-display font-bold tracking-tight leading-tight">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
+            <h2 className="text-2xl sm:text-4xl md:text-6xl font-display font-bold tracking-tight leading-tight">
               Empresas tempranas y jóvenes tempranos,{' '}
               <span className="text-emerald-400">creciendo juntos.</span>
             </h2>
