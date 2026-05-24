@@ -15,6 +15,9 @@ import {
   Heart,
   CheckCircle2,
   ArrowUpRight,
+  Activity,
+  Sparkles,
+  ThumbsUp,
 } from 'lucide-react';
 
 // ─── Animated helpers ────────────────────────────────────────────────────────
@@ -211,6 +214,252 @@ const STORIES = [
   },
 ];
 
+// ─── Flywheel telemetría (data real) ─────────────────────────────────────────
+
+interface FlywheelTouchpoint {
+  touchpoint: string;
+  total: number;
+  explicit: number;
+  implicit: number;
+  positiveRate: number | null;
+  lastTimestamp: number | null;
+  withIcsCount: number;
+}
+
+interface FlywheelData {
+  total: number;
+  byKind: { explicit: number; implicit: number };
+  touchpoints: FlywheelTouchpoint[];
+  calibration: {
+    icsVsOutcomeCorrelation: number;
+    sampleSize: number;
+    aiPreevalAgreementRate: number | null;
+    preevalSampleSize: number;
+  };
+}
+
+// Labels en español neutro para los 17 touchpoints del PRD §8.6.
+// Si agregás un touchpoint nuevo en lib/types.ts, agregalo acá también
+// para que aparezca con nombre humano en lugar del snake_case del backend.
+const TOUCHPOINT_LABELS: Record<string, string> = {
+  interview_quality: 'Calidad de la entrevista',
+  profile_accuracy: 'Precisión del perfil',
+  evidence_quote: 'Citas de evidencia',
+  cv_generated: 'CV descargado',
+  opportunity_click: 'Click en oportunidad',
+  microtask_clarity: 'Claridad de la tarea',
+  microtask_evaluation: 'Justicia de la evaluación',
+  latent_suggestion: 'Sugerencia de rol latente',
+  course_recommendation: 'Curso recomendado',
+  need_structuring: 'Estructuración de necesidad',
+  match_useful: 'Utilidad del match',
+  profile_click: 'Empresa abre perfil',
+  microtask_proposed: 'Microtask propuesta',
+  microtask_outcome: 'Outcome de microtask',
+  ai_preeval_agreement: 'Acuerdo con pre-eval IA',
+  post_hire_followup: 'Contratación formal',
+  red_flag_accuracy: 'Acierto del red flag',
+  legacy: 'Señal legacy (pre-v3)',
+};
+
+function FlywheelSection() {
+  const [data, setData] = useState<FlywheelData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/flywheel');
+        if (!res.ok) {
+          if (!cancelled) setError('No pudimos cargar el flywheel.');
+          return;
+        }
+        const json = (await res.json()) as FlywheelData;
+        if (!cancelled) setData(json);
+      } catch {
+        if (!cancelled) setError('Error de red.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 animate-pulse">
+        <div className="h-5 w-1/3 bg-slate-200 rounded mb-3" />
+        <div className="h-8 w-1/2 bg-slate-200 rounded mb-6" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-slate-100 rounded-xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (error || !data) {
+    return null; // demo-friendly: si falla, no rompemos la página.
+  }
+
+  // Si hay 0 señales, mostramos un mensaje honesto (estamos en demo limpio)
+  // en lugar de números falsos.
+  const isEmpty = data.total === 0;
+  const corrSign = data.calibration.icsVsOutcomeCorrelation;
+  const corrLabel =
+    corrSign > 0.5
+      ? 'Bien calibrado'
+      : corrSign > 0.2
+        ? 'Calibración débil +'
+        : corrSign > -0.2
+          ? 'Sin señal aún'
+          : 'Anti-calibrado';
+  const corrColor =
+    corrSign > 0.5
+      ? 'text-emerald-600'
+      : corrSign > 0.2
+        ? 'text-amber-600'
+        : corrSign > -0.2
+          ? 'text-slate-500'
+          : 'text-rose-600';
+
+  return (
+    <FadeUp>
+      <section className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 md:p-10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl" aria-hidden />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity size={14} className="text-emerald-400" />
+            <span className="text-xs uppercase tracking-[0.18em] text-emerald-300 font-semibold">
+              Data flywheel · en vivo
+            </span>
+          </div>
+          <h2 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl tracking-tight leading-tight mb-3">
+            El motor reentrena con cada señal.
+          </h2>
+          <p className="text-slate-300 leading-relaxed max-w-2xl mb-8">
+            Cada interacción del producto (click, voto, evaluación) alimenta el
+            ground-truth que afina el ICS. Esto es lo que separa a SaltoAI de un
+            wrapper sobre LinkedIn — y lo medimos vivo.
+          </p>
+
+          {isEmpty ? (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center">
+              <Sparkles size={28} className="text-emerald-400 mx-auto mb-3" />
+              <p className="text-sm text-slate-300 max-w-md mx-auto">
+                El flywheel arrancó limpio para esta demo. Cuando jóvenes y
+                empresas usen el producto, vas a ver acá las señales en tiempo
+                real por cada uno de los 17 puntos del PRD §8.6.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Top stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                    Señales totales
+                  </div>
+                  <div className="font-display font-bold text-3xl text-white tabular-nums">
+                    <CountUp to={data.total} />
+                  </div>
+                </div>
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                    Explícitas
+                  </div>
+                  <div className="font-display font-bold text-3xl text-emerald-400 tabular-nums">
+                    <CountUp to={data.byKind.explicit} />
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    El user dijo algo activamente
+                  </div>
+                </div>
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                    Implícitas
+                  </div>
+                  <div className="font-display font-bold text-3xl text-amber-300 tabular-nums">
+                    <CountUp to={data.byKind.implicit} />
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    Clicks · views · descargas
+                  </div>
+                </div>
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                    ICS ↔ outcome
+                  </div>
+                  <div className={`font-display font-bold text-3xl tabular-nums ${corrColor}`}>
+                    {corrSign.toFixed(2)}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    {corrLabel} · n={data.calibration.sampleSize}
+                  </div>
+                </div>
+              </div>
+
+              {/* Touchpoints table — top 8 por volumen */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                  <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                    Top touchpoints
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {data.touchpoints.length} activos de 17
+                  </div>
+                </div>
+                <div className="divide-y divide-slate-800">
+                  {data.touchpoints.slice(0, 8).map((tp) => (
+                    <div
+                      key={tp.touchpoint}
+                      className="px-5 py-3 flex items-center gap-4 hover:bg-slate-900/40 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">
+                          {TOUCHPOINT_LABELS[tp.touchpoint] ?? tp.touchpoint}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {tp.explicit} explícitas · {tp.implicit} implícitas
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono tabular-nums text-emerald-400 font-bold">
+                          {tp.total}
+                        </div>
+                        {tp.positiveRate !== null && (
+                          <div className="text-[10px] text-slate-500 inline-flex items-center gap-1">
+                            <ThumbsUp size={9} /> {tp.positiveRate}% positivo
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {data.calibration.aiPreevalAgreementRate !== null && (
+                <div className="mt-5 text-xs text-slate-400 leading-relaxed">
+                  <strong className="text-slate-200">Pre-eval IA:</strong>{' '}
+                  {data.calibration.aiPreevalAgreementRate}% de acuerdo entre la
+                  IA y el founder ({data.calibration.preevalSampleSize}{' '}
+                  observaciones). Si baja, reentrenamos el evaluador antes que
+                  el matcher.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+    </FadeUp>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ImpactoDashboard() {
@@ -321,6 +570,12 @@ export default function ImpactoDashboard() {
           </div>
         </FadeUp>
       </section>
+
+      {/* FLYWHEEL TELEMETRY — datos REALES de /api/admin/flywheel.
+          Va arriba de "Historias" porque es el diferenciador defensivo:
+          mostrar que el motor aprende es la mejor narrativa para aliados.
+          Si todavía no hay señales, el componente lo dice honestamente. */}
+      <FlywheelSection />
 
       {/* STORIES */}
       <section>

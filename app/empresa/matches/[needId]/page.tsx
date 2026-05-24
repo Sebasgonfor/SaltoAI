@@ -19,6 +19,9 @@ import {
 import type { CompanyNeed, Match, ICSBreakdown } from '@/lib/types';
 import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
+import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { emitSignal } from '@/lib/feedback';
 
 interface MatchResponse {
   need: CompanyNeed;
@@ -39,7 +42,15 @@ const DIM_LABELS: { key: keyof ICSBreakdown; label: string; weight: number | nul
 /**
  * Fire-and-forget para señales implícitas (click conectar, propose microtask).
  * No bloqueamos al founder con esto; si falla, simplemente no se registra.
- * El motor lo va a leer en el próximo recálculo de scoreCandidates().
+ *
+ * Doble pipe:
+ *   1. /api/feedback/implicit (legacy) — lo lee scoreCandidates() para ajustar
+ *      el ranking en tiempo real (sí, hace recálculo on-the-fly).
+ *   2. /api/feedback (v3) — alimenta el flywheel dashboard con touchpoint
+ *      tipado (profile_click | microtask_proposed). Sin esto el dashboard
+ *      de §8.6 no ve estas señales.
+ *
+ * Ambos endpoints son idempotentes server-side, así que duplicar no rompe.
  */
 function recordImplicitSignal(
   needId: string,
@@ -47,16 +58,30 @@ function recordImplicitSignal(
   signal: 'connect' | 'microtask_proposed',
   icsAtTime?: number,
 ) {
+  // 1. Legacy: el motor lo necesita para ajustes inmediatos.
   try {
     void fetch('/api/feedback/implicit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ needId, profileId, signal, icsAtTime }),
-      keepalive: true, // sobrevive navegación de página
+      keepalive: true,
     }).catch(() => {});
   } catch {
     /* never throws */
   }
+  // 2. v3: el flywheel dashboard. profile_click cuando el founder abre el
+  //    perfil, microtask_proposed cuando lo manda a /empresa/probar.
+  const touchpoint =
+    signal === 'connect' ? 'profile_click' : 'microtask_proposed';
+  void emitSignal({
+    kind: 'implicit',
+    touchpoint,
+    targetType: 'match',
+    targetId: `${needId}__${profileId}`,
+    needId,
+    profileId,
+    icsAtTime,
+  });
 }
 
 function BreakdownBars({
@@ -245,6 +270,21 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         </div>
       </header>
 
+      {/* Feedback "¿la IA capturó bien tu necesidad?" — aparece la PRIMERA
+          vez que el founder ve esta página (el dedup del componente vía
+          localStorage garantiza una sola aparición por needId). Critical:
+          si el founder dice "no", el structuring del prompt es la palanca
+          más alta — un error aquí contamina todo el matching downstream. */}
+      <FeedbackInlinePrompt
+        question="¿La IA capturó bien tu necesidad?"
+        hint="Mirá los skills, rasgos y restricciones de arriba. ¿Reflejan lo que dijiste en la entrevista?"
+        variant="rating"
+        touchpoint="need_structuring"
+        targetType="need"
+        targetId={needId}
+        dismissible
+      />
+
       {/* Aviso (rate-limit en ranking, contexto débil, etc.) */}
       {data.warning && (
         <div
@@ -381,6 +421,26 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <Info size={14} className="mt-0.5 text-slate-400 flex-shrink-0" />
                   <span><strong className="text-slate-900 font-semibold">Red flag IA:</strong> {top.redFlag}</span>
                 </div>
+                {/* Calibración del red flag: ¿el aviso de la IA fue acertado
+                    o ruido? Ground-truth crítico — si vemos muchos "no"
+                    sistemáticos en una dimensión, ajustamos el prompt. */}
+                {top.redFlag && top.redFlag !== 'Ninguna señal negativa visible.' && (
+                  <div className="bg-white/60 backdrop-blur border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-slate-600">
+                      ¿Este red flag fue acertado?
+                    </span>
+                    <FeedbackThumbs
+                      label=""
+                      layout="inline"
+                      silent
+                      touchpoint="red_flag_accuracy"
+                      targetType="match"
+                      targetId={`${needId}__${top.profileId}`}
+                      needId={needId}
+                      profileId={top.profileId}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </article>

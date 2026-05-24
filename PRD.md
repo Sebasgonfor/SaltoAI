@@ -355,6 +355,36 @@ Colección `feedback` en Firestore, schema v3 — cada interacción del producto
 
 **Reentrenamiento** = roadmap fase 1-2 con piloto real. Por ahora el dato queda **propietario** como combustible del flywheel.
 
+**Cableado en producto (Fase B+C+D — feb 2026):** los 17 touchpoints están instrumentados:
+
+| Touchpoint | Dónde dispara | Tipo de prompt |
+|---|---|---|
+| interview_quality | [`/joven/perfil/[id]`](app/joven/perfil/[id]/page.tsx) (post-entrevista) | rating ⭐ |
+| profile_accuracy | mismo archivo | thumbs 👍👎 |
+| evidence_quote | por cita en el perfil | thumbs silent |
+| cv_generated | botón "Descargar CV ATS" en `/joven/perfil/[id]` | implícita |
+| opportunity_click | [`/joven/conectar`](app/joven/conectar/page.tsx) — "Quiero conectar" + "Ver desglose" | implícita |
+| microtask_clarity | [`/joven/tareas/[id]`](app/joven/tareas/[id]/page.tsx) (pre-entrega) | thumbs |
+| microtask_evaluation | mismo archivo (post-evaluación de empresa) | thumbs no-dismiss |
+| course_recommendation | [`components/skills-gap.tsx`](components/skills-gap.tsx) — click + thumb por curso | implícita + thumbs |
+| need_structuring | [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) (1ra vez) | rating ⭐ |
+| match_useful | mismo archivo — `<MatchFeedback>` (legacy preservado) | thumbs |
+| profile_click | mismo archivo — `recordImplicitSignal` ahora doble-pipe a v3 | implícita |
+| microtask_proposed | mismo archivo — botón "Probar candidato" | implícita |
+| microtask_outcome | [`/empresa/tareas/[id]`](app/empresa/tareas/[id]/page.tsx) `evaluar()` | post-rating |
+| ai_preeval_agreement | mismo archivo — bajo la pre-eval IA | thumbs |
+| post_hire_followup | mismo archivo — post-evaluación | thumbs no-dismiss |
+| red_flag_accuracy | [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) bajo red flag del top | thumbs silent |
+| latent_suggestion | pendiente (la feature de roles latentes no está montada todavía) | — |
+
+16 de 17 touchpoints están vivos. El que falta (`latent_suggestion`) espera a que la feature de sugerencia de roles latentes salga del backlog.
+
+**Dashboard del flywheel (Fase E — feb 2026):** [`/api/admin/flywheel`](app/api/admin/flywheel/route.ts) (endpoint público de agregados — solo counts y rates, sin PII) consumido por [`/aliados/impacto`](app/aliados/impacto/page.tsx). Muestra:
+- Total de señales (explícitas vs implícitas).
+- Top touchpoints con `positiveRate` por uno.
+- Correlación entre ICS al momento del match y rating final del founder (`microtask_outcome`) — el indicador defensivo del §8.6.
+- % de acuerdo founder ↔ pre-eval IA (`ai_preeval_agreement`).
+
 ---
 
 ## 9. Arquitectura general
