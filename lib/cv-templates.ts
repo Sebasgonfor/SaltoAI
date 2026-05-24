@@ -199,9 +199,13 @@ function buildContactLine(opts: CvOptions): { html: string; hasContact: boolean 
   if (parts.length > 0) {
     return { html: `<p class="contact">${parts.join(" · ")}</p>`, hasContact: true };
   }
+  // Sin contacto: no renderizamos ni placeholders ([Email], [Teléfono]…) ni
+  // banner amarillo de advertencia. El export está gateado upstream por
+  // cv-customizer.tsx (validation.ok), así que llegar acá sin contacto solo
+  // ocurre en preview interno — y aún así no queremos texto "[…]" basura
+  // que se cuele si alguien imprime saltándose el gate (Cmd+P del navegador).
   return {
-    html: `<p class="contact placeholder">[Email] · [Teléfono] · [Ciudad] · [LinkedIn]</p>
-<p class="screen-only contact-hint">Completa tus datos de contacto antes de enviar. Vuelve al perfil para pasarlos como parámetros o edita el PDF luego de imprimir.</p>`,
+    html: "",
     hasContact: false,
   };
 }
