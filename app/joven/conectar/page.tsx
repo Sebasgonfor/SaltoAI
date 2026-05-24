@@ -428,7 +428,7 @@ function ConectarContent() {
           </div>
 
           {warning && (
-            <div className="flex items-start gap-2.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg">
+            <div className="flex items-start gap-2.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
               <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
               <span>{warning}</span>
             </div>
@@ -513,7 +513,7 @@ function ConectarContent() {
                       </div>
                     )}
                     {opp.redFlag && opp.redFlag !== 'Ninguna señal negativa visible.' && (
-                      <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <div className="text-xs text-emerald-900 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                         <strong>A tener en cuenta:</strong> {opp.redFlag}
                       </div>
                     )}
@@ -605,7 +605,7 @@ function ConectarContent() {
 
 /**
  * Barra de score 0-100 con label y número. Sirve al desglose ICS del joven
- * en cada opportunity card. Verde si >= 60, amarillo si 40-59, rosa si < 40.
+ * en cada opportunity card. Verde si >= 60, verde claro si 40-59, rosa si < 40.
  */
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const clamped = Math.max(0, Math.min(100, Math.round(value)));
@@ -613,7 +613,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
     clamped >= 60
       ? { bar: 'bg-emerald-500', text: 'text-emerald-700' }
       : clamped >= 40
-        ? { bar: 'bg-amber-500', text: 'text-amber-700' }
+        ? { bar: 'bg-emerald-300', text: 'text-emerald-600' }
         : { bar: 'bg-rose-500', text: 'text-rose-700' };
   return (
     <div>

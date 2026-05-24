@@ -108,7 +108,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           {isPending && (
-            <Badge className="bg-amber-100 text-amber-800 border-transparent">Pendiente de tu entrega</Badge>
+            <Badge className="bg-emerald-100 text-emerald-800 border-transparent">Pendiente de tu entrega</Badge>
           )}
           {isDelivered && (
             <Badge className="bg-slate-200 text-slate-700 border-transparent">Esperando evaluación de la empresa</Badge>
@@ -257,28 +257,28 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
 
       {/* Evaluación final empresa */}
       {isEvaluated && (
-        <section className="bg-amber-50/40 border border-amber-200 rounded-2xl p-6 md:p-8">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-amber-800 font-semibold mb-3">Evaluación final de la empresa</div>
+        <section className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-6 md:p-8">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-800 font-semibold mb-3">Evaluación final de la empresa</div>
           <div className="flex items-center gap-2 mb-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star
                 key={i}
                 size={24}
                 fill={i < (task.companyRating ?? 0) ? '#d97706' : 'none'}
-                className="text-amber-600"
+                className="text-emerald-600"
                 strokeWidth={1.5}
               />
             ))}
-            <span className="text-2xl font-display font-bold text-amber-700 ml-2">
+            <span className="text-2xl font-display font-bold text-emerald-700 ml-2">
               {task.companyRating}/5
             </span>
           </div>
           {task.companyComment && (
-            <blockquote className="text-slate-800 italic leading-relaxed border-l-2 border-amber-300 pl-4">
+            <blockquote className="text-slate-800 italic leading-relaxed border-l-2 border-emerald-300 pl-4">
               "{task.companyComment}"
             </blockquote>
           )}
-          <div className="mt-5 pt-5 border-t border-amber-200 text-xs text-amber-900 leading-relaxed">
+          <div className="mt-5 pt-5 border-t border-emerald-200 text-xs text-emerald-900 leading-relaxed">
             Esta evaluación ya está en tu Perfil de Evidencia como outcome verificado. Las próximas empresas la van a ver.
           </div>
           {/* Justicia percibida: el joven nos dice si la nota refleja su
@@ -286,7 +286,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
               es señal de que el founder está siendo demasiado duro (riesgo
               de sesgo de evaluación). No es dismissible — queremos cerrar
               el loop incluso en disputas. */}
-          <div className="mt-5 pt-5 border-t border-amber-200">
+          <div className="mt-5 pt-5 border-t border-emerald-200">
             <FeedbackInlinePrompt
               question="¿Sentís que la evaluación fue justa?"
               hint="Si no, anotamos la disputa. La empresa no ve tu voto."

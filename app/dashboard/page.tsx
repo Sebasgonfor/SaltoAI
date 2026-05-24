@@ -59,6 +59,7 @@ const NAV_JOVEN = [
   { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
   { icon: User, label: 'Mi perfil', href: '/joven/perfil' },
   { icon: Network, label: 'Oportunidades', href: '/joven/conectar' },
+  { icon: Briefcase, label: 'Mis tareas', href: '/joven/tareas' },
 ];
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ function StatCard({
 
 function TaskItem({ task }: { task: MicroTask }) {
   const statusMap = {
-    pending: { label: 'Pendiente', style: 'bg-amber-100 text-amber-800' },
+    pending: { label: 'Pendiente', style: 'bg-emerald-100 text-emerald-800' },
     in_progress: { label: 'En progreso', style: 'bg-blue-100 text-blue-800' },
     delivered: { label: 'Entregada', style: 'bg-slate-200 text-slate-700' },
     evaluated: { label: 'Evaluada', style: 'bg-emerald-100 text-emerald-800' },
@@ -123,7 +124,7 @@ function TaskItem({ task }: { task: MicroTask }) {
               {task.deadlineHours}h
             </span>
             {task.companyRating && (
-              <span className="flex items-center gap-1 text-amber-600">
+              <span className="flex items-center gap-1 text-emerald-600">
                 <Star size={11} fill="currentColor" />
                 {task.companyRating}/5
               </span>
@@ -396,7 +397,7 @@ export default function DashboardPage() {
           {/* ONBOARDING — sin perfil */}
           {!dataLoading && !profile && (
             <FadeUp delay={0.1}>
-              <section className="bg-gradient-to-br from-emerald-50 via-white to-amber-50/40 border border-emerald-200/60 rounded-2xl p-6 md:p-8">
+              <section className="bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 border border-emerald-200/60 rounded-2xl p-6 md:p-8">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
                   Por donde empezar
                 </div>
@@ -493,10 +494,11 @@ export default function DashboardPage() {
               <h2 className="text-xs uppercase tracking-[0.18em] text-slate-500 font-semibold mb-3">
                 Acciones rápidas
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { icon: MessageSquareQuote, label: profile ? 'Repetir entrevista' : 'Empezar entrevista', href: '/joven/chat', color: 'text-emerald-700', bg: 'bg-emerald-50' },
                   { icon: Network, label: 'Oportunidades', href: '/joven/conectar', color: 'text-slate-700', bg: 'bg-slate-50' },
+                  { icon: Briefcase, label: 'Mis tareas', href: '/joven/tareas', color: 'text-emerald-700', bg: 'bg-emerald-50' },
                   { icon: User, label: 'Mi perfil', href: `/joven/perfil/${user.uid}`, color: 'text-slate-700', bg: 'bg-slate-50' },
                 ].map(({ icon: Icon, label, href, color, bg }) => (
                   <Link key={label} href={href} className="group">

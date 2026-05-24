@@ -318,7 +318,7 @@ function HeroDark({
       className="relative overflow-hidden rounded-3xl text-white p-5 md:p-7"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.25) 0%, transparent 55%), linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, rgba(69, 26, 3, 0.4) 100%)',
+          'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.22) 0%, transparent 55%), linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, rgba(6, 78, 59, 0.35) 100%)',
       }}
     >
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
@@ -327,7 +327,7 @@ function HeroDark({
             inicial. */}
         <div className="relative flex-shrink-0">
           <div
-            className="rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl"
+            className="rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl"
             style={{ width: 72, height: 72 }}
           >
             {avatarText || '·'}
@@ -343,11 +343,11 @@ function HeroDark({
             <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight">
               {name}
             </h1>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold shadow-sm">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-semibold shadow-sm">
               {category}
             </span>
             {matchPct >= 70 && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-950/40 border border-amber-700/40 text-amber-300 text-xs font-semibold">
+              <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-700/40 text-emerald-300 text-xs font-semibold">
                 Match {matchPct}%
               </span>
             )}
@@ -359,7 +359,7 @@ function HeroDark({
               <div key={s.label} className="flex items-center gap-2.5">
                 <span className="text-xl leading-none">{s.icon}</span>
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-amber-200/70 font-semibold">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-200/80 font-semibold">
                     {s.label}
                   </div>
                   <div className="font-display font-bold text-base text-white tabular-nums truncate">
@@ -379,10 +379,7 @@ function HeroDark({
           <div className="hidden md:block">
             <RingScore value={ringValue} size={108} />
           </div>
-          {/* text-stone-500 sobre fondo stone-950 daba contraste insuficiente
-              ("PULSO LABORAL" apenas legible). amber-200/80 mantiene el aire
-              cálido del hero y pasa contraste WCAG AA holgado. */}
-          <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80 font-semibold mt-2">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80 font-semibold mt-2">
             {ringLabel}
           </div>
         </div>
@@ -424,8 +421,8 @@ function RingScore({ value, size = 96 }: { value: number; size?: number }) {
         />
         <defs>
           <linearGradient id="ringGradJoven" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#ea580c" />
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#059669" />
           </linearGradient>
         </defs>
       </svg>
@@ -522,8 +519,8 @@ function RadarCard({
           {/* Polígono filled */}
           <polygon
             points={polygonPoints}
-            fill="rgba(234, 88, 12, 0.18)"
-            stroke="#ea580c"
+            fill="rgba(16, 185, 129, 0.18)"
+            stroke="#059669"
             strokeWidth={2}
             strokeLinejoin="round"
           />
@@ -544,7 +541,7 @@ function RadarCard({
                   : 'start';
             return (
               <g key={i}>
-                <circle cx={vx} cy={vy} r={3.5} fill="#ea580c" />
+                <circle cx={vx} cy={vy} r={3.5} fill="#059669" />
                 <text
                   x={lx}
                   y={ly - 4}
@@ -576,7 +573,7 @@ function RadarCard({
       <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[10px] text-stone-500 border-t border-stone-100 pt-3">
         {axes.map((a) => (
           <div key={a.axis} className="flex items-center gap-1.5 min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
             <span className="truncate">
               <strong className="text-stone-700 font-semibold">{a.axis}</strong> · {a.raw}
             </span>
@@ -639,7 +636,7 @@ function EarningsCard({
   const rows: { label: string; value: number; color: string }[] = [
     { label: 'Pagadas', value: paidSum, color: 'bg-emerald-500' },
     { label: 'Evaluadas', value: evaluatedSum, color: 'bg-emerald-400' },
-    { label: 'Por evaluar', value: deliveredSum, color: 'bg-amber-400' },
+    { label: 'Por evaluar', value: deliveredSum, color: 'bg-emerald-300' },
     { label: 'En progreso', value: inProgressSum, color: 'bg-stone-300' },
   ].filter((r) => r.value > 0); // Solo mostramos rows que tengan valor
 
@@ -680,7 +677,7 @@ function EarningsCard({
         )}
       </div>
       {pendingCount > 0 && (
-        <div className="mt-5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center gap-2 text-xs text-amber-900">
+        <div className="mt-5 px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200/60 flex items-center gap-2 text-xs text-emerald-900">
           <span>⏳</span>
           <span><strong>{pendingCount}</strong> tarea{pendingCount === 1 ? '' : 's'} en curso · acelerar la entrega libera más ingresos.</span>
         </div>
@@ -767,7 +764,7 @@ function NextStepsCard({
           title="Próximos pasos"
           subtitle="Para llegar a tu primer ingreso"
         />
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold whitespace-nowrap">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-semibold whitespace-nowrap">
           {doneCount}/{steps.length}
         </span>
       </div>
@@ -777,7 +774,7 @@ function NextStepsCard({
             <div className={`group rounded-2xl border p-3 flex items-start gap-3 transition-colors ${
               s.done
                 ? 'border-emerald-200 bg-emerald-50/40'
-                : 'border-stone-200 hover:border-orange-300 hover:bg-orange-50/30'
+                : 'border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/30'
             }`}>
               {/* Status indicator: check para done, emoji + dot pulse para pending */}
               <div className="relative flex-shrink-0">
@@ -794,7 +791,7 @@ function NextStepsCard({
                 </div>
                 <div className="text-[11px] text-stone-500 leading-snug mt-0.5">{s.hint}</div>
                 {!s.done && (
-                  <div className="text-[11px] text-orange-700 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                  <div className="text-[11px] text-emerald-700 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
                     {s.cta.label} <ArrowRight size={10} />
                   </div>
                 )}
@@ -822,7 +819,7 @@ function OpportunitiesCard({
     <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <div className="flex items-center justify-between gap-2 mb-1">
         <SectionTitle title="Tus oportunidades" />
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
           {marketVisibility.needsMatchingMySkills} detectadas
         </span>
       </div>
@@ -836,7 +833,7 @@ function OpportunitiesCard({
               sublabel={topOpportunity.role}
               value={topOpportunity.approxIcs}
               badgeText="Top match"
-              badgeTone="orange"
+              badgeTone="brand"
             />
             {marketVisibility.topSkillsInDemand.slice(0, 4).map((s) => (
               <FlagBarRow
@@ -846,7 +843,7 @@ function OpportunitiesCard({
                 sublabel={`${s.demandedBy} ${s.demandedBy === 1 ? 'empresa' : 'empresas'} la piden`}
                 value={s.iHaveIt ? Math.min(99, 60 + s.demandedBy * 5) : Math.min(70, 20 + s.demandedBy * 5)}
                 badgeText={s.iHaveIt ? 'La tienes' : 'Aprenderla'}
-                badgeTone={s.iHaveIt ? 'emerald' : 'amber'}
+                badgeTone={s.iHaveIt ? 'emerald' : 'slate'}
               />
             ))}
           </>
@@ -859,7 +856,7 @@ function OpportunitiesCard({
       </div>
 
       <Link href={`/joven/conectar?profileId=${encodeURIComponent(profileId)}`} className="mt-4">
-        <button className="w-full text-xs text-orange-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
+        <button className="w-full text-xs text-emerald-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
           Ver desglose ICS completo <ArrowRight size={11} />
         </button>
       </Link>
@@ -880,16 +877,12 @@ function FlagBarRow({
   sublabel?: string;
   value: number;
   badgeText?: string;
-  badgeTone?: 'orange' | 'emerald' | 'amber' | 'slate';
+  badgeTone?: 'brand' | 'emerald' | 'slate';
 }) {
   const badgeColor =
-    badgeTone === 'orange'
-      ? 'bg-orange-100 text-orange-700'
-      : badgeTone === 'emerald'
-        ? 'bg-emerald-100 text-emerald-700'
-        : badgeTone === 'amber'
-          ? 'bg-amber-100 text-amber-800'
-          : 'bg-stone-100 text-stone-600';
+    badgeTone === 'brand' || badgeTone === 'emerald'
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-stone-100 text-stone-600';
   return (
     <div className="mt-3 first:mt-3">
       <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -917,7 +910,7 @@ function FlagBarRow({
       <div className="flex items-center gap-2">
         <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-orange-500 transition-all"
+            className="h-full bg-emerald-500 transition-all"
             style={{ width: `${value}%` }}
           />
         </div>
@@ -1037,11 +1030,11 @@ function HistoryCard({
       case 'microtask_proposed':
       case 'microtask_delivered':
       case 'microtask_evaluated':
-        return 'bg-orange-100 text-orange-700';
+        return 'bg-emerald-100 text-emerald-700';
       case 'feedback_received':
         return 'bg-emerald-100 text-emerald-700';
       case 'pass_reason':
-        return 'bg-amber-100 text-amber-800';
+        return 'bg-slate-100 text-slate-700';
       case 'profile_viewed':
       default:
         return 'bg-stone-100 text-stone-600';
@@ -1067,7 +1060,7 @@ function HistoryCard({
           <div className="space-y-3">
             {ratedTasks.map((t) => (
               <div key={t.id} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
                   <Briefcase size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1085,7 +1078,7 @@ function HistoryCard({
                       size={11}
                       className={
                         i < (t.companyRating ?? 0)
-                          ? 'text-amber-500 fill-amber-500'
+                          ? 'text-emerald-500 fill-emerald-500'
                           : 'text-stone-200 fill-transparent'
                       }
                     />
@@ -1144,18 +1137,18 @@ function InboxCard({
       <div className="flex items-center justify-between gap-2 mb-1">
         <SectionTitle title="Inbox de feedback" />
         {inbox.unreplied > 0 && (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
             {inbox.unreplied} sin responder
           </span>
         )}
       </div>
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
         <MiniMetric emoji="⭐" label="Positivos" value={inbox.positiveFeedback} tone="emerald" />
-        <MiniMetric emoji="🚪" label="Descartes" value={inbox.passReasons} tone="amber" />
+        <MiniMetric emoji="🚪" label="Descartes" value={inbox.passReasons} tone="slate" />
         <MiniMetric emoji="✉️" label="Pendientes" value={inbox.unreplied} tone="slate" />
       </div>
       <Link href={`/joven/perfil/${profileId}`} className="mt-4">
-        <button className="w-full text-xs text-orange-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
+        <button className="w-full text-xs text-emerald-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
           Abrir inbox completo <ArrowRight size={11} />
         </button>
       </Link>
@@ -1172,14 +1165,12 @@ function MiniMetric({
   emoji: string;
   label: string;
   value: number;
-  tone: 'emerald' | 'amber' | 'slate';
+  tone: 'emerald' | 'slate';
 }) {
   const bg =
     tone === 'emerald'
       ? 'bg-emerald-50 border-emerald-200/60'
-      : tone === 'amber'
-        ? 'bg-amber-50 border-amber-200/60'
-        : 'bg-stone-50 border-stone-200/60';
+      : 'bg-stone-50 border-stone-200/60';
   return (
     <div className={`border rounded-2xl px-3 py-3 text-center ${bg}`}>
       <div className="text-xl leading-none">{emoji}</div>
@@ -1227,7 +1218,7 @@ function MarketSkillsCard({
               <div className="flex items-center gap-2 mt-0.5">
                 <div className="flex-1 h-1 bg-stone-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full ${s.iHaveIt ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                    className={`h-full ${s.iHaveIt ? 'bg-emerald-500' : 'bg-emerald-200'}`}
                     style={{ width: `${(s.demandedBy / max) * 100}%` }}
                   />
                 </div>
