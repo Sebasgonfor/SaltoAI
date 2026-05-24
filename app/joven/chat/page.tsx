@@ -497,7 +497,7 @@ function ChatJoven() {
     // Full-height layout: ocupa todo el viewport menos los 80px del topbar
     // sticky del layout (h-20). El header del chat y el grid se reparten ese
     // espacio sin generar scroll externo en el body.
-    <div className="md:h-[calc(100dvh-80px)] md:overflow-y-auto max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+    <div className="md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
       <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
@@ -588,7 +588,7 @@ function ChatJoven() {
       )}
 
       <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[360px] sm:min-h-[480px] overflow-hidden">
+        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[360px] sm:min-h-[480px] md:min-h-0 overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 min-h-0">
             {displayMessages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
