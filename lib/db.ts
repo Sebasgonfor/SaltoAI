@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   addDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import {
@@ -223,6 +224,20 @@ export async function getAllNeeds(): Promise<CompanyNeed[]> {
     }
   }
   return Array.from(memNeeds.values());
+}
+
+export async function deleteNeed(id: string): Promise<boolean> {
+  let deleted = false;
+  if (useFirestore(NEEDS)) {
+    try {
+      await deleteDoc(doc(db, NEEDS, id));
+      deleted = true;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "deleteNeed", NEEDS);
+    }
+  }
+  if (memNeeds.delete(id)) deleted = true;
+  return deleted;
 }
 
 export async function getNeed(id: string): Promise<CompanyNeed | null> {
