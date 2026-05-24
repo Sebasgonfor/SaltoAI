@@ -19,6 +19,7 @@ import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
 import SkillsGap from '@/components/skills-gap';
 import DocumentsManager from '@/components/documents-manager';
+import InterviewTranscript from '@/components/interview-transcript';
 import { useAuth } from '@/lib/auth-context';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
@@ -354,6 +355,12 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           el dueño puede subir/borrar (la empresa solo ve los docs ya
           subidos cuando navega al perfil). */}
       {!viewerIsEmpresa && <DocumentsManager profileId={id} />}
+
+      {/* Transcripción de entrevista — solo dueño. Auditoría + memoria
+          personal del joven. La empresa NO la ve. */}
+      {!viewerIsEmpresa && perfil.interviewTranscript && perfil.interviewTranscript.length > 0 && (
+        <InterviewTranscript transcript={perfil.interviewTranscript} />
+      )}
 
       {/* Skills + Traits */}
       <section className="grid md:grid-cols-2 gap-5">

@@ -235,6 +235,14 @@ export async function POST(req: NextRequest) {
 
     let id: string;
     let storage: "firestore" | "memory";
+    // Sanitización del transcript: solo guardamos role + content (sin
+    // timestamps, sin metadata adicional). Strings vacíos descartados.
+    const interviewTranscript = Array.isArray(messages)
+      ? messages
+          .filter((m) => m && typeof m.content === "string" && m.content.trim().length > 0)
+          .map((m) => ({ role: m.role, content: m.content }))
+      : undefined;
+
     if (uid) {
       const existing = await getProfile(uid);
       await upsertProfileWithId(uid, {
@@ -243,6 +251,7 @@ export async function POST(req: NextRequest) {
         createdAt: existing?.createdAt ?? Date.now(),
         latent: existing?.latent,
         taskStats: existing?.taskStats,
+        ...(interviewTranscript && { interviewTranscript }),
       });
       id = uid;
       storage = storageFromId(uid);
@@ -250,6 +259,7 @@ export async function POST(req: NextRequest) {
       const created = await createProfile({
         ...extracted,
         embedding,
+        ...(interviewTranscript && { interviewTranscript }),
       });
       id = created.id;
       storage = created.storage;

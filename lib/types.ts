@@ -120,6 +120,16 @@ export interface Profile {
   latent?: LatentProfile;
   taskStats?: TaskOutcomeStat;
   /**
+   * Transcripción cruda de la entrevista que generó este perfil. Sirve a:
+   *   1. Auditoría: ver POR QUÉ se extrajo cada skill (releer el contexto).
+   *   2. Re-procesamiento: cuando cambiemos el modelo extractor, podemos
+   *      re-correrlo sin pedirle al joven que repita.
+   *   3. Data flywheel (PRD §8.6): comparar transcripciones con outcomes
+   *      reales (contrataciones) para reentrenar el motor.
+   *   4. UX: mostrarle al joven SU propia historia en el perfil.
+   */
+  interviewTranscript?: { role: Role; content: string }[];
+  /**
    * Skills extraídas por IA de los documentos del joven (diplomas,
    * certificados). NO persistido en el documento `profiles`; se enriquece
    * en runtime desde la colección `documents` cuando el motor de matching

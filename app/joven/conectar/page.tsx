@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { Gender, OpportunityMatch, Profile } from '@/lib/types';
 import { RoleGate } from '@/components/auth/role-gate';
+import MatchingAnimation from '@/components/matching-animation';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 // --- Cache cliente de oportunidades (5 min) ---
@@ -275,53 +276,7 @@ function ConectarContent() {
   }
 
   if (loading) {
-    // Skeleton de carga: replica la estructura real (3 cards con score)
-    // para que la transición a contenido real sea visualmente continua,
-    // no un flash. Los datos del skeleton son falsos pero estructuralmente
-    // honestos — el usuario ve qué va a aparecer.
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
-        <header>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
-            Conectar con empresas
-          </div>
-          <div className="h-10 md:h-14 w-3/4 bg-slate-200 rounded animate-pulse mb-4" />
-          <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
-        </header>
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400 font-semibold">
-          <Network size={14} className="text-emerald-500 animate-pulse" />
-          Buscando oportunidades compatibles…
-        </div>
-        <div className="space-y-4">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8"
-            >
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1 space-y-3">
-                  {i === 0 && (
-                    <div className="h-5 w-24 bg-emerald-100 rounded-full animate-pulse" />
-                  )}
-                  <div className="h-7 w-2/3 bg-slate-200 rounded animate-pulse" />
-                  <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" />
-                  <div className="h-4 w-5/6 bg-slate-100 rounded animate-pulse" />
-                </div>
-                <div className="flex items-baseline gap-1 flex-shrink-0">
-                  <div
-                    className="h-12 w-16 bg-emerald-100 rounded animate-pulse"
-                    style={{ animationDelay: `${i * 0.1}s` }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-center text-xs text-slate-400">
-          Calculando tu ICS contra cada necesidad publicada…
-        </p>
-      </div>
-    );
+    return <MatchingAnimation variant="opportunities" />;
   }
 
   if (error) {

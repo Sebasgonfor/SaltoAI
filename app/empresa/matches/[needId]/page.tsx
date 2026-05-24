@@ -23,6 +23,7 @@ import MatchFeedback from '@/components/match-feedback';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 import { NeedRadiography } from '@/components/empresa/need-radiography';
+import MatchingAnimation from '@/components/matching-animation';
 import { emitSignal } from '@/lib/feedback';
 
 interface MatchResponse {
@@ -264,17 +265,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   };
 
   if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-3 text-slate-500 mb-4">
-          <Network size={18} className="text-emerald-500 animate-pulse" />
-          <span className="text-sm">Calculando Índice de Compatibilidad…</span>
-        </div>
-        <div className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-          Vectorizando tu necesidad, comparando contra perfiles por similitud semántica, y rankeando el shortlist con LLM. ~10 segundos.
-        </div>
-      </div>
-    );
+    return <MatchingAnimation variant="candidates" />;
   }
 
   if (error || !data) {
