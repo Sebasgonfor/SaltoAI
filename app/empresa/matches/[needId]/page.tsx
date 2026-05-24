@@ -99,7 +99,7 @@ function BreakdownBars({
         const isPenalty = key === 'penalties';
         return (
           <div key={key} className="flex items-center gap-3 text-xs">
-            <div className={size === 'lg' ? 'w-32' : 'w-24'}>
+            <div className={size === 'lg' ? 'w-24 sm:w-32' : 'w-20 sm:w-24'}>
               <div className="text-slate-700 font-medium">{label}</div>
               {weight !== null && (
                 <div className="text-[10px] text-slate-400 uppercase tracking-wider">peso {Math.round(weight * 100)}%</div>
@@ -375,7 +375,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
               {/* Left: identity + score */}
               <div className="md:col-span-5 space-y-5">
                 <div>
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
                     {top.profileName}
                   </h2>
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -404,7 +404,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 </div>
 
                 <div className="flex items-baseline gap-3 pt-4">
-                  <span className="font-display font-bold text-5xl sm:text-7xl md:text-8xl text-emerald-600 tabular-nums leading-none">
+                  <span className="font-display font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl text-emerald-600 tabular-nums leading-none">
                     {top.ics}
                   </span>
                   <div className="space-y-0.5">

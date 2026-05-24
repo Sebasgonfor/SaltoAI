@@ -4,8 +4,10 @@ export const MAX_USER_TURNS = 5;
 export const CLOSING_MESSAGE =
   "Genial, tengo lo que necesitaba. Voy a construir tu Perfil de Evidencia ahora.";
 
-const SIGNALS_LIST = `Señales CUANTITATIVAS (para roles donde los números importan — ventas, marketing, growth):
-1. Iniciativa — algo que arrancó sin que se lo pidieran.
+export const CLOSING_MESSAGE_EMPRESA =
+  "Perfecto, tengo suficiente contexto. Voy a estructurar tu necesidad y buscar candidatos ahora.";
+
+const SIGNALS_LIST = `1. Iniciativa — algo que arrancó sin que se lo pidieran.
 2. Aprendizaje autónomo — aprendió algo solo/a (tutoriales, prueba-error).
 3. Resolución de problemas — destrabó algo improvisando.
 4. Resultados medibles — números, %, ventas, clientes, tiempos.
@@ -119,6 +121,63 @@ export function buildLiveOpeningUserPrompt(firstName?: string): string {
   return name
     ? `Hola, soy ${name}. Estoy listo/a para empezar la entrevista.`
     : "Hola, estoy listo/a para empezar la entrevista.";
+}
+
+const EMPRESA_SIGNALS_LIST = `1. Rol y tareas reales — qué hace la persona día a día (no el título).
+2. Contexto del equipo — con quién trabaja, tamaño, cultura y etapa de la empresa.
+3. Skills clave — técnicas o blandas más importantes para este rol.
+4. Restricciones — horario, presencialidad, salario o tipo de contrato.
+5. Reto principal — el problema concreto que esta persona debe resolver.
+6. Criterio de éxito — cómo sabrán en 90 días que fue la persona correcta.`;
+
+/** System instruction para Gemini Live API (modo voz) — entrevista de empresa. */
+export function buildLiveSystemInstructionEmpresa(companyName?: string): string {
+  const company = companyName?.trim();
+  const companyLine = company
+    ? `La empresa se llama ${company}. Puedes referirte a ella por su nombre de vez en cuando.`
+    : "Habla con el representante de la empresa de forma cercana y profesional.";
+
+  return `Eres el asistente de SaltoAI para empresas. Tu trabajo es EXTRAER CONTEXTO real sobre la posición que necesitan cubrir, para hacer un matching preciso con candidatos jóvenes con potencial.
+Tu trabajo NO es evaluar ni sugerir. Tu trabajo es ESCUCHAR Y PREGUNTAR para entender la necesidad real.
+
+${companyLine}
+
+REGLAS DE VOZ (CRÍTICO):
+- Habla en español neutro latinoamericano (tuteo con "tú"), cercano pero profesional. PROHIBIDO el voseo rioplatense ("vos", "tenés", "contame", "decime", "podés").
+- Frases cortas. UNA sola pregunta por turno.
+- Espera a que la persona termine de hablar antes de responder.
+- Si la respuesta es vaga, pide UN ejemplo concreto con otra redacción.
+
+TURNOS DE LA EMPRESA:
+- Mínimo ${MIN_USER_TURNS} respuestas antes de cerrar.
+- Máximo ${MAX_USER_TURNS} respuestas: en el turno ${MAX_USER_TURNS} cierra sin hacer otra pregunta.
+
+SEÑALES A CUBRIR (de forma diversa):
+${EMPRESA_SIGNALS_LIST}
+
+REGLAS DE COBERTURA:
+- NO repitas el ángulo de una pregunta anterior.
+- En cada turno, elige preguntar por una señal AÚN NO CUBIERTA.
+- Profundiza UNA VEZ en una señal vaga, luego salta a otra.
+
+ESTILO:
+- UNA pregunta a la vez. Corta y específica (máx 2 oraciones).
+- Profundiza en el día real: "¿Qué hace esa persona en un martes cualquiera?"
+- NO inventes contexto. NO supongas.
+
+INICIO:
+- Tu PRIMER mensaje debe ser un saludo breve y la pregunta: "¿Cuál es el rol que necesitas cubrir y qué haría esa persona en un día normal de trabajo?"
+
+CIERRE:
+- Cuando tengas evidencia suficiente (4+ señales con detalle) o llegues al turno ${MAX_USER_TURNS}, di exactamente algo equivalente a: "${CLOSING_MESSAGE_EMPRESA}"
+- Después del cierre, no hagas más preguntas.`;
+}
+
+export function buildLiveOpeningUserPromptEmpresa(companyName?: string): string {
+  const company = companyName?.trim();
+  return company
+    ? `Hola, somos ${company}. Estamos listos para describir el perfil que necesitamos.`
+    : "Hola, estamos listos para describir el perfil que necesitamos.";
 }
 
 /** Prompt para generar el primer mensaje del agente (modo texto). */
