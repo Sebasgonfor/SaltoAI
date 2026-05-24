@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -5,8 +7,18 @@ import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
 import { RoleCTA } from '@/components/auth/role-cta';
 import { ArrowRight, Sparkles, MessageSquareQuote, Layers, Network } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 export default function LandingPage() {
+  // Cuando el user está logueado, los CTAs del rol OPUESTO se ocultan
+  // (eran ruido: convergían al mismo destino que el dropdown del UserButton).
+  // El header pasa a mostrar SOLO el UserButton; el hero y el CTA final
+  // mantienen el botón del rol activo y ocultan el otro.
+  const { account } = useAuth();
+  const isLoggedIn = !!account;
+  const isJoven = account?.role === 'joven';
+  const isEmpresa = account?.role === 'empresa';
+
   return (
     <div className="flex flex-col min-h-screen bg-[#FAFAF7] text-slate-900">
       {/* NAV */}
@@ -18,18 +30,27 @@ export default function LandingPage() {
           <Link href="#problema" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">El problema</Link>
           <Link href="#flujo" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">Cómo funciona</Link>
           <Link href="#ia" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">La IA</Link>
-          <div className="h-5 w-px bg-slate-200 mx-2" />
-          <RoleCTA
-            role="joven"
-            href="/joven/chat"
-            variant="outline"
-            className="h-9 px-3 text-sm border-0 bg-transparent text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-          >
-            Soy joven
-          </RoleCTA>
-          <RoleCTA role="empresa" href="/empresa/chat" className="h-9 px-3 text-sm">
-            Soy empresa
-          </RoleCTA>
+          {/* Botones "Soy joven" / "Soy empresa" SOLO para usuarios anónimos.
+              Cuando hay sesión, el UserButton (dropdown a la derecha) ya
+              tiene "Mi dashboard" + "Publicar necesidad" + "Cerrar sesión",
+              así que estos botones eran ruido visual y producían el reporte
+              "los 4 botones llevan al mismo destino". */}
+          {!isLoggedIn && (
+            <>
+              <div className="h-5 w-px bg-slate-200 mx-2" />
+              <RoleCTA
+                role="joven"
+                href="/joven/chat"
+                variant="outline"
+                className="h-9 px-3 text-sm border-0 bg-transparent text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                Soy joven
+              </RoleCTA>
+              <RoleCTA role="empresa" href="/empresa/chat" className="h-9 px-3 text-sm">
+                Soy empresa
+              </RoleCTA>
+            </>
+          )}
           <div className="h-5 w-px bg-slate-200 mx-2" />
           <UserButton />
         </nav>
@@ -54,30 +75,43 @@ export default function LandingPage() {
                   SaltoAI es la plataforma de IA que <strong className="text-slate-900 font-semibold">traduce experiencia informal en evidencia laboral real</strong>, y emparenta jóvenes con empresas tempranas por <strong className="text-slate-900 font-semibold">potencial</strong>, no por años en un papel.
                 </p>
 
+                {/* Hero CTAs: ambos para anónimos, solo el rol activo si hay sesión. */}
                 <div className="mt-8 sm:mt-12 flex flex-col sm:flex-row gap-3">
-                  <RoleCTA
-                    role="joven"
-                    href="/joven/chat"
-                    className="h-14 px-7 text-base bg-slate-900 hover:bg-slate-800 gap-3 transition-all"
-                  >
-                    <div className="text-left">
-                      <div className="font-semibold">Quiero mi primera oportunidad</div>
-                      <div className="text-xs font-normal text-slate-400">Cuenta tu historia · 5 minutos</div>
-                    </div>
-                    <ArrowRight size={18} />
-                  </RoleCTA>
-                  <RoleCTA
-                    role="empresa"
-                    href="/empresa/chat"
-                    variant="outline"
-                    className="h-14 px-7 text-base border-2 border-emerald-500 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-50 gap-3 transition-all"
-                  >
-                    <div className="text-left">
-                      <div className="font-semibold">Necesito talento junior</div>
-                      <div className="text-xs font-normal text-emerald-700/70">Hasta 10 candidatos · no 200 CVs</div>
-                    </div>
-                    <ArrowRight size={18} />
-                  </RoleCTA>
+                  {(!isLoggedIn || isJoven) && (
+                    <RoleCTA
+                      role="joven"
+                      href="/joven/chat"
+                      className="h-14 px-7 text-base bg-slate-900 hover:bg-slate-800 gap-3 transition-all"
+                    >
+                      <div className="text-left">
+                        <div className="font-semibold">
+                          {isJoven ? 'Continuar mi entrevista' : 'Quiero mi primera oportunidad'}
+                        </div>
+                        <div className="text-xs font-normal text-slate-400">
+                          {isJoven ? 'Retomá donde quedaste' : 'Cuenta tu historia · 5 minutos'}
+                        </div>
+                      </div>
+                      <ArrowRight size={18} />
+                    </RoleCTA>
+                  )}
+                  {(!isLoggedIn || isEmpresa) && (
+                    <RoleCTA
+                      role="empresa"
+                      href="/empresa/chat"
+                      variant="outline"
+                      className="h-14 px-7 text-base border-2 border-emerald-500 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-50 gap-3 transition-all"
+                    >
+                      <div className="text-left">
+                        <div className="font-semibold">
+                          {isEmpresa ? 'Publicar otra necesidad' : 'Necesito talento junior'}
+                        </div>
+                        <div className="text-xs font-normal text-emerald-700/70">
+                          {isEmpresa ? 'Hasta 10 candidatos por necesidad' : 'Hasta 10 candidatos · no 200 CVs'}
+                        </div>
+                      </div>
+                      <ArrowRight size={18} />
+                    </RoleCTA>
+                  )}
                 </div>
 
                 <div className="mt-14 flex items-center gap-6 text-sm text-slate-500">
@@ -325,22 +359,27 @@ export default function LandingPage() {
             <p className="mt-6 text-lg text-emerald-100/80 max-w-2xl mx-auto">
               El primer empleo no debería depender de un CV que aún no puedes tener. SaltoAI hace que dependa de tu potencial.
             </p>
+            {/* CTA final: igual al hero, oculta el rol opuesto con sesión. */}
             <div className="mt-12 flex flex-col sm:flex-row gap-3 justify-center">
-              <RoleCTA
-                role="joven"
-                href="/joven/chat"
-                className="h-14 px-8 text-base bg-white text-slate-900 hover:bg-slate-100 gap-3"
-              >
-                Empezar mi entrevista <ArrowRight size={18} />
-              </RoleCTA>
-              <RoleCTA
-                role="empresa"
-                href="/empresa/chat"
-                variant="outline"
-                className="h-14 px-8 text-base bg-transparent border-2 border-emerald-400/40 text-emerald-50 hover:bg-emerald-900/40 hover:border-emerald-400 gap-3"
-              >
-                Publicar mi necesidad <ArrowRight size={18} />
-              </RoleCTA>
+              {(!isLoggedIn || isJoven) && (
+                <RoleCTA
+                  role="joven"
+                  href="/joven/chat"
+                  className="h-14 px-8 text-base bg-white text-slate-900 hover:bg-slate-100 gap-3"
+                >
+                  {isJoven ? 'Volver a mi entrevista' : 'Empezar mi entrevista'} <ArrowRight size={18} />
+                </RoleCTA>
+              )}
+              {(!isLoggedIn || isEmpresa) && (
+                <RoleCTA
+                  role="empresa"
+                  href="/empresa/chat"
+                  variant="outline"
+                  className="h-14 px-8 text-base bg-transparent border-2 border-emerald-400/40 text-emerald-50 hover:bg-emerald-900/40 hover:border-emerald-400 gap-3"
+                >
+                  {isEmpresa ? 'Publicar otra necesidad' : 'Publicar mi necesidad'} <ArrowRight size={18} />
+                </RoleCTA>
+              )}
             </div>
           </div>
         </section>

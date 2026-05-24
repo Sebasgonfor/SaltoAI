@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
       useful?: boolean;
       note?: string;
       source?: "empresa_match" | "joven_perfil" | "other";
+      /** ICS predicho por el motor en el momento del voto. Permite medir
+       * calibración: ¿el modelo acierta cuando le da 90%? ¿cuando le da 40%? */
+      icsAtTime?: number;
     };
 
     // matchId puede venir armado por el cliente, o lo derivamos de needId+profileId
@@ -42,6 +45,8 @@ export async function POST(req: NextRequest) {
       useful: body.useful,
       source: body.source ?? "empresa_match",
       note: body.note,
+      signalType: "explicit_vote",
+      ...(typeof body.icsAtTime === "number" && { icsAtTime: body.icsAtTime }),
     });
 
     log.end({

@@ -29,10 +29,12 @@ function readVote(matchId: string): Vote {
 interface Props {
   needId: string;
   profileId: string;
+  /** ICS predicho al momento del voto — se guarda para correlación de calibración. */
+  icsAtTime?: number;
   variant?: 'hero' | 'card';
 }
 
-export default function MatchFeedback({ needId, profileId, variant = 'card' }: Props) {
+export default function MatchFeedback({ needId, profileId, icsAtTime, variant = 'card' }: Props) {
   const matchId = `${needId}__${profileId}`;
   const [vote, setVote] = useState<Vote>(() => readVote(matchId));
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +62,7 @@ export default function MatchFeedback({ needId, profileId, variant = 'card' }: P
           profileId,
           useful,
           source: 'empresa_match',
+          ...(typeof icsAtTime === 'number' && { icsAtTime }),
         }),
       });
       if (!res.ok) {

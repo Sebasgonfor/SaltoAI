@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cosineSimilarity } from "@/lib/embeddings";
-import { getAllNeeds, getProfile } from "@/lib/db";
+import { getAllNeeds, getAllProfiles, getProfile } from "@/lib/db";
 import { scoreCandidates, SHORTLIST_SIZE, RETURN_SIZE } from "@/lib/ics";
 import { startLog } from "@/lib/logger";
-import type { OpportunityMatch } from "@/lib/types";
+import type { OpportunityMatch, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -50,14 +50,27 @@ export async function POST(req: NextRequest) {
       .slice(0, SHORTLIST_SIZE)
       .map((s) => s.n);
 
-    // 2. Para cada necesidad del shortlist, calculamos el ICS contra ESTE joven.
-    // No batcheamos por necesidad (cada need tiene 1 candidato a evaluar);
-    // hacemos N pequeñas llamadas en paralelo con limite de concurrencia.
-    // En la práctica para el demo N≤15 y Gemini absorbe bien la concurrencia.
+    // 2. Anchors de calibración: cuando llamamos a scoreCandidates() con UN
+    // solo perfil, el LLM no tiene con qué comparar y tiende a inflar todos
+    // los scores ("93% para todo" cuando la empresa veía "21%"). Pasamos
+    // 3-4 perfiles aleatorios DEL MISMO sistema como referencia comparativa;
+    // sus scores se descartan, solo conservamos el del joven que consulta.
+    // Esto restaura la simetría con /api/match (que ya naturalmente batched).
+    const allProfiles = await getAllProfiles();
+    const otherProfiles: Profile[] = allProfiles
+      .filter((p) => p.id && p.id !== profile.id)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 4);
+
+    // 3. Para cada necesidad del shortlist, calculamos el ICS contra ESTE
+    // joven + anchors. En paralelo con límite de concurrencia.
     const results = await Promise.all(
       shortlistNeeds.map(async (need) => {
-        const scored = await scoreCandidates(need, [profile], { applyHardFilter: true });
-        return { need, scored };
+        const batch = [profile, ...otherProfiles];
+        const scored = await scoreCandidates(need, batch, { applyHardFilter: false });
+        // Filtramos para devolver SOLO el del joven que consulta.
+        const ours = scored.matches.find((m) => m.profileId === profile.id);
+        return { need, scored, ours };
       })
     );
 
@@ -67,10 +80,9 @@ export async function POST(req: NextRequest) {
     let degradedCount = 0;
     const excludedNeedIds: string[] = [];
 
-    for (const { need, scored } of results) {
-      const match = scored.matches[0];
-      if (!match) {
-        // Excluido por hardConstraints
+    for (const { need, scored, ours } of results) {
+      if (!ours) {
+        // El joven cayó fuera del ranking (penalizaciones duras, etc.)
         if (need.id) excludedNeedIds.push(need.id);
         continue;
       }
@@ -80,8 +92,11 @@ export async function POST(req: NextRequest) {
         needId: need.id!,
         companyName: need.companyName,
         role: need.role,
-        ics: match.ics,
-        reason: match.reason,
+        ics: ours.ics,
+        reason: ours.reason,
+        breakdown: ours.breakdown,
+        redFlag: ours.redFlag,
+        topSkills: ours.topSkills,
       });
     }
 

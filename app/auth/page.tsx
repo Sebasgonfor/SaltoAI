@@ -19,6 +19,20 @@ function parseRole(value: string | null): UserRole | undefined {
   return undefined;
 }
 
+/**
+ * Mismo workaround que en /onboarding/rol: el `next` se respeta solo si
+ * es coherente con el rol resuelto. Sino, default del rol. Sin esto, un
+ * user joven con `?next=/empresa/chat` (heredado de un flow anterior)
+ * aterriza en el muro de RoleGate de empresa.
+ */
+function resolveTarget(role: UserRole, next: string): string {
+  if (next === '/') return role === 'joven' ? '/joven/chat' : '/empresa/chat';
+  if (role === 'joven' && (next === '/joven' || next.startsWith('/joven/'))) return next;
+  if (role === 'empresa' && (next === '/empresa' || next.startsWith('/empresa/'))) return next;
+  if (!next.startsWith('/joven') && !next.startsWith('/empresa')) return next;
+  return role === 'joven' ? '/joven/chat' : '/empresa/chat';
+}
+
 function AuthPageInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -29,7 +43,7 @@ function AuthPageInner() {
   useEffect(() => {
     if (loading || !user) return;
     if (account) {
-      router.replace(next !== '/' ? next : account.role === 'joven' ? '/joven/chat' : '/empresa/chat');
+      router.replace(resolveTarget(account.role, next));
       return;
     }
     router.replace(`/onboarding/rol?next=${encodeURIComponent(next)}`);

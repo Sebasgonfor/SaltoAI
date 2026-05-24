@@ -56,11 +56,15 @@ function buildEmbeddingText(n: Omit<CompanyNeed, "id" | "createdAt" | "embedding
 export async function POST(req: NextRequest) {
   const log = startLog(req, "necesidad");
   try {
-    const { companyName, rawDescription, legal } = (await req.json()) as {
-      companyName: string;
-      rawDescription: string;
-      legal?: CompanyLegal;
-    };
+    const { companyName, rawDescription, legal, ownerUid, ownerEmail, ownerName } =
+      (await req.json()) as {
+        companyName: string;
+        rawDescription: string;
+        legal?: CompanyLegal;
+        ownerUid?: string;
+        ownerEmail?: string | null;
+        ownerName?: string | null;
+      };
     if (!companyName?.trim() || !rawDescription?.trim()) {
       log.end({ status: 400, extra: { reason: "fields_required" } });
       return NextResponse.json(
@@ -122,6 +126,13 @@ export async function POST(req: NextRequest) {
       rawDescription: rawDescription.trim(),
       ...structured,
       ...(legal && legal.acceptedTerms ? { legal } : {}),
+      // Sin ownerUid la necesidad se guarda en Firestore pero NUNCA aparece
+      // en el dashboard del founder (listNeedsByOwner filtra por uid). Era
+      // el bug del usuario "no se guardó" — sí se guardaba, pero quedaba
+      // huérfana y no la encontraba.
+      ...(ownerUid ? { ownerUid } : {}),
+      ...(ownerEmail ? { ownerEmail } : {}),
+      ...(ownerName ? { ownerName } : {}),
     };
 
     const embedding = await embed(buildEmbeddingText(base));

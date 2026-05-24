@@ -82,8 +82,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [configured]);
 
+  // IMPORTANTE: cuando intendedRole es undefined, LIMPIAMOS el ref. Sin esto,
+  // un valor de un flow anterior contaminaba el siguiente: si el user clickeaba
+  // "Soy empresa" (popup Google → setea pendingRole='empresa'), cancelaba el
+  // popup, y después iba a /auth a registrarse con email sin ?role= → el
+  // signUp aplicaba 'empresa' contra la voluntad del user. Resultado:
+  // alguien llamado "Juan Joven" se registraba con email y quedaba como empresa.
   const setPendingRole = useCallback((intendedRole?: UserRole) => {
-    if (intendedRole) pendingRoleRef.current = intendedRole;
+    pendingRoleRef.current = intendedRole ?? null;
   }, []);
 
   const signInWithGoogle = useCallback(
@@ -132,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: string,
       password: string,
       displayName: string | undefined,
-      intendedRole?: UserRole
+      _intendedRole?: UserRole
     ) => {
       if (!configured) {
         alert(
@@ -140,7 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
         return null;
       }
-      setPendingRole(intendedRole);
+      // El registro por email NO confía en `intendedRole` para auto-asignar
+      // el rol. Razón: el `?role=` puede venir de un link viejo, una sesión
+      // anterior cancelada, o un share. No hay garantía de que coincide con
+      // la intención real del user. Forzamos que /onboarding/rol lo pregunte
+      // explícitamente (escenario donde alguien llamado "Juan Joven" se
+      // registraba por email y terminaba marcado como empresa).
+      //
+      // En Google sí confiamos en intendedRole porque el clic en "Soy X" +
+      // popup es un acto deliberado y visualmente claro. Email = no.
+      setPendingRole(undefined);
       try {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         const name = displayName?.trim();

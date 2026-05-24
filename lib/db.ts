@@ -20,6 +20,7 @@ import type {
   FeedbackEntry,
   MicroTask,
   LatentProfile,
+  ProfileDocument,
   TaskOutcomeStat,
 } from "./types";
 
@@ -27,6 +28,7 @@ const PROFILES = "profiles";
 const NEEDS = "needs";
 const FEEDBACK = "feedback";
 const MICROTASKS = "microtasks";
+const DOCUMENTS = "documents";
 
 export type StorageMode = "firestore" | "memory";
 
@@ -52,6 +54,7 @@ type DbGlobals = {
   memNeeds: Map<string, CompanyNeed>;
   memFeedback: FeedbackEntry[];
   memMicroTasks: Map<string, MicroTask>;
+  memDocuments: Map<string, ProfileDocument>;
 };
 const g = globalThis as unknown as { __saltoDb?: DbGlobals };
 if (!g.__saltoDb) {
@@ -60,12 +63,17 @@ if (!g.__saltoDb) {
     memNeeds: new Map(),
     memFeedback: [],
     memMicroTasks: new Map(),
+    memDocuments: new Map(),
   };
 }
+// Backfill por si el globalThis fue creado por una versión anterior sin
+// memDocuments. Sin esto, HMR en dev deja la prop como undefined → crash.
+if (!g.__saltoDb.memDocuments) g.__saltoDb.memDocuments = new Map();
 const memProfiles = g.__saltoDb.memProfiles;
 const memNeeds = g.__saltoDb.memNeeds;
 const memFeedback = g.__saltoDb.memFeedback;
 const memMicroTasks = g.__saltoDb.memMicroTasks;
+const memDocuments = g.__saltoDb.memDocuments;
 
 // Antes había un único flag global `firestoreDisabled` que se prendía con
 // el PRIMER error y dejaba el proceso entero en modo memoria — un permiso
@@ -432,6 +440,97 @@ export async function countMicroTasksBetween(
   return Array.from(memMicroTasks.values()).filter(
     (t) => t.companyId === companyId && t.profileId === profileId
   ).length;
+}
+
+// --- ProfileDocument CRUD (diplomas, certificados, etc) ---
+
+export async function createDocument(
+  d: Omit<ProfileDocument, "id" | "createdAt">,
+): Promise<{ id: string; storage: StorageMode }> {
+  const data: ProfileDocument = { ...d, createdAt: Date.now() };
+  if (useFirestore(DOCUMENTS)) {
+    try {
+      const ref = await addDoc(
+        collection(db, DOCUMENTS),
+        stripUndefined(data as unknown as Record<string, unknown>),
+      );
+      return { id: ref.id, storage: "firestore" };
+    } catch (e) {
+      disableFirestoreWithWarning(e, "createDocument", DOCUMENTS);
+    }
+  }
+  const id = makeLocalId();
+  memDocuments.set(id, { ...data, id });
+  return { id, storage: "memory" };
+}
+
+export async function getDocument(id: string): Promise<ProfileDocument | null> {
+  if (useFirestore(DOCUMENTS)) {
+    try {
+      const snap = await getDoc(doc(db, DOCUMENTS, id));
+      if (!snap.exists()) return memDocuments.get(id) ?? null;
+      return { id: snap.id, ...(snap.data() as Omit<ProfileDocument, "id">) };
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getDocument", DOCUMENTS);
+    }
+  }
+  return memDocuments.get(id) ?? null;
+}
+
+export async function listDocumentsByProfile(
+  profileId: string,
+): Promise<ProfileDocument[]> {
+  if (!profileId) return [];
+  if (useFirestore(DOCUMENTS)) {
+    try {
+      const q = query(collection(db, DOCUMENTS), where("profileId", "==", profileId));
+      const snap = await getDocs(q);
+      const remote = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<ProfileDocument, "id">),
+      }));
+      remote.sort((a, b) => b.createdAt - a.createdAt);
+      return remote;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listDocumentsByProfile", DOCUMENTS);
+    }
+  }
+  return Array.from(memDocuments.values())
+    .filter((d) => d.profileId === profileId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function updateDocument(
+  id: string,
+  patch: Partial<ProfileDocument>,
+): Promise<void> {
+  if (useFirestore(DOCUMENTS)) {
+    try {
+      await updateDoc(
+        doc(db, DOCUMENTS, id),
+        stripUndefined(patch as unknown as Record<string, unknown>),
+      );
+      return;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "updateDocument", DOCUMENTS);
+    }
+  }
+  const existing = memDocuments.get(id);
+  if (existing) memDocuments.set(id, { ...existing, ...patch });
+}
+
+export async function deleteDocument(id: string): Promise<boolean> {
+  let deleted = false;
+  if (useFirestore(DOCUMENTS)) {
+    try {
+      await deleteDoc(doc(db, DOCUMENTS, id));
+      deleted = true;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "deleteDocument", DOCUMENTS);
+    }
+  }
+  if (memDocuments.delete(id)) deleted = true;
+  return deleted;
 }
 
 export { isFirestoreConfigured };

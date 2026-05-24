@@ -19,10 +19,19 @@ import {
   ListChecks,
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask, Profile } from '@/lib/types';
+import { useAuth } from '@/lib/auth-context';
 
 const COMPANY_ID_KEY = 'salto_company_id';
 
-function getOrCreateCompanyId(): string {
+/**
+ * companyId del founder. Si está autenticado, usamos `user.uid` (Firebase) —
+ * la misma clave que el dashboard `/empresa` usa para LISTAR microtasks. Sin
+ * eso, una task creada acá nunca aparecía en el dashboard porque el ID era
+ * un random de localStorage (`comp_<ts>_<r>`). Caemos al random solo cuando
+ * no hay sesión, para que el demo sin login siga andando.
+ */
+function resolveCompanyId(uid: string | undefined): string {
+  if (uid) return uid;
   if (typeof window === 'undefined') return 'anon';
   let id = localStorage.getItem(COMPANY_ID_KEY);
   if (!id) {
@@ -37,6 +46,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
   const router = useRouter();
   const sp = useSearchParams();
   const needId = sp.get('needId') || undefined;
+  const { user } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [need, setNeed] = useState<CompanyNeed | null>(null);
@@ -64,12 +74,29 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
           const data = await nRes.json();
           setNeed(data.need);
           if (data.need?.companyName) setCompanyName(data.need.companyName);
+        } else if (user?.uid) {
+          // Sin needId, intentamos obtener el companyName de la última
+          // necesidad publicada por este founder (legal.companyName la guardamos
+          // en el chat). Evita que el form salga vacío y tenga que escribirlo.
+          try {
+            const mineRes = await fetch(`/api/necesidad/mias?uid=${encodeURIComponent(user.uid)}`);
+            if (mineRes.ok) {
+              const mineJson = await mineRes.json();
+              const last = Array.isArray(mineJson.needs) && mineJson.needs.length > 0
+                ? mineJson.needs[0]
+                : null;
+              const inferredName = last?.legal?.companyName || last?.companyName;
+              if (inferredName) setCompanyName(inferredName);
+            }
+          } catch {
+            /* fallback al input vacío */
+          }
         }
       } finally {
         setLoading(false);
       }
     })();
-  }, [profileId, needId]);
+  }, [profileId, needId, user?.uid]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +109,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyId: getOrCreateCompanyId(),
+          companyId: resolveCompanyId(user?.uid),
           companyName: companyName.trim(),
           profileId,
           rawRequest: rawRequest.trim(),

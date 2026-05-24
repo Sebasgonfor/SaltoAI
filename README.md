@@ -105,9 +105,10 @@ lib/
 - **Híbrido shortlist + ranking**: embeddings reducen el universo a top-5 candidatos por similitud semántica; el LLM solo califica esos 5. Escala a miles de perfiles sin pagar LLM por cada uno.
 - **Fallbacks graceful**: si Gemini falla o no hay key, todo sigue funcionando con extractor mock + heurística de strings. Demo no se rompe.
 
-## Roadmap inmediato
+## Roadmap inmediato 
 
 - Reglas Firestore por auth + ownership.
 - CV ATS (one-click desde el Perfil de Evidencia).
 - Feedback en cada etapa que reentrena los pesos ICS (data flywheel — ver PRD §8.6).
 - Migrar `firebase` (cliente) a `firebase-admin` en API routes con service account.
+

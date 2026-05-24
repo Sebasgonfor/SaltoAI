@@ -800,7 +800,7 @@ function ChatJoven() {
                     {liveStatus === 'paused' && (
                       <>
                         <span className="w-2 h-2 bg-slate-400 rounded-full" />
-                        Pausado — tocá Retomar para continuar
+                        Pausado — toca Retomar para continuar
                       </>
                     )}
                     {liveStatus === 'idle' && !liveActive && (
