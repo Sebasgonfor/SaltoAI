@@ -6,7 +6,7 @@ export default function AliadosLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
       <header className="px-6 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between sticky top-0 z-20">
         <Link href="/" className="flex items-center gap-2.5">
-          <SaltoLogo variant="light" size={32} />
+          <SaltoLogo variant="full" size={32} />
           <div className="flex flex-col leading-tight">
             <span className="font-display font-semibold text-slate-900 tracking-tight">Salto</span>
             <span className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-medium">para aliados</span>

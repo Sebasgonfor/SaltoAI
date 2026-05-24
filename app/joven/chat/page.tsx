@@ -425,47 +425,11 @@ function ChatJoven() {
       await connectLive();
     }
   };
-  if (phase === 'basics') {
-    return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10 lg:py-16 w-full">
-        <header className="mb-10 text-center">
-          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-            <UserCircle2 size={28} strokeWidth={1.75} />
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">Paso 1 de 2</div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            Antes de tu historia, lo básico.
-          </h1>
-          <p className="text-slate-600 mt-3 leading-relaxed max-w-md mx-auto">
-            Nombre y edad van en tu perfil y en el CV para ATS. El género lo eliges tú — no lo adivinamos por tu nombre.
-          </p>
-        </header>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-2">Nombre completo</label>
-            <Input
-              placeholder="Ej. Camila Silva"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              className="h-11 sm:h-12 text-sm sm:text-base"
-              autoComplete="name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-2">Edad</label>
-            <Input
-              type="number"
-              min={16}
-              max={35}
-              placeholder="Ej. 21"
-              value={formAge}
-              onChange={(e) => setFormAge(e.target.value)}
-              className="h-11 sm:h-12 text-sm sm:text-base w-full sm:w-32"
-            />
-          </div>
-
+  // NOTA: el bloque `if (phase === 'basics')` que existía acá (con JSX inline
+  // del wizard) era código stale dejado por un refactor a `<BasicsWizard>` —
+  // el merge de feat/data lo dejó "cosido" con la siguiente función y rompió
+  // el parser de TS. El render real del paso 1 vive más abajo (línea ~504).
   const switchInterviewMode = (mode: InterviewMode) => {
     if (closing || loading || liveActive || liveStatus === 'connecting') return;
     if (userTurns > 0) return;
