@@ -26,3 +26,31 @@ export function isAuthCancellation(err: unknown): boolean {
   const code = (err as { code?: string })?.code ?? '';
   return code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request';
 }
+
+/**
+ * ¿El error es "esperable" (user typeó mal, ya registrado, demasiados
+ * intentos)? Estos NO son bugs — el form ya los muestra al usuario con
+ * `getAuthErrorMessage`. Logearlos a console solo genera ruido en el dev
+ * overlay de Next y confunde al revisar logs reales.
+ *
+ * Para bugs reales (network down, Firebase misconfigured, internal),
+ * isExpected devuelve false → caller debe console.error para diagnóstico.
+ */
+const EXPECTED_AUTH_CODES = new Set([
+  'auth/email-already-in-use',
+  'auth/invalid-email',
+  'auth/weak-password',
+  'auth/wrong-password',
+  'auth/user-not-found',
+  'auth/invalid-credential',
+  'auth/too-many-requests',
+  'auth/popup-closed-by-user',
+  'auth/cancelled-popup-request',
+  'auth/user-disabled',
+  'auth/account-exists-with-different-credential',
+]);
+
+export function isExpectedAuthError(err: unknown): boolean {
+  const code = (err as { code?: string })?.code ?? '';
+  return EXPECTED_AUTH_CODES.has(code);
+}
