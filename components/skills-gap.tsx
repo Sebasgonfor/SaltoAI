@@ -344,16 +344,6 @@ export function SkillsGap({ profileId }: { profileId: string }) {
             contigo. Cubrir estas brechas sube tu ICS para esas empresas.
           </p>
         </div>
-        {coverageAvg > 0 && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-center flex-shrink-0">
-            <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">
-              Cobertura promedio
-            </div>
-            <div className="font-display font-bold text-2xl text-emerald-700 tabular-nums">
-              {coverageAvg}%
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="space-y-3">

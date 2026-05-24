@@ -7,6 +7,11 @@ import { parseProfileContact } from "@/lib/profile-contact";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateForProfileExtraction, parseJovenAge } from "@/lib/input-validation";
 import { sanitizeEvidenceForCv } from "@/lib/cv-evidence";
+import {
+  heuristicExtraction,
+  isProfileTooThin,
+  mergeProfiles,
+} from "@/lib/heuristic-profile";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage, Gender, JovenBasics, Profile } from "@/lib/types";
 
@@ -168,41 +173,80 @@ export async function POST(req: NextRequest) {
       .join("\n");
 
     let extracted: Omit<Profile, "id" | "createdAt" | "embedding">;
+    let extractionMode: "llm" | "llm+heuristic" | "heuristic_only" | "mock" = "llm";
+
+    // Piso heurístico — se computa siempre. Usa regex sobre el transcript
+    // para producir 2-5 skills/evidencias ancladas a citas reales. Es nuestra
+    // red de seguridad para que el perfil NUNCA salga vacío.
+    const heuristic = heuristicExtraction(messages, { name: basics.name });
 
     if (!hasGeminiKey()) {
-      extracted = mockExtraction(basics, transcript);
-      log.info("mode.mock_extraction");
-    } else {
-      const response = await gemini().models.generateContent({
-        model: GEMINI_MODEL,
-        contents: `${EXTRACTION_PROMPT}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-        },
-      });
-      const parsed = JSON.parse(response.text || "{}");
+      // Sin LLM, usamos heurístico real (más rico que el mock canónico).
       extracted = {
         name: basics.name,
         age: basics.age,
         gender: basics.gender,
-        summary: parsed.summary || "",
-        skills: Array.isArray(parsed.skills) ? parsed.skills : [],
-        traits: Array.isArray(parsed.traits) ? parsed.traits : [],
-        evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
+        ...heuristic,
       };
-
-      if (extracted.evidence.length === 0 && extracted.skills.length === 0) {
-        log.warn("edge.empty_extraction");
-        log.end({ status: 422, extra: { code: "no_evidence_extracted" } });
-        return NextResponse.json(
-          {
-            error:
-              "No pudimos anclar evidencia concreta en lo que contaste. Vuelve al chat y profundiza con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
-            code: "no_evidence_extracted",
+      extractionMode = "heuristic_only";
+      log.info("mode.heuristic_extraction");
+    } else {
+      let llmBody = { summary: "", skills: [] as string[], traits: [] as string[], evidence: [] as { skill: string; quote: string }[] };
+      try {
+        const response = await gemini().models.generateContent({
+          model: GEMINI_MODEL,
+          contents: `${EXTRACTION_PROMPT}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
           },
-          { status: 422 }
-        );
+        });
+        const parsed = JSON.parse(response.text || "{}");
+        llmBody = {
+          summary: parsed.summary || "",
+          skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+          traits: Array.isArray(parsed.traits) ? parsed.traits : [],
+          evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
+        };
+      } catch (llmErr) {
+        // Si el LLM cae aquí (timeout, JSON mal formado, etc.) y NO es rate
+        // limit, seguimos con heurístico — la entrevista no muere. Los rate
+        // limits sí se propagan al catch externo para mostrar Retry-After.
+        if (isRateLimitError(llmErr)) throw llmErr;
+        log.warn("perfil.llm_failed_falling_back", {
+          message: (llmErr as Error)?.message,
+        });
+      }
+
+      // Decisión de fusión:
+      //   LLM rico  → usar LLM solo (mejor narrativa).
+      //   LLM pobre → fusionar con heurístico para garantizar piso.
+      //   LLM vacío → heurístico puro.
+      if (isProfileTooThin(llmBody)) {
+        const merged = isProfileTooThin({ skills: llmBody.skills, evidence: llmBody.evidence })
+          ? mergeProfiles(llmBody, heuristic)
+          : llmBody;
+        extracted = {
+          name: basics.name,
+          age: basics.age,
+          gender: basics.gender,
+          ...merged,
+        };
+        extractionMode = llmBody.skills.length === 0 && llmBody.evidence.length === 0
+          ? "heuristic_only"
+          : "llm+heuristic";
+        log.info("perfil.thin_llm_reinforced_with_heuristic", {
+          llmSkills: llmBody.skills.length,
+          llmEvidence: llmBody.evidence.length,
+        });
+      } else {
+        extracted = {
+          name: basics.name,
+          age: basics.age,
+          gender: basics.gender,
+          ...llmBody,
+        };
+        extractionMode = "llm";
       }
     }
 
@@ -219,17 +263,18 @@ export async function POST(req: NextRequest) {
     fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'A',location:'app/api/perfil/route.ts:POST',message:'perfil extraction after sanitize',data:{skills:extracted.skills.length,evidence:extracted.evidence.length,uid:!!uid},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
-    if (extracted.evidence.length === 0 && extracted.skills.length === 0) {
-      log.warn("edge.empty_extraction_after_polish");
-      log.end({ status: 422, extra: { code: "no_evidence_extracted" } });
-      return NextResponse.json(
-        {
-          error:
-            "No pudimos anclar evidencia concreta en lo que contaste. Vuelve al chat y profundiza con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
-          code: "no_evidence_extracted",
-        },
-        { status: 422 }
-      );
+    // Último piso: si tras la sanitización quedó vacío, usamos el heurístico
+    // crudo. El perfil NUNCA debe salir sin skills/evidencias.
+    if (extracted.evidence.length === 0 || extracted.skills.length === 0) {
+      log.warn("edge.empty_after_sanitize_fallback_to_heuristic");
+      extracted = {
+        ...extracted,
+        skills: heuristic.skills,
+        traits: extracted.traits.length > 0 ? extracted.traits : heuristic.traits,
+        evidence: heuristic.evidence,
+        summary: extracted.summary?.trim() || heuristic.summary,
+      };
+      extractionMode = "heuristic_only";
     }
 
     const embedding = await embed(buildEmbeddingText(extracted));
@@ -275,9 +320,10 @@ export async function POST(req: NextRequest) {
         traits: extracted.traits.length,
         evidence: extracted.evidence.length,
         storage,
+        extractionMode,
       },
     });
-    return NextResponse.json({ id, profile: saved, storage });
+    return NextResponse.json({ id, profile: saved, storage, extractionMode });
   } catch (err) {
     if (isRateLimitError(err)) {
       const shape = classifyProviderError(err);
