@@ -149,6 +149,12 @@ export interface CompanyNeed {
   createdAt: number;
   /** Solo presente cuando la necesidad vino del chat con gating legal. */
   legal?: CompanyLegal;
+  /** UID del founder dueño. Necesario para que `listNeedsByOwner()` lo
+   * encuentre y aparezca en `/empresa` (dashboard). Sin esto la necesidad
+   * queda huérfana — guardada en Firestore pero invisible para su dueño. */
+  ownerUid?: string;
+  ownerEmail?: string | null;
+  ownerName?: string | null;
 }
 
 export interface ICSBreakdown {
