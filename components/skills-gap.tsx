@@ -32,6 +32,8 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
+import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 interface AggregatedGap {
   skill: string;
@@ -147,6 +149,7 @@ function writeCoursesCache(profileId: string, all: Record<string, CachedCoursesE
 }
 
 export function SkillsGap({ profileId }: { profileId: string }) {
+  const emit = useEmitSignal();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aggregated, setAggregated] = useState<AggregatedGap[]>([]);
@@ -465,41 +468,77 @@ export function SkillsGap({ profileId }: { profileId: string }) {
 
                   {courseData && courseData.courses.length > 0 && (
                     <div className="space-y-2.5">
-                      {courseData.courses.map((c, i) => (
-                        <a
-                          key={i}
-                          href={c.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-white border border-slate-200 hover:border-emerald-300 hover:shadow-sm transition-all rounded-lg p-3.5"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1.5">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-slate-900 leading-snug">{c.title}</div>
-                              <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
-                                <BookOpen size={11} />
-                                <span>{c.provider}</span>
-                                {c.estimatedHours > 0 && (
-                                  <>
-                                    <span>·</span>
-                                    <span>~{c.estimatedHours}h</span>
-                                  </>
-                                )}
-                                {c.language === 'en-with-es-subs' && (
-                                  <>
-                                    <span>·</span>
-                                    <span className="text-amber-700">EN con subs ES</span>
-                                  </>
-                                )}
+                      {courseData.courses.map((c, i) => {
+                        // targetId estable por (profile, skill, índice) para
+                        // que el dedup de localStorage funcione bien y un
+                        // user no pueda votar dos veces el mismo curso.
+                        const courseTargetId = `${profileId}__${gap.skill}__${i}`;
+                        return (
+                          <div
+                            key={i}
+                            className="block bg-white border border-slate-200 hover:border-emerald-300 hover:shadow-sm transition-all rounded-lg p-3.5"
+                          >
+                            <a
+                              href={c.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => {
+                                // Implícita: el user abrió el curso. Es señal
+                                // fuerte de relevancia (más fuerte que el
+                                // thumb de abajo que pocos cliquean).
+                                emit({
+                                  touchpoint: 'course_recommendation',
+                                  targetType: 'suggestion',
+                                  targetId: courseTargetId,
+                                  text: c.title,
+                                });
+                              }}
+                              className="block"
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm text-slate-900 leading-snug">{c.title}</div>
+                                  <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                    <BookOpen size={11} />
+                                    <span>{c.provider}</span>
+                                    {c.estimatedHours > 0 && (
+                                      <>
+                                        <span>·</span>
+                                        <span>~{c.estimatedHours}h</span>
+                                      </>
+                                    )}
+                                    {c.language === 'en-with-es-subs' && (
+                                      <>
+                                        <span>·</span>
+                                        <span className="text-amber-700">EN con subs ES</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <ExternalLink size={14} className="text-slate-400 flex-shrink-0 mt-0.5" />
                               </div>
+                              {c.why && (
+                                <p className="text-xs text-slate-600 leading-relaxed mt-1">{c.why}</p>
+                              )}
+                            </a>
+                            {/* Thumb explícito sobre la calidad de la
+                                recomendación. Silencioso: no muestra "Gracias"
+                                inline para no romper el ritmo visual del
+                                listado. */}
+                            <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-end">
+                              <FeedbackThumbs
+                                label="¿Buena recomendación?"
+                                thanksText="Gracias."
+                                layout="inline"
+                                silent
+                                touchpoint="course_recommendation"
+                                targetType="suggestion"
+                                targetId={courseTargetId}
+                              />
                             </div>
-                            <ExternalLink size={14} className="text-slate-400 flex-shrink-0 mt-0.5" />
                           </div>
-                          {c.why && (
-                            <p className="text-xs text-slate-600 leading-relaxed mt-1">{c.why}</p>
-                          )}
-                        </a>
-                      ))}
+                        );
+                      })}
                       {courseData.cached && (
                         <p className="text-[10px] text-slate-400 italic">Resultados cacheados — actualizados las últimas 24h.</p>
                       )}

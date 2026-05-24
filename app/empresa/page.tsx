@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask } from '@/lib/types';
 import { LegalEditor } from '@/components/empresa/legal-editor';
+import { EmpresaWidgets } from '@/components/dashboard/empresa-widgets';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -252,17 +253,47 @@ export default function EmpresaDashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [needsRes, tasksRes] = await Promise.all([
-          fetch(`/api/necesidad/mias?uid=${encodeURIComponent(user.uid)}`),
+        // Legacy: tareas creadas antes del fix usaban un companyId random
+        // de localStorage. Si todavía existe, lo consultamos en paralelo
+        // y mergeamos resultados — así no se pierden las histórias del
+        // demo. (Cuando todo lo nuevo sea con user.uid, esto queda inerte.)
+        let legacyCompanyId: string | null = null;
+        try {
+          legacyCompanyId = localStorage.getItem('salto_company_id');
+        } catch {
+          /* SSR-safe */
+        }
+        const taskRequests: Promise<Response>[] = [
           fetch(`/api/microtask/list?companyId=${encodeURIComponent(user.uid)}`),
+        ];
+        if (legacyCompanyId && legacyCompanyId !== user.uid) {
+          taskRequests.push(
+            fetch(`/api/microtask/list?companyId=${encodeURIComponent(legacyCompanyId)}`),
+          );
+        }
+        const [needsRes, ...tasksResponses] = await Promise.all([
+          fetch(`/api/necesidad/mias?uid=${encodeURIComponent(user.uid)}`),
+          ...taskRequests,
         ]);
         if (!cancelled && needsRes.ok) {
           const d = await needsRes.json();
           setNeeds(Array.isArray(d.needs) ? d.needs : []);
         }
-        if (!cancelled && tasksRes.ok) {
-          const d = await tasksRes.json();
-          setTasks(Array.isArray(d.tasks) ? d.tasks : []);
+        // Merge de las tasks: por id, conservando la más reciente.
+        if (!cancelled) {
+          const allTasks = new Map<string, MicroTask>();
+          for (const tr of tasksResponses) {
+            if (!tr.ok) continue;
+            const d = await tr.json();
+            if (!Array.isArray(d.tasks)) continue;
+            for (const t of d.tasks as MicroTask[]) {
+              if (t.id) allTasks.set(t.id, t);
+            }
+          }
+          const merged = Array.from(allTasks.values()).sort(
+            (a, b) => b.createdAt - a.createdAt,
+          );
+          setTasks(merged);
         }
       } catch {
         /* silent: empty state se ocupa */
@@ -332,7 +363,8 @@ export default function EmpresaDashboardPage() {
 
       {user?.uid && <LegalEditor uid={user.uid} />}
 
-      {/* KPIs */}
+      {/* KPIs base — operacional. Las activas/por-evaluar/cerradas son las que
+          el founder mira primero para saber QUÉ está pendiente HOY. */}
       <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={Layers}
@@ -361,6 +393,21 @@ export default function EmpresaDashboardPage() {
           hint="Evaluadas + pagadas"
         />
       </section>
+
+      {/* Widgets enriquecidos — pasaporte visual del founder: hero dark +
+          ADN de búsqueda (radar) + inversión + top candidatos + pipeline
+          funnel + estilo founder + salud por necesidad + calibración. Una
+          sola request al endpoint. */}
+      <EmpresaWidgets
+        uid={user.uid}
+        companyName={
+          needs[0]?.companyName ||
+          user.displayName ||
+          (user.email ? user.email.split('@')[0] : 'Mi empresa')
+        }
+        needs={needs}
+        tasks={tasks}
+      />
 
       {/* CTA + lista de necesidades */}
       <section>

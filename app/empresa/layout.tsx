@@ -8,7 +8,7 @@ import { RoleGate } from '@/components/auth/role-gate';
 export default function EmpresaLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <header className="px-6 h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between sticky top-0 z-20">
+      <header className="px-4 sm:px-6 h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between sticky top-0 z-20">
         <Link href="/" className="flex items-center shrink-0">
           <SaltoLogo variant="full" size={56} />
         </Link>
@@ -42,7 +42,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
       <main className="flex-1 flex flex-col w-full">
         <RoleGate role="empresa">{children}</RoleGate>
       </main>
-      <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
+      <footer className="border-t border-slate-200 py-6 px-4 sm:px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
         <span>SaltoAI · Calidad, no volumen</span>
         <span>Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI</span>
       </footer>

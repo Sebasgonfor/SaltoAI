@@ -23,6 +23,14 @@ import DocumentsManager from '@/components/documents-manager';
 import { BasicsEditor } from '@/components/joven/basics-editor';
 import { profileToJovenBasics } from '@/lib/user-onboarding-storage';
 import { useAuth } from '@/lib/auth-context';
+import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import {
+  CompanyFeedbackToYouth,
+  PassReasonButton,
+} from '@/components/feedback/company-to-youth';
+import { YouthFeedbackInbox } from '@/components/feedback/youth-inbox';
+import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 const GENDER_LABEL: Record<Gender, string> = {
   mujer: 'Mujer',
@@ -41,6 +49,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
   const { account, user } = useAuth();
   const viewerIsEmpresa = account?.role === 'empresa';
   const viewerIsOwner = !!user?.uid && user.uid === id;
+  const emit = useEmitSignal();
   const [perfil, setPerfil] = useState<Profile | null>(null);
   const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -236,6 +245,32 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         </section>
       )}
 
+      {/* FEEDBACK del joven sobre la calidad de la entrevista y la precisión
+          del perfil generado (touchpoints PRD §8.6: interview_quality +
+          profile_accuracy). Se muestra solo al dueño del perfil — el founder
+          que pasa por aquí no debe ver estos prompts. Dedup por localStorage
+          (no aparecen dos veces para el mismo perfil). */}
+      {!viewerIsEmpresa && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <FeedbackInlinePrompt
+            question="¿La entrevista entendió tu potencial?"
+            hint="Tu calificación entrena el motor que extrae evidencia."
+            variant="rating"
+            touchpoint="interview_quality"
+            targetType="profile"
+            targetId={id}
+          />
+          <FeedbackInlinePrompt
+            question="¿Este perfil te representa?"
+            hint="Si algo falta o sobra, marcalo — lo usamos para afinar."
+            variant="thumbs"
+            touchpoint="profile_accuracy"
+            targetType="profile"
+            targetId={id}
+          />
+        </div>
+      )}
+
       {/* Bloque contextual por rol del viewer:
           - Joven dueño del perfil → CvCustomizer (personaliza SU CV con SUS
             datos de contacto, idiomas, educación; persistencia localStorage
@@ -247,8 +282,8 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             Antes ambos roles veían el CvCustomizer y el founder podía
             sobrescribir los datos guardados en su browser. */}
       {viewerIsEmpresa ? (
-        <section>
-          <div className="mb-5">
+        <section className="space-y-5">
+          <div className="mb-1">
             <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
               Próximo paso
             </div>
@@ -266,17 +301,37 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               href={`/api/cv?profileId=${encodeURIComponent(id)}&style=minimalist&autoprint=1`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => {
+                // Señal implícita: la empresa descargó el CV. Es señal de
+                // interés alto en el candidato (engagement > "ver perfil").
+                emit({
+                  touchpoint: 'cv_generated',
+                  targetType: 'profile',
+                  targetId: id,
+                });
+              }}
             >
               <Button variant="outline" className="gap-2">
                 Descargar CV ATS
               </Button>
             </a>
+            {/* "No avanzar" — cierra el loop incluso cuando la respuesta es
+                "no". El joven raramente recibe esto en otras plataformas.
+                Touchpoint company_pass_reason. */}
+            <PassReasonButton profileId={id} profileName={perfil.name} />
             <p className="w-full text-xs text-slate-500 mt-2 leading-relaxed">
               <strong className="text-slate-700">Recomendación:</strong> en lugar de mandar el
               CV a tu mail, propón una micro-tarea pagada acotada. Te llega evidencia REAL de
               cómo trabaja antes de comprometerte con un contrato.
             </p>
           </div>
+          {/* Feedback empresa → joven sobre la candidatura. NO es la
+              evaluación de microtask: es comentario+rating sobre el perfil
+              entero. Va aparte del flujo de microtask para que la empresa
+              pueda dejar feedback aunque NO decida proponer tarea (el
+              caso más común al inicio del funnel). Touchpoint
+              company_feedback_to_youth. */}
+          <CompanyFeedbackToYouth profileId={id} profileName={perfil.name} />
         </section>
       ) : (
         <section>
@@ -291,6 +346,12 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           <CvCustomizer profileId={id} />
         </section>
       )}
+
+      {/* Inbox de feedback recibido — el cierre del loop bidireccional
+          (PRD §8.6 v4). El joven ve los comentarios+ratings que empresas
+          le dejaron sobre su candidatura, las razones de descarte, y
+          puede responder. Solo visible al dueño del perfil. */}
+      {!viewerIsEmpresa && <YouthFeedbackInbox profileId={id} />}
 
       {/* Tu historia → Evidencia (pipeline pedagógico) */}
       <section className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200 rounded-3xl p-8 md:p-10">
@@ -440,6 +501,26 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                     </div>
                   </div>
                 </div>
+                {/* Feedback por cita — solo lo ve el dueño del perfil. La
+                    empresa NO debe poder marcar evidencia ajena como errada
+                    (sería ataque al perfil). Genera señal ground-truth para
+                    detectar alucinaciones del extractor. */}
+                {!viewerIsEmpresa && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-slate-500">
+                      ¿La cita captura bien lo que contaste?
+                    </span>
+                    <FeedbackThumbs
+                      label=""
+                      thanksText="Gracias, lo registramos."
+                      layout="inline"
+                      silent
+                      touchpoint="evidence_quote"
+                      targetType="evidence"
+                      targetId={`${id}__ev_${i}`}
+                    />
+                  </div>
+                )}
               </article>
             ))}
           </div>

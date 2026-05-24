@@ -102,6 +102,7 @@ export async function GET(req: NextRequest) {
     implicit_connect: 0,
     implicit_microtask: 0,
     microtask_outcome: 0,
+    joven_interest: 0,
     unknown: 0,
   };
   for (const f of all) {

@@ -4,3 +4,4 @@
 {"sessionId":"aa3c62","hypothesisId":"B","location":"app/empresa/candidatos/page.tsx","message":"match_from_session","data":{"needId":"ewJc5imWpo1PZIzgIMfs","profileId":"y4xC0c1fbFdtpt99uBHi8Ah652w2","ics":29},"timestamp":1779615443602}
 {"sessionId":"aa3c62","hypothesisId":"B","location":"app/empresa/candidatos/page.tsx","message":"match_from_session","data":{"needId":"ewJc5imWpo1PZIzgIMfs","profileId":"y4xC0c1fbFdtpt99uBHi8Ah652w2","ics":29},"timestamp":1779615443605}
 {"sessionId":"aa3c62","hypothesisId":"B","location":"components/empresa/candidate-detail.tsx","message":"detail_loaded","data":{"profileId":"y4xC0c1fbFdtpt99uBHi8Ah652w2","needId":"ewJc5imWpo1PZIzgIMfs","ms":7623,"hasMatchProp":true},"timestamp":1779615451227}
+{"sessionId":"aa3c62","hypothesisId":"D","location":"lib/auth-context.tsx","message":"auth_state","data":{"uid":"bVIRHyrPjKN08buoV5zpsaSk7w92","hasAccount":true,"role":"empresa","pendingRole":null},"timestamp":1779616123810}

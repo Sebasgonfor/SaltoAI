@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { MicroTask } from '@/lib/types';
 import { RoleGate } from '@/components/auth/role-gate';
+import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 
 /**
  * Detalle de micro-tarea del joven. Privado — solo el dueño puede entregar
@@ -163,6 +164,22 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         </div>
       </section>
 
+      {/* Feedback de claridad de la consigna — disparado solo en estado
+          pending. El joven nos dice si entendió qué tiene que entregar
+          ANTES de empezar (ground-truth para mejorar cómo redactamos
+          tareas: brief + expectedDeliverable + criteria). */}
+      {isPending && (
+        <FeedbackInlinePrompt
+          question="¿La tarea está clara? ¿Sabés qué tenés que entregar?"
+          hint="Si la consigna se ve confusa, lo arreglamos antes de que pierdas tiempo."
+          variant="thumbs"
+          touchpoint="microtask_clarity"
+          targetType="microtask"
+          targetId={id}
+          dismissible
+        />
+      )}
+
       {/* Form de entrega */}
       {isPending && (
         <section className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-6 md:p-8">
@@ -263,6 +280,22 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
           )}
           <div className="mt-5 pt-5 border-t border-amber-200 text-xs text-amber-900 leading-relaxed">
             Esta evaluación ya está en tu Perfil de Evidencia como outcome verificado. Las próximas empresas la van a ver.
+          </div>
+          {/* Justicia percibida: el joven nos dice si la nota refleja su
+              trabajo. Si vemos muchos "no" sistemáticos contra una empresa,
+              es señal de que el founder está siendo demasiado duro (riesgo
+              de sesgo de evaluación). No es dismissible — queremos cerrar
+              el loop incluso en disputas. */}
+          <div className="mt-5 pt-5 border-t border-amber-200">
+            <FeedbackInlinePrompt
+              question="¿Sentís que la evaluación fue justa?"
+              hint="Si no, anotamos la disputa. La empresa no ve tu voto."
+              variant="thumbs"
+              touchpoint="microtask_evaluation"
+              targetType="microtask"
+              targetId={id}
+              dismissible={false}
+            />
           </div>
         </section>
       )}

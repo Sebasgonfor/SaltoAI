@@ -24,6 +24,10 @@ import { storeMatchForNavigation } from '@/lib/match-navigation-storage';
 import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
 import { useAuth } from '@/lib/auth-context';
+import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { NeedRadiography } from '@/components/empresa/need-radiography';
+import { emitSignal } from '@/lib/feedback';
 
 interface MatchResponse {
   need: CompanyNeed;
@@ -44,7 +48,15 @@ const DIM_LABELS: { key: keyof ICSBreakdown; label: string; weight: number | nul
 /**
  * Fire-and-forget para señales implícitas (click conectar, propose microtask).
  * No bloqueamos al founder con esto; si falla, simplemente no se registra.
- * El motor lo va a leer en el próximo recálculo de scoreCandidates().
+ *
+ * Doble pipe:
+ *   1. /api/feedback/implicit (legacy) — lo lee scoreCandidates() para ajustar
+ *      el ranking en tiempo real (sí, hace recálculo on-the-fly).
+ *   2. /api/feedback (v3) — alimenta el flywheel dashboard con touchpoint
+ *      tipado (profile_click | microtask_proposed). Sin esto el dashboard
+ *      de §8.6 no ve estas señales.
+ *
+ * Ambos endpoints son idempotentes server-side, así que duplicar no rompe.
  */
 function recordImplicitSignal(
   needId: string,
@@ -52,6 +64,7 @@ function recordImplicitSignal(
   signal: 'connect' | 'microtask_proposed',
   icsAtTime?: number,
 ) {
+  // 1. Legacy: el motor lo necesita para ajustes inmediatos.
   try {
     void fetch('/api/feedback/implicit', {
       method: 'POST',
@@ -62,6 +75,19 @@ function recordImplicitSignal(
   } catch {
     /* never throws */
   }
+  // 2. v3: el flywheel dashboard. profile_click cuando el founder abre el
+  //    perfil, microtask_proposed cuando lo manda a /empresa/probar.
+  const touchpoint =
+    signal === 'connect' ? 'profile_click' : 'microtask_proposed';
+  void emitSignal({
+    kind: 'implicit',
+    touchpoint,
+    targetType: 'match',
+    targetId: `${needId}__${profileId}`,
+    needId,
+    profileId,
+    icsAtTime,
+  });
 }
 
 function candidateHref(needId: string, profileId: string) {
@@ -93,7 +119,7 @@ function BreakdownBars({
         const isPenalty = key === 'penalties';
         return (
           <div key={key} className="flex items-center gap-3 text-xs">
-            <div className={size === 'lg' ? 'w-32' : 'w-24'}>
+            <div className={size === 'lg' ? 'w-24 sm:w-32' : 'w-20 sm:w-24'}>
               <div className="text-slate-700 font-medium">{label}</div>
               {weight !== null && (
                 <div className="text-[10px] text-slate-400 uppercase tracking-wider">peso {Math.round(weight * 100)}%</div>
@@ -270,6 +296,34 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
               {need.companyName}
             </h1>
             <p className="text-lg text-slate-700 max-w-3xl">{need.role}</p>
+            {need.jobNature && (
+              <div className="mt-2 inline-flex items-center gap-2 text-xs">
+                <Badge
+                  variant="outline"
+                  className={
+                    need.jobNature === 'cuantitativa'
+                      ? 'bg-blue-50 text-blue-800 border-blue-200'
+                      : need.jobNature === 'cualitativa'
+                        ? 'bg-violet-50 text-violet-800 border-violet-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                  }
+                  title={
+                    need.jobNature === 'cuantitativa'
+                      ? 'El motor pondera ALTO los resultados medibles del candidato.'
+                      : need.jobNature === 'cualitativa'
+                        ? 'El motor NO castiga al candidato por no traer métricas — valora detalle, constancia y confiabilidad.'
+                        : 'Pesos balanceados; no se favorece ni penaliza la ausencia de métricas.'
+                  }
+                >
+                  Rol {need.jobNature}
+                </Badge>
+                {need.jobNatureReason && (
+                  <span className="text-slate-500 italic max-w-md truncate" title={need.jobNatureReason}>
+                    {need.jobNatureReason}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <Link href="/empresa/chat">
             <Button variant="outline" size="sm">Editar necesidad</Button>
@@ -311,6 +365,29 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
           </div>
         </div>
       </header>
+
+      {/* Feedback "¿la IA capturó bien tu necesidad?" — aparece la PRIMERA
+          vez que el founder ve esta página (el dedup del componente vía
+          localStorage garantiza una sola aparición por needId). Critical:
+          si el founder dice "no", el structuring del prompt es la palanca
+          más alta — un error aquí contamina todo el matching downstream. */}
+      <FeedbackInlinePrompt
+        question="¿La IA capturó bien tu necesidad?"
+        hint="Mirá los skills, rasgos y restricciones de arriba. ¿Reflejan lo que dijiste en la entrevista?"
+        variant="rating"
+        touchpoint="need_structuring"
+        targetType="need"
+        targetId={needId}
+        dismissible
+      />
+
+      {/* Radiografía — dashboard rico antes de los matches.
+          Convierte la página en una vista de inteligencia operativa:
+          KPIs + salud + histograma + dimensiones + skills coverage +
+          perfil de empresa + engagement. Reduce la fricción para que
+          el founder entienda QUÉ es lo que está mirando antes de ir
+          candidato por candidato. */}
+      <NeedRadiography need={need} matches={matches} needId={needId} />
 
       {/* Aviso (rate-limit en ranking, contexto débil, etc.) */}
       {data.warning && (
@@ -365,7 +442,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
               {/* Left: identity + score */}
               <div className="md:col-span-5 space-y-5">
                 <div>
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
                     {top.profileName}
                   </h2>
                   {decisionFor(decisions, top.profileId) === 'interested' && (
@@ -397,7 +474,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 </div>
 
                 <div className="flex items-baseline gap-3 pt-4">
-                  <span className="font-display font-bold text-5xl sm:text-7xl md:text-8xl text-emerald-600 tabular-nums leading-none">
+                  <span className="font-display font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl text-emerald-600 tabular-nums leading-none">
                     {top.ics}
                   </span>
                   <div className="space-y-0.5">
@@ -472,6 +549,26 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <Info size={14} className="mt-0.5 text-slate-400 flex-shrink-0" />
                   <span><strong className="text-slate-900 font-semibold">Red flag IA:</strong> {top.redFlag}</span>
                 </div>
+                {/* Calibración del red flag: ¿el aviso de la IA fue acertado
+                    o ruido? Ground-truth crítico — si vemos muchos "no"
+                    sistemáticos en una dimensión, ajustamos el prompt. */}
+                {top.redFlag && top.redFlag !== 'Ninguna señal negativa visible.' && (
+                  <div className="bg-white/60 backdrop-blur border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-slate-600">
+                      ¿Este red flag fue acertado?
+                    </span>
+                    <FeedbackThumbs
+                      label=""
+                      layout="inline"
+                      silent
+                      touchpoint="red_flag_accuracy"
+                      targetType="match"
+                      targetId={`${needId}__${top.profileId}`}
+                      needId={needId}
+                      profileId={top.profileId}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </article>

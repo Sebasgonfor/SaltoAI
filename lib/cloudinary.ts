@@ -79,6 +79,32 @@ export interface SignedUploadParams {
 }
 
 /**
+ * Decide el resource_type de Cloudinary por extensión de archivo.
+ *
+ * Antes usábamos "auto" — Cloudinary decidía. Para PDFs "auto" routea a
+ * "image" resource type, y eso TIENE TRES PROBLEMAS:
+ *   1. Cuentas Cloudinary nuevas tienen "PDF and ZIP delivery" DESACTIVADO
+ *      por default en Settings → Security. La URL devolvía 401/403 al fetch.
+ *   2. Cuando está habilitado, el image upload puede entregar el PDF
+ *      rasterizado (primera página como JPEG) en vez del binario original.
+ *   3. Las transformaciones de "image" no aplican a PDFs y a veces fallan.
+ *
+ * Solución: explicit resource_type según extensión.
+ *   - pdf  → "raw"   (binario crudo, sin transformaciones, siempre se entrega)
+ *   - image (jpg/png/webp) → "image" (con transformaciones disponibles)
+ *
+ * Esto requiere que el cliente NO use "auto" — pero como nosotros firmamos
+ * el upload con el resourceType específico, el cliente debe usar el mismo.
+ */
+function inferResourceType(fileName: string, override?: CloudinaryResourceType): CloudinaryResourceType {
+  if (override && override !== "auto") return override;
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  if (ext === "pdf") return "raw";
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
+  return "raw"; // default conservador
+}
+
+/**
  * Genera los parámetros firmados para que el cliente suba un documento
  * directamente a Cloudinary sin pasar por nuestro servidor.
  *
@@ -106,7 +132,7 @@ export function signUpload(args: {
     .slice(0, 80) || "doc";
   const folder = `${cfg.uploadFolder}/${args.profileId}`;
   const publicId = `${safeName}-${timestamp}`;
-  const resourceType = args.resourceType ?? "auto";
+  const resourceType = inferResourceType(args.fileName, args.resourceType);
 
   // Cloudinary firma SOLO los params que vamos a enviar al endpoint de upload.
   // Si después el cliente manda un param no incluido en la firma, Cloudinary

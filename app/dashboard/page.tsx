@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
+import { JovenWidgets } from '@/components/dashboard/joven-widgets';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -276,7 +277,10 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
 
       {/* ── TOPBAR ── */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 h-14 px-4 flex items-center justify-between">
+      {/* backdrop-blur-md en sticky recalculaba el filter en cada frame de
+          scroll → uno de los mayores culpables del scroll lento. Lo cambio
+          por fondo sólido. Se ve igual de premium y el scroll va smooth. */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-14 px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -286,9 +290,11 @@ export default function DashboardPage() {
           >
             <Menu size={18} />
           </button>
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center">
+            {/* variant=full ya incluye icono + texto "SaltoAI" — antes había
+                un <span>SaltoAI</span> redundante que mostraba el wordmark
+                dos veces en el topbar. */}
             <SaltoLogo variant="full" size={26} />
-            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">SaltoAI</span>
           </Link>
         </div>
         <UserButton />
@@ -321,9 +327,8 @@ export default function DashboardPage() {
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               >
                 <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center">
                     <SaltoLogo variant="full" size={24} />
-                    <span className="font-display font-semibold text-slate-900 text-sm">SaltoAI</span>
                   </div>
                   <button
                     type="button"
@@ -341,38 +346,44 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* ── MAIN CONTENT ── */}
-        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-4xl">
+        {/* Sin max-w: el dashboard ocupa TODO el espacio disponible al
+            costado del sidebar. `flex-1 min-w-0` ya garantiza que se
+            adapta al ancho restante después del sidebar de 208px (w-52).
+            El padding lateral aumenta en pantallas grandes para que el
+            contenido no quede pegado al borde derecho. */}
+        <main className="flex-1 min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7">
 
-          {/* WELCOME — sin avatar/foto. El producto no maneja foto de perfil. */}
-          <FadeUp>
-            <div>
-              <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
-                {getGreeting(firstName)}
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {profile ? 'Tu perfil está activo y visible para empresas.' : 'Completa tu entrevista para empezar.'}
-              </p>
-            </div>
-          </FadeUp>
+          {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
+              ya muestra greeting (vía nombre + categoría), avatar circular,
+              status text ("Última actividad: …") y los 4 KPIs (skills,
+              evidencias, microtasks, rating). Mantenerlos arriba duplicaba
+              información y rompía la jerarquía visual. Solo dejamos el
+              greeting cuando NO hay perfil — ahí el hero no se renderiza
+              y el onboarding banner toma protagonismo. */}
+          {!dataLoading && !profile && (
+            <FadeUp>
+              <div>
+                <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
+                  {getGreeting(firstName)}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Completa tu entrevista para empezar.
+                </p>
+              </div>
+            </FadeUp>
+          )}
 
-          {/* STAT CARDS */}
-          {!dataLoading && (
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                icon={Layers}
-                value={profile?.skills.length ?? 0}
-                label="Skills"
-                color="text-emerald-600"
-                delay={0.05}
-              />
-              <StatCard
-                icon={MessageSquareQuote}
-                value={profile?.evidence.length ?? 0}
-                label="Evidencias"
-                color="text-emerald-600"
-                delay={0.1}
-              />
-            </div>
+          {/* Widgets enriquecidos — pasaporte de talento visual. El hero
+              dentro del componente reemplaza el welcome header.
+              Sin <FadeUp> wrapper: el motion.div agrega un compositing
+              layer que persiste post-animación → más overhead en scroll. */}
+          {!dataLoading && profile && (
+            <JovenWidgets
+              uid={user.uid}
+              profileId={user.uid}
+              profile={profile}
+              tasks={tasks}
+            />
           )}
 
           {/* ONBOARDING — sin perfil */}
@@ -482,7 +493,7 @@ export default function DashboardPage() {
                   { icon: User, label: 'Mi perfil', href: `/joven/perfil/${user.uid}`, color: 'text-slate-700', bg: 'bg-slate-50' },
                 ].map(({ icon: Icon, label, href, color, bg }) => (
                   <Link key={label} href={href} className="group">
-                    <div className={`${bg} border border-slate-200 rounded-xl p-4 hover:shadow-sm hover:border-slate-300 transition-all flex flex-col items-start gap-2`}>
+                    <div className={`${bg} border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-colors flex flex-col items-start gap-2`}>
                       <div className={`${color}`}>
                         <Icon size={18} strokeWidth={1.75} />
                       </div>

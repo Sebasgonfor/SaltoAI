@@ -302,22 +302,136 @@ Cada contratación genera un dato propietario que nadie más tiene: **¿el match
 
 **Lo que ya está capturando data (MVP, día 1):**
 
-Colección `feedback` en Firestore, schema mínimo:
+Colección `feedback` en Firestore, schema v3 — cada interacción del producto produce señal:
+
 ```ts
 {
-  matchId: string,        // `${needId}__${profileId}` — idempotente, sin secuencias
-  needId?: string,
-  profileId?: string,
-  useful: boolean,        // ¿el founder marcó "útil" o "no útil"?
+  // Identificación de la señal
+  touchpoint: FeedbackTouchpoint,    // 17 puntos del producto (ver lista abajo)
+  kind: "explicit" | "implicit",     // ¿el user dijo algo o solo cliqueó?
+  targetType: "profile" | "need" | "match" | "microtask" | "evidence" | "suggestion",
+  targetId: string,                  // a qué objeto se refiere
+
+  // Quién (opcional — señal anónima sigue siendo útil)
+  userId?: string,
+  userRole?: "joven" | "empresa",
+
+  // Payload (cualquiera puede venir, depende del touchpoint)
+  rating?: 1|2|3|4|5,
+  binary?: boolean,
+  text?: string,
+  icsAtTime?: number,                // snapshot del score al momento del voto
+  modelVersion?: string,             // qué prompt/weights produjo lo que estamos calificando
   timestamp: number,
-  source: "empresa_match" | "joven_perfil" | "other",
-  note?: string
+
+  // Legacy (compat con el botón "útil sí/no" del primer MVP)
+  matchId?, needId?, profileId?, useful?, signalType?, score?, source?, note?,
 }
 ```
 
-Punto de entrada: botón `¿útil? sí/no` en cada card de match ([`components/match-feedback.tsx`](components/match-feedback.tsx)), POST a [`/api/feedback`](app/api/feedback/route.ts). Persistente en localStorage del navegador (sobrevive refresh sin auth). Reentrenamiento de pesos del ICS = roadmap fase 1-2 con piloto real.
+**Los 17 touchpoints donde Salto pregunta o registra señal** (ver [`lib/types.ts`](lib/types.ts) `FeedbackTouchpoint`):
 
-**Próximas etapas a instrumentar (no en MVP):** post-entrevista joven ("¿la conversación se sintió justa?"), post-contratación empresa ("¿el match efectivamente funcionó después de N días?"), dashboard de auditoría para aliados.
+| # | Touchpoint | Kind | Cuándo |
+|---|---|---|---|
+| 1 | `interview_quality` | explicit | Post-entrevista — "¿se sintió justa?" |
+| 2 | `profile_accuracy` | explicit | Post-perfil — "¿esto te representa?" |
+| 3 | `evidence_quote` | explicit | Por cita — "¿está bien atribuida?" |
+| 4 | `cv_generated` | implicit | Descarga de CV — tracking de uso |
+| 5 | `opportunity_click` | implicit | Click en oportunidad — interés revelado |
+| 6 | `microtask_clarity` | explicit | Post-propuesta — "¿estaba clara la consigna?" |
+| 7 | `microtask_evaluation` | explicit | Post-evaluación — "¿fue justa?" |
+| 8 | `latent_suggestion` | explicit | "¿este rol latente te interesa?" |
+| 9 | `course_recommendation` | explicit | "¿el curso recomendado encaja?" |
+| 10 | `need_structuring` | explicit | "¿la IA capturó bien lo que necesitas?" |
+| 11 | `match_useful` | explicit | El sí/no clásico en cada card de match (legacy) |
+| 12 | `profile_click` | implicit | Empresa abrió un perfil — atención revelada |
+| 13 | `microtask_proposed` | implicit | Empresa propuso microtask — conversión del match |
+| 14 | `microtask_outcome` | explicit | Empresa marca entregable como aceptado/rechazado |
+| 15 | `ai_preeval_agreement` | explicit | "¿coincide la pre-eval de la IA con tu juicio?" |
+| 16 | `post_hire_followup` | explicit | "Lo contraté formalmente / no funcionó después de N días" |
+| 17 | `red_flag_accuracy` | explicit | "¿el red flag fue acertado?" |
+| 18 | `company_feedback_to_youth` | explicit | **Empresa → joven** · rating + comentario sobre la candidatura |
+| 19 | `company_pass_reason` | explicit | **Empresa → joven** · razón corta cuando NO avanza con el perfil |
+| 20 | `youth_reply_to_company` | explicit | **Joven → empresa** · respuesta al feedback recibido (cierra el loop humano) |
+
+Los 3 últimos (18-20) son el canal **bidireccional empresa ↔ joven** (v4 — feb 2026). No miden a la IA: capturan feedback humano que cierra el loop que ningún competidor da. El joven raramente recibe feedback de calidad en LinkedIn/Computrabajo cuando lo descartan; acá lo recibe siempre, incluso un "no avanzo porque te falta X" con razón canónica (`reasonCode`) para agregar en el dashboard.
+
+**Infraestructura (Fase A — feb 2026):** [`lib/feedback.ts`](lib/feedback.ts) (`emitSignal`, `emitSignalBatch`, dedup vía localStorage), primitives [`components/feedback/{thumbs,rating,inline-prompt}.tsx`](components/feedback/), hook [`hooks/use-emit-signal.ts`](hooks/use-emit-signal.ts) para señales implícitas, endpoint [`app/api/feedback/route.ts`](app/api/feedback/route.ts) que acepta legacy + v3 + batch (backward compatible).
+
+**Reentrenamiento** = roadmap fase 1-2 con piloto real. Por ahora el dato queda **propietario** como combustible del flywheel.
+
+**Cableado en producto (Fase B+C+D — feb 2026):** los 17 touchpoints están instrumentados:
+
+| Touchpoint | Dónde dispara | Tipo de prompt |
+|---|---|---|
+| interview_quality | [`/joven/perfil/[id]`](app/joven/perfil/[id]/page.tsx) (post-entrevista) | rating ⭐ |
+| profile_accuracy | mismo archivo | thumbs 👍👎 |
+| evidence_quote | por cita en el perfil | thumbs silent |
+| cv_generated | botón "Descargar CV ATS" en `/joven/perfil/[id]` | implícita |
+| opportunity_click | [`/joven/conectar`](app/joven/conectar/page.tsx) — "Quiero conectar" + "Ver desglose" | implícita |
+| microtask_clarity | [`/joven/tareas/[id]`](app/joven/tareas/[id]/page.tsx) (pre-entrega) | thumbs |
+| microtask_evaluation | mismo archivo (post-evaluación de empresa) | thumbs no-dismiss |
+| course_recommendation | [`components/skills-gap.tsx`](components/skills-gap.tsx) — click + thumb por curso | implícita + thumbs |
+| need_structuring | [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) (1ra vez) | rating ⭐ |
+| match_useful | mismo archivo — `<MatchFeedback>` (legacy preservado) | thumbs |
+| profile_click | mismo archivo — `recordImplicitSignal` ahora doble-pipe a v3 | implícita |
+| microtask_proposed | mismo archivo — botón "Probar candidato" | implícita |
+| microtask_outcome | [`/empresa/tareas/[id]`](app/empresa/tareas/[id]/page.tsx) `evaluar()` | post-rating |
+| ai_preeval_agreement | mismo archivo — bajo la pre-eval IA | thumbs |
+| post_hire_followup | mismo archivo — post-evaluación | thumbs no-dismiss |
+| red_flag_accuracy | [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) bajo red flag del top | thumbs silent |
+| latent_suggestion | pendiente (la feature de roles latentes no está montada todavía) | — |
+
+16 de 17 touchpoints unidireccionales están vivos. El que falta (`latent_suggestion`) espera a que la feature de sugerencia de roles latentes salga del backlog.
+
+**Canal bidireccional empresa ↔ joven (v4):**
+- [`/joven/perfil/[id]`](app/joven/perfil/[id]/page.tsx) cuando `viewerIsEmpresa`: `<CompanyFeedbackToYouth>` (form rating+comentario) + `<PassReasonButton>` (modal con razones canónicas).
+- [`/joven/perfil/[id]`](app/joven/perfil/[id]/page.tsx) cuando el dueño: `<YouthFeedbackInbox profileId>` lista los hilos recibidos con `<Textarea>` de respuesta inline.
+- Endpoint dedicado: [`/api/feedback/youth?profileId=X`](app/api/feedback/youth/route.ts) arma los threads (parents + replies anidadas por `parentFeedbackId`).
+
+Los componentes viven en [`components/feedback/company-to-youth.tsx`](components/feedback/company-to-youth.tsx) y [`components/feedback/youth-inbox.tsx`](components/feedback/youth-inbox.tsx).
+
+**Dashboard del flywheel (Fase E — feb 2026):** [`/api/admin/flywheel`](app/api/admin/flywheel/route.ts) (endpoint público de agregados — solo counts y rates, sin PII) consumido por [`/aliados/impacto`](app/aliados/impacto/page.tsx). Muestra:
+- Total de señales (explícitas vs implícitas).
+- Top touchpoints con `positiveRate` por uno.
+- Correlación entre ICS al momento del match y rating final del founder (`microtask_outcome`) — el indicador defensivo del §8.6.
+- % de acuerdo founder ↔ pre-eval IA (`ai_preeval_agreement`).
+
+**Dashboards enriquecidos (feb 2026):** además de las listas operacionales, [`/empresa`](app/empresa/page.tsx) y [`/dashboard`](app/dashboard/page.tsx) montan un pack de widgets que conectan TODO el flywheel a métricas accionables.
+
+**Empresa — [`<EmpresaWidgets>`](components/dashboard/empresa-widgets.tsx)** consume [`/api/dashboard/empresa`](app/api/dashboard/empresa/route.ts):
+
+| Widget | Qué responde |
+|---|---|
+| **KPI strip** | Candidatos en pipeline · ICS promedio cross-need · COP invertido · hires confirmados |
+| **Pipeline funnel** | 6 stages (shortlist → abrir → microtask → entregar → evaluar → contratar) + 3 conversion rates |
+| **Calibración del motor** | Pares pre-eval IA vs rating final · delta promedio · label (alineado/optimista/conservador) |
+| **Salud de necesidades** | Top 5 needs ordenadas por health score asc (peores primero) con `topIssue` accionable |
+| **Top candidatos cross-need** | Perfiles que aparecen en múltiples shortlists con ICS promedio + actividad |
+
+**Joven — [`<JovenWidgets>`](components/dashboard/joven-widgets.tsx)** consume [`/api/dashboard/joven`](app/api/dashboard/joven/route.ts):
+
+| Widget | Qué responde |
+|---|---|
+| **KPI strip** | COP ganado · rating promedio · skills verificadas/declaradas · inbox unread |
+| **Visibilidad de mercado** | # necesidades activas que piden tus skills · top 5 skills demandadas con ✓/✗ "iHaveIt" |
+| **Top oportunidad** | Mejor match aproximado (jaccard sobre skills, sin invocar LLM) con CTA al desglose ICS real |
+| **Inbox preview** | Positivos · descartes · sin responder, con CTA al inbox completo en el perfil |
+| **Activity timeline** | Feed de eventos: microtask propuesta · entregada · evaluada · feedback recibido · perfil visto (agregado por día) |
+
+**Radiografía de la necesidad (feb 2026):** [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) deja de ser solo "lista de candidatos" y se vuelve una vista de inteligencia operativa. El componente [`<NeedRadiography>`](components/empresa/need-radiography.tsx) muestra:
+
+| Widget | Qué responde |
+|---|---|
+| **KPIs** | ICS promedio · # candidatos · días desde publicación · % de skills cubiertas |
+| **Salud de la necesidad** | Score 0-100 + issues accionables (contexto corto, pocas skills, restricciones imposibles) |
+| **Histograma de ICS** | Distribución del shortlist por bucket de 20 |
+| **Dimensiones promedio** | Skills · conducta · aprendizaje · contexto (palancas de mejora) |
+| **Cobertura de skills** | Pedidas vs. cubiertas por el shortlist (insight: qué pediste que nadie tiene) |
+| **Perfil de la empresa** | Legal, founder, otras búsquedas activas, badge "primera necesidad" |
+| **Engagement** | Perfiles abiertos, microtasks propuestas, útiles, descartes — todo desde el feedback log |
+
+Data: la mayoría de widgets son derivados client-side desde `need + matches` (cero round-trips extra). El perfil de empresa y el engagement vienen de [`/api/empresa/radiography?needId=X`](app/api/empresa/radiography/route.ts).
 
 ---
 

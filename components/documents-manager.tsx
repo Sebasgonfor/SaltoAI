@@ -288,7 +288,14 @@ export function DocumentsManager({ profileId }: { profileId: string }) {
       ) : (
         <div className="mt-6 space-y-3">
           {documents.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} onDelete={() => handleDelete(doc.id!)} />
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              onDelete={() => handleDelete(doc.id!)}
+              onUpdated={(updated) => {
+                setDocuments((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+              }}
+            />
           ))}
         </div>
       )}
@@ -299,12 +306,35 @@ export function DocumentsManager({ profileId }: { profileId: string }) {
 function DocumentRow({
   doc,
   onDelete,
+  onUpdated,
 }: {
   doc: ProfileDocument;
   onDelete: () => void;
+  onUpdated: (updated: ProfileDocument) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const isImage = ['jpg', 'jpeg', 'png', 'webp'].includes(doc.format);
+
+  const handleRetry = async () => {
+    if (retrying || !doc.id) return;
+    setRetrying(true);
+    setRetryError(null);
+    // Optimistic: marcamos pending mientras corre.
+    onUpdated({ ...doc, extractionStatus: 'pending', extractionError: undefined });
+    try {
+      const res = await fetch(`/api/documentos/${doc.id}/retry`, { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Falló el reintento.');
+      if (json.document) onUpdated(json.document);
+    } catch (e) {
+      setRetryError((e as Error).message);
+      onUpdated({ ...doc, extractionStatus: 'failed' }); // restore
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <article className="border border-slate-200 rounded-xl overflow-hidden">
@@ -395,9 +425,28 @@ function DocumentRow({
         </div>
       )}
 
-      {doc.extractionStatus === 'failed' && doc.extractionError && (
-        <div className="border-t border-slate-100 px-4 py-2.5 bg-rose-50/40 text-xs text-rose-800">
-          {doc.extractionError}
+      {doc.extractionStatus === 'failed' && (
+        <div className="border-t border-slate-100 px-4 py-3 bg-rose-50/40 text-xs flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 text-rose-800">
+            {doc.extractionError || 'La IA no pudo leer el documento.'}
+            {retryError && (
+              <div className="text-rose-900 mt-1.5 italic">Reintento: {retryError}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleRetry}
+            disabled={retrying}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-50 text-[11px] font-medium transition-colors"
+          >
+            {retrying ? (
+              <>
+                <Loader2 size={11} className="animate-spin" /> Reintentando…
+              </>
+            ) : (
+              'Reintentar análisis'
+            )}
+          </button>
         </div>
       )}
     </article>

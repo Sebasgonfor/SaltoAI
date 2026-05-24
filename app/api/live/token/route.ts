@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Modality } from "@google/genai";
 import { geminiAlpha, GEMINI_LIVE_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { buildLiveSystemInstruction } from "@/lib/interview-prompt";
+import {
+  buildLiveSystemInstruction,
+  buildLiveSystemInstructionEmpresa,
+} from "@/lib/interview-prompt";
 import { startLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -11,8 +14,10 @@ export async function POST(req: NextRequest) {
   const log = startLog(req, "live/token");
 
   try {
-    const body = (await req.json()) as { firstName?: string };
+    const body = (await req.json()) as { firstName?: string; mode?: string; companyName?: string };
     const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
+    const mode = body.mode === "empresa" ? "empresa" : "joven";
+    const companyName = typeof body.companyName === "string" ? body.companyName.trim() : "";
 
     if (!hasGeminiKey()) {
       log.end({ status: 503, extra: { reason: "no_gemini_key" } });
@@ -35,7 +40,10 @@ export async function POST(req: NextRequest) {
           model: GEMINI_LIVE_MODEL,
           config: {
             responseModalities: [Modality.AUDIO],
-            systemInstruction: buildLiveSystemInstruction(firstName || undefined),
+            systemInstruction:
+              mode === "empresa"
+                ? buildLiveSystemInstructionEmpresa(companyName || undefined)
+                : buildLiveSystemInstruction(firstName || undefined),
             speechConfig: {
               // Native audio Live model only accepts BCP-47 codes it supports (es-CO closes the socket).
               languageCode: "es-US",

@@ -40,7 +40,7 @@ function resolveTarget(role: UserRole, next: string): string {
 function OnboardingRolInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, account, loading, chooseRole } = useAuth();
+  const { user, account, loading, roleLoading, chooseRole } = useAuth();
   const [submitting, setSubmitting] = useState<UserRole | null>(null);
   const next = isSafeNext(params.get('next'));
 
@@ -89,10 +89,24 @@ function OnboardingRolInner() {
     return null;
   }
 
-  if (loading) {
+  // Mostramos el spinner durante AMBAS fases de carga, no solo `loading`.
+  //
+  // Bug que arregla: cuando el user clickea "Soy joven" en la landing,
+  // signInWithGoogle pone pendingRole='joven', abre el popup, vuelve con
+  // user válido. En ese momento `loading=false` (la sesión ya cargó) PERO
+  // `roleLoading=true` porque onAuthStateChanged está aplicando el
+  // pendingRole vía setUserRole() en Firestore (200-500ms). Si solo
+  // chequeáramos `loading`, el componente caía al render del picker → el
+  // user veía el "¿joven o empresa?" por una fracción de segundo antes
+  // del redirect. Ahora durante ese gap mostramos spinner.
+  //
+  // Cuando un user entra directo a /onboarding/rol SIN intent previo
+  // (pendingRole=null), roleLoading termina en false con account=null,
+  // y entonces sí mostramos el picker — comportamiento correcto.
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-        Cargando…
+        Configurando tu cuenta…
       </div>
     );
   }
@@ -101,8 +115,8 @@ function OnboardingRolInner() {
     return (
       <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
         <Header />
-        <main className="flex-1 flex items-center justify-center px-6 py-16">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 md:p-10 shadow-sm">
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-10 sm:py-16">
+          <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 md:p-10 shadow-sm">
             <AuthForm
               title="Inicia sesión para elegir tu rol"
               subtitle="Necesitamos saber si vas a usar Salto como joven buscando oportunidades o como empresa contratando."
@@ -191,7 +205,7 @@ export default function OnboardingRolPage() {
 
 function Header() {
   return (
-    <header className="px-6 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center sticky top-0 z-20">
+    <header className="px-4 sm:px-6 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center sticky top-0 z-20">
       <Link href="/" className="flex items-center shrink-0">
         <SaltoLogo variant="full" size={56} />
       </Link>
