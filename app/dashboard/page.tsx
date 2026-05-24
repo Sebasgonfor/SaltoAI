@@ -277,7 +277,10 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
 
       {/* ── TOPBAR ── */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 h-14 px-4 flex items-center justify-between">
+      {/* backdrop-blur-md en sticky recalculaba el filter en cada frame de
+          scroll → uno de los mayores culpables del scroll lento. Lo cambio
+          por fondo sólido. Se ve igual de premium y el scroll va smooth. */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-14 px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -343,9 +346,12 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* ── MAIN CONTENT ── */}
-        {/* max-w-4xl era angosto: con 3 cards por row la radar quedaba
-            apretada. Subo a 6xl para que los widgets respiren. */}
-        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-6xl">
+        {/* Sin max-w: el dashboard ocupa TODO el espacio disponible al
+            costado del sidebar. `flex-1 min-w-0` ya garantiza que se
+            adapta al ancho restante después del sidebar de 208px (w-52).
+            El padding lateral aumenta en pantallas grandes para que el
+            contenido no quede pegado al borde derecho. */}
+        <main className="flex-1 min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7">
 
           {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
               ya muestra greeting (vía nombre + categoría), avatar circular,
@@ -368,16 +374,16 @@ export default function DashboardPage() {
           )}
 
           {/* Widgets enriquecidos — pasaporte de talento visual. El hero
-              dentro del componente reemplaza el welcome header. */}
+              dentro del componente reemplaza el welcome header.
+              Sin <FadeUp> wrapper: el motion.div agrega un compositing
+              layer que persiste post-animación → más overhead en scroll. */}
           {!dataLoading && profile && (
-            <FadeUp>
-              <JovenWidgets
-                uid={user.uid}
-                profileId={user.uid}
-                profile={profile}
-                tasks={tasks}
-              />
-            </FadeUp>
+            <JovenWidgets
+              uid={user.uid}
+              profileId={user.uid}
+              profile={profile}
+              tasks={tasks}
+            />
           )}
 
           {/* ONBOARDING — sin perfil */}
@@ -487,7 +493,7 @@ export default function DashboardPage() {
                   { icon: User, label: 'Mi perfil', href: `/joven/perfil/${user.uid}`, color: 'text-slate-700', bg: 'bg-slate-50' },
                 ].map(({ icon: Icon, label, href, color, bg }) => (
                   <Link key={label} href={href} className="group">
-                    <div className={`${bg} border border-slate-200 rounded-xl p-4 hover:shadow-sm hover:border-slate-300 transition-all flex flex-col items-start gap-2`}>
+                    <div className={`${bg} border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-colors flex flex-col items-start gap-2`}>
                       <div className={`${color}`}>
                         <Icon size={18} strokeWidth={1.75} />
                       </div>

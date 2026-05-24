@@ -236,18 +236,43 @@ function ChatJoven() {
   const displayTurns = Math.min(userTurns, MAX_TURNS);
   const atTurnLimit = userTurns >= MAX_TURNS;
 
+  // En modo voz, `liveMessages` solo se popula cuando un TURNO se cierra
+  // (el agente toma la palabra). Pero `liveUserText` se actualiza en cada
+  // chunk de transcripción mientras el joven sigue hablando — esa es la
+  // señal que el panel "Detectando en vivo" debe leer. Antes el cómputo
+  // ignoraba `liveUserText` así que el contador y las señales quedaban
+  // en 0 durante TODO el turno actual hasta que se cerrara.
+  //
+  // Solución: appendar `liveUserText` al texto del usuario cuando estamos
+  // en modo voz y hay transcripción parcial activa. Se aplica tanto al
+  // regex de señales como al wordsCount.
+  const liveDraftText =
+    interviewMode === 'voice' && (liveActive || liveStatus === 'agentSpeaking')
+      ? liveUserText
+      : '';
+
   const detected = useMemo(() => {
-    const text = displayMessages.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
+    const messageText = displayMessages
+      .filter((m) => m.role === 'user')
+      .map((m) => m.content)
+      .join(' ');
+    const text = liveDraftText
+      ? `${messageText} ${liveDraftText}`
+      : messageText;
     const set = new Set<string>();
     for (const s of SIGNALS) if (s.match.test(text)) set.add(s.label);
     return set;
-  }, [displayMessages]);
+  }, [displayMessages, liveDraftText]);
 
   const wordsCount = useMemo(() => {
-    return displayMessages
+    const messageWords = displayMessages
       .filter((m) => m.role === 'user')
       .reduce((acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length, 0);
-  }, [displayMessages]);
+    const liveWords = liveDraftText
+      ? liveDraftText.trim().split(/\s+/).filter(Boolean).length
+      : 0;
+    return messageWords + liveWords;
+  }, [displayMessages, liveDraftText]);
 
   const resetInterview = () => {
     const confirmMsg = closing

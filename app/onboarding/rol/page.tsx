@@ -40,7 +40,7 @@ function resolveTarget(role: UserRole, next: string): string {
 function OnboardingRolInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, account, loading, chooseRole } = useAuth();
+  const { user, account, loading, roleLoading, chooseRole } = useAuth();
   const [submitting, setSubmitting] = useState<UserRole | null>(null);
   const next = isSafeNext(params.get('next'));
 
@@ -89,10 +89,24 @@ function OnboardingRolInner() {
     return null;
   }
 
-  if (loading) {
+  // Mostramos el spinner durante AMBAS fases de carga, no solo `loading`.
+  //
+  // Bug que arregla: cuando el user clickea "Soy joven" en la landing,
+  // signInWithGoogle pone pendingRole='joven', abre el popup, vuelve con
+  // user válido. En ese momento `loading=false` (la sesión ya cargó) PERO
+  // `roleLoading=true` porque onAuthStateChanged está aplicando el
+  // pendingRole vía setUserRole() en Firestore (200-500ms). Si solo
+  // chequeáramos `loading`, el componente caía al render del picker → el
+  // user veía el "¿joven o empresa?" por una fracción de segundo antes
+  // del redirect. Ahora durante ese gap mostramos spinner.
+  //
+  // Cuando un user entra directo a /onboarding/rol SIN intent previo
+  // (pendingRole=null), roleLoading termina en false con account=null,
+  // y entonces sí mostramos el picker — comportamiento correcto.
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-        Cargando…
+        Configurando tu cuenta…
       </div>
     );
   }

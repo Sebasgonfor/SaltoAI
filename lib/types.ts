@@ -263,12 +263,16 @@ export interface Match {
  *                          (puso dinero en el juego).
  *   microtask_outcome    — la micro-tarea fue completada y rateada: ground-truth
  *                          real sobre si ese match funciona o no.
+ *   joven_interest       — el joven clickeó "Quiero conectar" en una oportunidad:
+ *                          intención bidireccional; cuando ambas partes mostraron
+ *                          interés (joven + founder) es señal MUY fuerte de match real.
  */
 export type FeedbackSignal =
   | "explicit_vote"
   | "implicit_connect"
   | "implicit_microtask"
-  | "microtask_outcome";
+  | "microtask_outcome"
+  | "joven_interest";
 
 /**
  * Touchpoint del producto donde el feedback se captura. Cada pantalla
