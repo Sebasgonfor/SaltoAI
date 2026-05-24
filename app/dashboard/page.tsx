@@ -374,16 +374,16 @@ export default function DashboardPage() {
           )}
 
           {/* Widgets enriquecidos — pasaporte de talento visual. El hero
-              dentro del componente reemplaza el welcome header. */}
+              dentro del componente reemplaza el welcome header.
+              Sin <FadeUp> wrapper: el motion.div agrega un compositing
+              layer que persiste post-animación → más overhead en scroll. */}
           {!dataLoading && profile && (
-            <FadeUp>
-              <JovenWidgets
-                uid={user.uid}
-                profileId={user.uid}
-                profile={profile}
-                tasks={tasks}
-              />
-            </FadeUp>
+            <JovenWidgets
+              uid={user.uid}
+              profileId={user.uid}
+              profile={profile}
+              tasks={tasks}
+            />
           )}
 
           {/* ONBOARDING — sin perfil */}
@@ -493,7 +493,7 @@ export default function DashboardPage() {
                   { icon: User, label: 'Mi perfil', href: `/joven/perfil/${user.uid}`, color: 'text-slate-700', bg: 'bg-slate-50' },
                 ].map(({ icon: Icon, label, href, color, bg }) => (
                   <Link key={label} href={href} className="group">
-                    <div className={`${bg} border border-slate-200 rounded-xl p-4 hover:shadow-sm hover:border-slate-300 transition-all flex flex-col items-start gap-2`}>
+                    <div className={`${bg} border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-colors flex flex-col items-start gap-2`}>
                       <div className={`${color}`}>
                         <Icon size={18} strokeWidth={1.75} />
                       </div>

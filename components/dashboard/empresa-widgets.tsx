@@ -203,7 +203,12 @@ export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
   }
 
   return (
-    <section className="space-y-5" aria-label="Pasaporte del founder">
+    // contain:content aisla repaints del bloque durante scroll.
+    <section
+      className="space-y-5"
+      aria-label="Pasaporte del founder"
+      style={{ contain: 'content' }}
+    >
       {/* ─── HERO ────────────────────────────────────────────────────── */}
       <HeroDark
         avatarText={initials(companyName)}
@@ -278,8 +283,10 @@ function HeroDark({
     >
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
         <div className="relative flex-shrink-0">
-          <div className="rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl shadow-lg shadow-amber-900/40"
-               style={{ width: 72, height: 72 }}>
+          <div
+            className="rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl"
+            style={{ width: 72, height: 72 }}
+          >
             {avatarText || '·'}
           </div>
           <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-stone-950 flex items-center justify-center">
