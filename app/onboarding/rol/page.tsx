@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { GraduationCap, Building2, ArrowRight, Sparkles } from 'lucide-react';
@@ -18,26 +18,12 @@ function defaultDestination(role: UserRole): string {
   return role === 'joven' ? '/joven/chat' : '/empresa/chat';
 }
 
-/**
- * Si la URL `next` apunta a un área cuyo rol es inequívoco (/empresa/* o
- * /joven/*), no tiene sentido preguntar de nuevo: el usuario ya eligió al
- * hacer click desde la landing. Devolvemos el rol implícito para auto-
- * resolver el onboarding y mandar directo al destino.
- */
-function roleFromNext(next: string): UserRole | null {
-  if (next.startsWith('/empresa/') || next === '/empresa') return 'empresa';
-  if (next.startsWith('/joven/') || next === '/joven') return 'joven';
-  return null;
-}
-
 function OnboardingRolInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { user, account, loading, chooseRole } = useAuth();
   const [submitting, setSubmitting] = useState<UserRole | null>(null);
   const next = isSafeNext(params.get('next'));
-  const impliedRole = roleFromNext(next);
-  const autoResolvedRef = useRef(false);
 
   const choose = async (role: UserRole) => {
     if (!user) return;
@@ -52,21 +38,24 @@ function OnboardingRolInner() {
     }
   };
 
-  // Auto-resolución: si el destino implica el rol (vino de "Soy empresa" /
-  // "Soy joven" en la landing), no preguntamos de nuevo. Lo elegimos en
-  // background y mandamos al destino. El ref evita disparar el efecto dos
-  // veces durante el ciclo de render.
-  useEffect(() => {
-    if (!user || account || !impliedRole || autoResolvedRef.current) return;
-    autoResolvedRef.current = true;
-    void choose(impliedRole);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, account, impliedRole]);
+  // ANTES había una "auto-resolución" que inferia el rol del `next`
+  // (ej: next=/empresa/chat → asignaba empresa sin preguntar). Esto era
+  // útil cuando el `next` venía directamente del click "Soy empresa" en
+  // la landing, pero generaba un bug grave: si el `next` quedaba
+  // contaminado de un flow anterior (signup por email que heredaba
+  // `next=/empresa/chat` de una visita previa), el sistema asignaba
+  // empresa a un usuario llamado "Juan Joven" sin mostrarle el picker.
+  //
+  // La auto-resolución era redundante con el feature de `pendingRoleRef`
+  // del AuthProvider — cuando el user clickea "Soy X" + Google, el role
+  // se aplica DENTRO de onAuthStateChanged antes de aterrizar acá.
+  //
+  // Sin auto-resolución, la única forma de salir de esta página sin
+  // elegir es: (1) el AuthProvider asignó el rol vía pendingRole (caso
+  // Google + click "Soy X") — entonces account != null y el useEffect
+  // abajo redirige; o (2) el user clickea uno de los RoleCard.
 
   // Si ya hay rol asignado, sacarlo de aquí inmediatamente.
-  // El router.replace tiene que vivir en useEffect, no en el render:
-  // si no, React tira "Cannot update a component while rendering a different
-  // component" porque cambiar la URL es un setState side-effect.
   useEffect(() => {
     if (!account) return;
     const target = next !== '/' ? next : defaultDestination(account.role);
@@ -75,21 +64,6 @@ function OnboardingRolInner() {
 
   if (account) {
     return null;
-  }
-
-  // Auto-resolviendo: el efecto ya disparó choose(impliedRole); mostramos
-  // un loader honesto en vez de la pantalla de selección.
-  if (user && impliedRole) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-        <span className="inline-flex items-center gap-2">
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-          <span className="ml-2">Llevándote a {impliedRole === 'empresa' ? 'tu panel de empresa' : 'tu entrevista'}…</span>
-        </span>
-      </div>
-    );
   }
 
   if (loading) {
