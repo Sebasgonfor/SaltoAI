@@ -199,26 +199,15 @@ export default function ChatEmpresa() {
     if (closing) return;
     const ok =
       typeof window === 'undefined' ||
-      window.confirm(
-        '¿Reiniciar todo? Se borran los datos legales y la entrevista. Vas a tener que empezar desde el paso 1.'
-      );
+      window.confirm('¿Reiniciar la conversación? Se borra la entrevista actual y empiezas de nuevo con los mismos datos de empresa.');
     if (!ok) return;
-    clearPersisted(user?.uid);
-    setMessages([]);
+    live.disconnect();
+    setMessages(legal ? [buildOpeningMessage(form.legalRepName)] : []);
     setInput('');
-    setLegal(null);
-    setForm({
-      companyName: '',
-      taxId: '',
-      legalRepName: user?.displayName ?? '',
-      legalRepDocId: '',
-      acceptedTerms: false,
-    });
-    setFormError(null);
     setSubmitError(null);
     setLoading(false);
     setClosing(false);
-    setPhase('legal');
+    setInterviewMode('text');
   };
 
   const startInterview = () => {
