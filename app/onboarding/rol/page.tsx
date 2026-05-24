@@ -18,6 +18,25 @@ function defaultDestination(role: UserRole): string {
   return role === 'joven' ? '/joven/chat' : '/empresa/chat';
 }
 
+/**
+ * El `next` del query string se RESPETA solo si es coherente con el rol
+ * resuelto. Si no, lo descartamos y vamos al default del rol. Sin esto,
+ * un user que elige "joven" pero entró al onboarding con `?next=/empresa/chat`
+ * (heredado de un flow anterior) termina chocando contra el RoleGate de
+ * empresa, viendo "Tu cuenta está registrada como joven". El rol elegido
+ * manda, no el query.
+ */
+function resolveTarget(role: UserRole, next: string): string {
+  if (next === '/') return defaultDestination(role);
+  // Coherente: el next apunta al área del rol elegido.
+  if (role === 'joven' && (next === '/joven' || next.startsWith('/joven/'))) return next;
+  if (role === 'empresa' && (next === '/empresa' || next.startsWith('/empresa/'))) return next;
+  // Neutro (no /joven/* ni /empresa/*): respetamos.
+  if (!next.startsWith('/joven') && !next.startsWith('/empresa')) return next;
+  // Conflicto (next del rol opuesto): default del rol elegido.
+  return defaultDestination(role);
+}
+
 function OnboardingRolInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -31,8 +50,10 @@ function OnboardingRolInner() {
     try {
       const acc = await chooseRole(role);
       if (!acc) return;
-      const target = next !== '/' ? next : defaultDestination(acc.role);
-      router.push(target);
+      // El destino se calcula con el rol REAL devuelto por chooseRole, no
+      // con `role` literal — si ya había account (set-once), chooseRole
+      // devuelve el rol existente, no el clickeado.
+      router.push(resolveTarget(acc.role, next));
     } finally {
       setSubmitting(null);
     }
@@ -56,10 +77,12 @@ function OnboardingRolInner() {
   // abajo redirige; o (2) el user clickea uno de los RoleCard.
 
   // Si ya hay rol asignado, sacarlo de aquí inmediatamente.
+  // resolveTarget descarta el `next` si es del rol opuesto — sin esto
+  // un user joven con `?next=/empresa/chat` aterriza en el muro de
+  // RoleGate de empresa.
   useEffect(() => {
     if (!account) return;
-    const target = next !== '/' ? next : defaultDestination(account.role);
-    router.replace(target);
+    router.replace(resolveTarget(account.role, next));
   }, [account, next, router]);
 
   if (account) {
