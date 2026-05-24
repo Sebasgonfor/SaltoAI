@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
 import { NavLink } from '@/components/nav-link';
@@ -32,10 +31,9 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
             label="Mis matches"
             hint="Shortlist de candidatos rankeados por ICS para cada necesidad publicada."
           />
-          <Button variant="outline" size="sm" className="hidden md:inline-flex ml-2">
-            Ayuda
-          </Button>
-          <div className="h-5 w-px bg-slate-200 mx-2" />
+          {/* Botón "Ayuda" removido por petición del user — el separador
+              también queda fuera porque sin nada a la izquierda no tiene
+              sentido visual. UserButton hereda el spacing del flex. */}
           <UserButton />
         </nav>
       </header>

@@ -18,7 +18,16 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Star, MessageCircle, X as XIcon, Send, Inbox, Reply, Check } from 'lucide-react';
+import {
+  Star,
+  MessageCircle,
+  X as XIcon,
+  Send,
+  Inbox,
+  Reply,
+  Check,
+  RefreshCw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/auth-context';
@@ -57,26 +66,49 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
   const { user } = useAuth();
   const [data, setData] = useState<InboxResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  // Refresh manual: estado separado para que el spinner del botón sea
+  // visible pero NO se desmonte la lista actual. UX: dejar de feedback
+  // y ver el botón girar 800ms en vez de que parpadee el inbox.
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastFetchAt, setLastFetchAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchInbox = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/feedback/youth?profileId=${encodeURIComponent(profileId)}`,
-      );
+      // Pasamos también el user.uid del joven autenticado para cubrir el
+      // caso donde la empresa dejó feedback contra un id distinto al del
+      // URL (ej. perfiles del seed con id=seed_xxx vs el uid real). El
+      // endpoint hace OR sobre los dos targetIds para encontrar todo.
+      const params = new URLSearchParams({ profileId });
+      if (user?.uid && user.uid !== profileId) {
+        params.set('uid', user.uid);
+      }
+      const res = await fetch(`/api/feedback/youth?${params.toString()}`);
       if (!res.ok) {
         setError('No pudimos cargar tu inbox.');
         return;
       }
       const json = (await res.json()) as InboxResponse;
       setData(json);
+      setLastFetchAt(Date.now());
       setError(null);
     } catch {
       setError('Error de red.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [profileId]);
+    // user?.uid en deps para re-fetch si la sesión cambia (logout+login con
+    // distinta cuenta abre nuevos aliases de targetId).
+  }, [profileId, user?.uid]);
+
+  // Handler dedicado para refresh manual: marca refreshing=true (visible
+  // en el botón) sin tocar loading=true que desmontaría el render actual.
+  const handleManualRefresh = () => {
+    if (refreshing || loading) return;
+    setRefreshing(true);
+    void fetchInbox();
+  };
 
   useEffect(() => {
     void fetchInbox();
@@ -97,7 +129,7 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
 
   return (
     <section className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8">
-      <div className="flex items-end justify-between mb-5 gap-3">
+      <div className="flex items-start justify-between mb-5 gap-3">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
             Tu inbox
@@ -109,17 +141,41 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
             Esto es lo que LinkedIn nunca te da: comentarios reales de empresas que
             abrieron tu perfil — incluso cuando no avanzaron. Podés responder.
           </p>
+          {lastFetchAt && (
+            <p className="text-[11px] text-slate-400 mt-2">
+              Actualizado {formatAgo(lastFetchAt)}.
+            </p>
+          )}
         </div>
-        {!isEmpty && (
-          <div className="text-xs text-slate-500 hidden sm:flex items-center gap-3 flex-shrink-0 pb-2">
-            <span className="inline-flex items-center gap-1">
-              <Star size={11} className="text-amber-500" /> {data.summary.positives} positivos
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <XIcon size={11} className="text-slate-400" /> {data.summary.passReasons} descartes
-            </span>
-          </div>
-        )}
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          {/* Botón refrescar — necesario porque cuando una empresa deja
+              feedback estando vos en otra pestaña, no hay push notification
+              ni websocket: la única forma de verlo era refresh del browser.
+              Esto re-fetch sin recargar la página. */}
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-emerald-700 disabled:opacity-50 border border-slate-200 hover:border-emerald-300 rounded-full px-3 py-1.5 transition-colors"
+            title="Buscar feedback nuevo"
+          >
+            <RefreshCw
+              size={12}
+              className={refreshing ? 'animate-spin' : ''}
+            />
+            {refreshing ? 'Buscando…' : 'Refrescar'}
+          </button>
+          {!isEmpty && (
+            <div className="text-xs text-slate-500 hidden sm:flex items-center gap-3">
+              <span className="inline-flex items-center gap-1">
+                <Star size={11} className="text-amber-500" /> {data.summary.positives} positivos
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <XIcon size={11} className="text-slate-400" /> {data.summary.passReasons} descartes
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {isEmpty ? (
