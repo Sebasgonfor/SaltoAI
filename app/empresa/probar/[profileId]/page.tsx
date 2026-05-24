@@ -136,7 +136,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
           Listo. {profile.name.split(' ')[0]} ya puede empezar.
         </h1>
         <p className="text-slate-600 leading-relaxed">
-          La micro-tarea está activa. Cuando entregue, vas a recibir una pre-evaluación de Salto IA contra los criterios estructurados, y tú das la calificación final.
+          La micro-tarea está activa. Cuando entregue, vas a recibir una pre-evaluación de SaltoAI contra los criterios estructurados, y tú das la calificación final.
         </p>
 
         {warning && (
@@ -170,7 +170,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
           Pagale una tarea real a {profile.name.split(' ')[0]} antes de comprometerte.
         </h1>
         <p className="text-lg text-slate-600 leading-relaxed">
-          Salto IA estructura tu intención libre en una micro-tarea concreta con criterios de evaluación claros, monto justo y deadline razonable. Si funciona, pasas a contratación formal con evidencia real, no un CV.
+          SaltoAI estructura tu intención libre en una micro-tarea concreta con criterios de evaluación claros, monto justo y deadline razonable. Si funciona, pasas a contratación formal con evidencia real, no un CV.
         </p>
       </header>
 
@@ -294,7 +294,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
               {[
                 'Gemini estructura tu intención en brief + criterios + deadline + monto.',
                 `${profile.name.split(' ')[0]} recibe la tarea y entrega.`,
-                'Salto IA hace pre-evaluación contra los criterios.',
+                'SaltoAI hace pre-evaluación contra los criterios.',
                 'Tú das la calificación final. Outcome queda en su perfil.',
               ].map((step, i) => (
                 <li key={i} className="flex gap-3 leading-relaxed">
@@ -310,7 +310,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
           <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex gap-3">
             <Lightbulb size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 leading-relaxed">
-              <strong className="font-semibold">Compromiso ético:</strong> Salto monitorea uso recurrente sin oferta formal. Las micro-tareas son para probar, no para reemplazar empleo.
+              <strong className="font-semibold">Compromiso ético:</strong> SaltoAI monitorea uso recurrente sin oferta formal. Las micro-tareas son para probar, no para reemplazar empleo.
             </p>
           </div>
         </aside>

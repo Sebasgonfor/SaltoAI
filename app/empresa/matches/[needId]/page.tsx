@@ -254,7 +254,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       {matches.length === 0 && (
         <section className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-2xl p-12 text-center">
           <UserCheck size={32} className="text-slate-400 mx-auto mb-4" />
-          <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">Aún no hay perfiles en Salto</h3>
+          <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">Aún no hay perfiles en SaltoAI</h3>
           <p className="text-sm text-slate-500 max-w-md mx-auto">
             Pide a algún joven que haga su entrevista, o ejecuta el seed (`curl localhost:3000/api/seed`) para cargar perfiles de demo.
           </p>

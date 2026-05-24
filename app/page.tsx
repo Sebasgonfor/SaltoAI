@@ -51,7 +51,7 @@ export default function LandingPage() {
                   de un CV que aún no puedes tener.
                 </h1>
                 <p className="mt-10 text-lg md:text-xl text-slate-600 max-w-2xl leading-relaxed text-pretty">
-                  Salto es la plataforma de IA que <strong className="text-slate-900 font-semibold">traduce experiencia informal en evidencia laboral real</strong>, y emparenta jóvenes con empresas tempranas por <strong className="text-slate-900 font-semibold">potencial</strong>, no por años en un papel.
+                  SaltoAI es la plataforma de IA que <strong className="text-slate-900 font-semibold">traduce experiencia informal en evidencia laboral real</strong>, y emparenta jóvenes con empresas tempranas por <strong className="text-slate-900 font-semibold">potencial</strong>, no por años en un papel.
                 </p>
 
                 <div className="mt-8 sm:mt-12 flex flex-col sm:flex-row gap-3">
@@ -248,7 +248,7 @@ export default function LandingPage() {
                   Esto no es un wrapper de ChatGPT.
                 </h2>
                 <p className="text-lg text-slate-600 leading-relaxed mb-6">
-                  Si le quitas la IA, Salto deja de existir. El núcleo —extraer evidencia de una historia desordenada y matchear por potencial con un score explicable— es matemáticamente imposible sin extracción estructurada, embeddings y un motor de compatibilidad multifactor.
+                  Si le quitas la IA, SaltoAI deja de existir. El núcleo —extraer evidencia de una historia desordenada y matchear por potencial con un score explicable— es matemáticamente imposible sin extracción estructurada, embeddings y un motor de compatibilidad multifactor.
                 </p>
                 <ul className="space-y-4 text-slate-600">
                   <li className="flex gap-3">
@@ -323,7 +323,7 @@ export default function LandingPage() {
               <span className="text-emerald-400">creciendo juntos.</span>
             </h2>
             <p className="mt-6 text-lg text-emerald-100/80 max-w-2xl mx-auto">
-              El primer empleo no debería depender de un CV que aún no puedes tener. Salto hace que dependa de tu potencial.
+              El primer empleo no debería depender de un CV que aún no puedes tener. SaltoAI hace que dependa de tu potencial.
             </p>
             <div className="mt-12 flex flex-col sm:flex-row gap-3 justify-center">
               <RoleCTA

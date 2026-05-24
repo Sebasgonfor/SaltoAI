@@ -25,7 +25,7 @@ export default function JovenLayout({ children }: { children: React.ReactNode })
       </header>
       <main className="flex-1 flex flex-col w-full">{children}</main>
       <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
-        <span>Salto · Tu primer salto al empleo formal</span>
+        <span>SaltoAI · Tu primer salto al empleo formal</span>
         <span>Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI</span>
       </footer>
     </div>

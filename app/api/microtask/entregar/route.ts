@@ -6,7 +6,7 @@ import type { CriterionScore, MicroTask } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const EVALUATE_PROMPT = `Eres el pre-evaluador IA de Salto.
+const EVALUATE_PROMPT = `Eres el pre-evaluador IA de SaltoAI.
 Recibes una micro-tarea (con su brief, entregable esperado y criterios) + el entregable que envió el joven.
 Tu trabajo es dar una pre-evaluación HONESTA Y CONSTRUCTIVA, no inflar ni destruir.
 

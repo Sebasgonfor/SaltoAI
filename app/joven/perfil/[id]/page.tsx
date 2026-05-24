@@ -107,7 +107,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             </div>
             <div className="leading-snug">
               <span className="font-semibold text-slate-900">Estás viendo el perfil de un candidato</span>
-              <span className="text-slate-600 hidden md:inline"> · Salto te muestra evidencia citada, no un CV.</span>
+              <span className="text-slate-600 hidden md:inline"> · SaltoAI te muestra evidencia citada, no un CV.</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -126,7 +126,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-transparent">
             <CheckCircle2 size={12} className="mr-1" />
-            Perfil de Evidencia · Verificado por Salto IA
+            Perfil de Evidencia · Verificado por SaltoAI
           </Badge>
           <Badge variant="outline" className="border-slate-200 text-slate-600">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
@@ -173,7 +173,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               Las empresas ya pueden verte.
             </h2>
             <p className="text-slate-300 leading-relaxed mb-6 max-w-2xl">
-              Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, Salto calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás en su shortlist (top 10).
+              Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, SaltoAI calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás en su shortlist (top 10).
             </p>
             <Link href={`/joven/conectar?profileId=${encodeURIComponent(id)}`}>
               <Button className="gap-2 bg-white text-slate-900 hover:bg-slate-100">
@@ -191,7 +191,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           - Empresa viendo candidato → acciones de evaluación (proponer
             micro-tarea pagada, descargar CV ATS read-only sin posibilidad
             de editar contacto). Un founder no necesita personalizar el
-            CV del candidato — lo evalúa dentro de Salto y propone tarea.
+            CV del candidato — lo evalúa dentro de SaltoAI y propone tarea.
             Antes ambos roles veían el CvCustomizer y el founder podía
             sobrescribir los datos guardados en su browser. */}
       {viewerIsEmpresa ? (
@@ -244,7 +244,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
       <section className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200 rounded-3xl p-8 md:p-10">
         <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">Tu historia → Evidencia</div>
         <h2 className="font-display font-semibold text-2xl md:text-3xl text-slate-900 mb-8 tracking-tight">
-          Así fue cómo Salto convirtió lo que contaste en señales comparables.
+          Así fue cómo SaltoAI convirtió lo que contaste en señales comparables.
         </h2>
         <div className="grid md:grid-cols-3 gap-4">
           {[
