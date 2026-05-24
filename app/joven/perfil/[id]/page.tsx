@@ -184,19 +184,61 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         </section>
       )}
 
-      {/* CV ATS — sale del hero (donde estaba apretado) y queda como sección
-          propia, con el form de contacto obligatorio bien visible. */}
-      <section>
-        <div className="mb-5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
-            Tu CV listo para postular
+      {/* Bloque contextual por rol del viewer:
+          - Joven dueño del perfil → CvCustomizer (personaliza SU CV con SUS
+            datos de contacto, idiomas, educación; persistencia localStorage
+            por profileId).
+          - Empresa viendo candidato → acciones de evaluación (proponer
+            micro-tarea pagada, descargar CV ATS read-only sin posibilidad
+            de editar contacto). Un founder no necesita personalizar el
+            CV del candidato — lo evalúa dentro de Salto y propone tarea.
+            Antes ambos roles veían el CvCustomizer y el founder podía
+            sobrescribir los datos guardados en su browser. */}
+      {viewerIsEmpresa ? (
+        <section>
+          <div className="mb-5">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
+              Próximo paso
+            </div>
+            <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
+              ¿Cómo querés evaluar a {perfil.name.split(' ')[0]}?
+            </h2>
           </div>
-          <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
-            Elegí plantilla y completá tu contacto.
-          </h2>
-        </div>
-        <CvCustomizer profileId={id} />
-      </section>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-wrap gap-3 items-start">
+            <Link href={`/empresa/probar/${id}`}>
+              <Button className="gap-2">
+                <Sparkles size={14} /> Proponer micro-tarea pagada
+              </Button>
+            </Link>
+            <a
+              href={`/api/cv?profileId=${encodeURIComponent(id)}&style=minimalist&autoprint=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="outline" className="gap-2">
+                Descargar CV ATS
+              </Button>
+            </a>
+            <p className="w-full text-xs text-slate-500 mt-2 leading-relaxed">
+              <strong className="text-slate-700">Recomendación:</strong> en lugar de mandar el
+              CV a tu mail, proponé una micro-tarea pagada acotada. Te llega evidencia REAL de
+              cómo trabaja antes de comprometerte con un contrato.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <section>
+          <div className="mb-5">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
+              Tu CV listo para postular
+            </div>
+            <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
+              Elegí plantilla y completá tu contacto.
+            </h2>
+          </div>
+          <CvCustomizer profileId={id} />
+        </section>
+      )}
 
       {/* Tu historia → Evidencia (pipeline pedagógico) */}
       <section className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200 rounded-3xl p-8 md:p-10">
