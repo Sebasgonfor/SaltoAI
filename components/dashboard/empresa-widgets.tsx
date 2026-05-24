@@ -265,9 +265,17 @@ function HeroDark({
   statusText: string;
   stats: { icon: string; label: string; value: string }[];
 }) {
+  // Mismo background compuesto sin filter:blur que en joven-widgets —
+  // scroll smooth. Antes el blur-3xl en w-80 h-80 forzaba repaint en
+  // cada frame de scroll.
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40 text-white p-5 md:p-7">
-      <div className="absolute -top-20 -right-20 w-80 h-80 bg-amber-500/20 rounded-full blur-3xl" aria-hidden />
+    <div
+      className="relative overflow-hidden rounded-3xl text-white p-5 md:p-7"
+      style={{
+        backgroundImage:
+          'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.25) 0%, transparent 55%), linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, rgba(69, 26, 3, 0.4) 100%)',
+      }}
+    >
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
         <div className="relative flex-shrink-0">
           <div className="rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl shadow-lg shadow-amber-900/40"
