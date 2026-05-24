@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -18,9 +18,17 @@ import {
   FileText,
   ShieldCheck,
   AlertTriangle,
+  Keyboard,
+  Radio,
+  Phone,
+  PhoneOff,
+  Pause,
+  Play,
 } from 'lucide-react';
 import type { ChatMessage } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
+import { useLiveInterview } from '@/hooks/use-live-interview';
+import { CLOSING_MESSAGE_EMPRESA } from '@/lib/interview-prompt';
 
 const MAX_TURNS = 6;
 
@@ -146,6 +154,7 @@ export default function ChatEmpresa() {
   const [closing, setClosing] = useState(false);
   const [restored, setRestored] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [interviewMode, setInterviewMode] = useState<'text' | 'voice'>('text');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -181,20 +190,6 @@ export default function ChatEmpresa() {
     }
   }, [user, form.legalRepName]);
 
-  const userTurns = messages.filter((m) => m.role === 'user').length;
-
-  const detected = useMemo(() => {
-    const text = messages.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
-    const set = new Set<string>();
-    for (const s of SLOTS) if (s.match.test(text)) set.add(s.key);
-    return set;
-  }, [messages]);
-
-  const wordsCount = useMemo(() => {
-    return messages
-      .filter((m) => m.role === 'user')
-      .reduce((acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length, 0);
-  }, [messages]);
 
   const resetAll = () => {
     if (closing) return;
@@ -261,12 +256,9 @@ export default function ChatEmpresa() {
     setPhase('interview');
   };
 
-  const finalizeNeed = async (history: ChatMessage[]) => {
+  const finalizeNeed = useCallback(async (history: ChatMessage[]) => {
     if (!legal || !user) return;
     setClosing(true);
-    // Concatenamos los turnos del founder para alimentar el extractor existente
-    // (/api/necesidad). Así reutilizamos toda la pipeline de structuring + ICS
-    // sin duplicar lógica.
     const rawDescription = history
       .filter((m) => m.role === 'user')
       .map((m) => m.content.trim())
@@ -300,7 +292,53 @@ export default function ChatEmpresa() {
       setSubmitError('Error de red. Prueba enviar de nuevo en un momento.');
       setClosing(false);
     }
-  };
+  }, [legal, user, router]);
+
+  const finalizeNeedRef = useRef(finalizeNeed);
+  useEffect(() => { finalizeNeedRef.current = finalizeNeed; }, [finalizeNeed]);
+
+  const live = useLiveInterview({
+    mode: 'empresa',
+    companyName: legal?.companyName,
+    closingMessage: CLOSING_MESSAGE_EMPRESA,
+    closingKeywords: ['estructurar tu necesidad', 'buscar candidatos', 'suficiente contexto'],
+    onInterviewComplete: (conversation) => {
+      disconnectLiveRef.current?.();
+      setMessages(conversation);
+      void finalizeNeedRef.current(conversation);
+    },
+  });
+
+  const disconnectLiveRef = useRef(live.disconnect);
+  useEffect(() => { disconnectLiveRef.current = live.disconnect; }, [live.disconnect]);
+
+  const displayMessages =
+    interviewMode === 'voice' && (live.isActive || live.messages.length > 0)
+      ? live.messages
+      : messages;
+
+  const userTurns =
+    interviewMode === 'voice' && (live.isActive || live.messages.length > 0)
+      ? live.userTurns
+      : messages.filter((m) => m.role === 'user').length;
+  const displayTurns = Math.min(userTurns, MAX_TURNS);
+
+  const detected = useMemo(() => {
+    const text = displayMessages.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
+    const set = new Set<string>();
+    for (const s of SLOTS) if (s.match.test(text)) set.add(s.key);
+    return set;
+  }, [displayMessages]);
+
+  const wordsCount = useMemo(() => {
+    return displayMessages
+      .filter((m) => m.role === 'user')
+      .reduce((acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length, 0);
+  }, [displayMessages]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [live.messages, live.liveUserText, live.liveAgentText]);
 
   const sendUserMessage = async () => {
     if (!input.trim() || loading || closing || !legal) return;
@@ -518,9 +556,9 @@ export default function ChatEmpresa() {
               <span
                 key={i}
                 className={`h-2 rounded-full transition-all ${
-                  i < userTurns
+                  i < displayTurns
                     ? 'w-6 bg-emerald-500'
-                    : i === userTurns
+                    : i === displayTurns && displayTurns < MAX_TURNS
                     ? 'w-6 bg-slate-300'
                     : 'w-2 bg-slate-200'
                 }`}
@@ -528,8 +566,43 @@ export default function ChatEmpresa() {
             ))}
           </div>
           <span className="text-xs text-slate-500 tabular-nums font-medium">
-            {userTurns}/{MAX_TURNS}
+            {displayTurns}/{MAX_TURNS}
           </span>
+          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-white">
+            <Button
+              type="button"
+              variant={interviewMode === 'text' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => {
+                if (closing || loading || live.isActive || live.status === 'connecting') return;
+                live.disconnect();
+                setInterviewMode('text');
+                if (messages.length === 0 && legal) {
+                  setMessages([buildOpeningMessage(form.legalRepName)]);
+                }
+              }}
+              disabled={closing || loading || live.isActive || live.status === 'connecting' || userTurns > 0}
+            >
+              <Keyboard size={14} />
+              Texto
+            </Button>
+            <Button
+              type="button"
+              variant={interviewMode === 'voice' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => {
+                if (closing || loading || live.isActive || live.status === 'connecting') return;
+                setInterviewMode('voice');
+                setMessages([]);
+              }}
+              disabled={closing || loading || live.isActive || live.status === 'connecting' || userTurns > 0}
+            >
+              <Radio size={14} />
+              Voz
+            </Button>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -554,7 +627,7 @@ export default function ChatEmpresa() {
       <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
         <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[480px] overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5 min-h-0">
-            {messages.map((msg, i) => (
+            {displayMessages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
                   <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
@@ -589,7 +662,41 @@ export default function ChatEmpresa() {
                 )}
               </div>
             ))}
-            {(loading || closing) && (
+            {interviewMode === 'voice' && (live.liveUserText || live.liveAgentText) && (
+              <div className="space-y-3 pt-2 border-t border-dashed border-slate-200">
+                {live.liveUserText && (
+                  <div className="flex gap-3 justify-end opacity-80">
+                    <div className="px-4 py-2 rounded-2xl max-w-[85%] bg-slate-700/90 text-white text-sm italic">
+                      {live.liveUserText}
+                    </div>
+                    {user?.photoURL ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName || 'Tú'}
+                        referrerPolicy="no-referrer"
+                        className="w-9 h-9 rounded-full flex-shrink-0 object-cover ring-2 ring-slate-100 opacity-80"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500">
+                        <User size={16} />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {live.liveAgentText && (
+                  <div className="flex gap-3 justify-start opacity-80">
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                      <Sparkles size={16} />
+                    </div>
+                    <div className="px-4 py-2 rounded-2xl max-w-[85%] bg-stone-50 border border-slate-100 text-slate-700 text-sm italic font-display">
+                      {live.liveAgentText}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {(loading || closing) && interviewMode === 'text' && (
               <div className="flex gap-3 justify-start">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
                   <Sparkles size={16} />
@@ -606,31 +713,183 @@ export default function ChatEmpresa() {
                 </div>
               </div>
             )}
+            {closing && interviewMode === 'voice' && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
+                  <Sparkles size={16} />
+                </div>
+                <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="text-xs text-emerald-700 ml-2 font-medium">Estructurando tu necesidad y buscando candidatos…</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-            <div className="flex gap-2 items-end">
-              <Textarea
-                placeholder="Cuéntame con tus palabras…"
-                className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendUserMessage();
-                  }
-                }}
-                disabled={loading || closing}
-              />
-              <Button
-                className="h-[64px] px-5 gap-2"
-                onClick={sendUserMessage}
-                disabled={loading || closing || !input.trim()}
-              >
-                Enviar <ArrowRight size={14} />
-              </Button>
-            </div>
+            {interviewMode === 'voice' ? (
+              <>
+                {live.error && (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3" role="alert">
+                    {live.error}
+                  </p>
+                )}
+                <div className="flex flex-col items-center gap-4 py-2">
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    {live.status === 'connecting' && (
+                      <>
+                        <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                        Conectando…
+                      </>
+                    )}
+                    {live.status === 'listening' && (
+                      <>
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        Escuchando
+                      </>
+                    )}
+                    {live.status === 'agentSpeaking' && (
+                      <>
+                        <span className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
+                        El asistente está hablando
+                      </>
+                    )}
+                    {live.status === 'paused' && (
+                      <>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full" />
+                        Pausado — toca Retomar para continuar
+                      </>
+                    )}
+                    {live.status === 'idle' && !live.isActive && (
+                      <span>Toca el botón para iniciar la conversación por voz</span>
+                    )}
+                    {live.status === 'closed' && !closing && (
+                      <span>Sesión de voz finalizada</span>
+                    )}
+                    {live.status === 'error' && (
+                      <span className="text-rose-600">Error de conexión — prueba de nuevo o usa modo texto</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {(live.status === 'idle' || live.status === 'closed' || live.status === 'error') && !live.isActive && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-emerald-300"
+                        onClick={() => void live.connect()}
+                        disabled={closing}
+                        title="Iniciar conversación por voz"
+                        aria-label="Iniciar conversación por voz"
+                      >
+                        <Phone size={28} />
+                      </Button>
+                    )}
+                    {(live.status === 'listening' || live.status === 'agentSpeaking') && (
+                      <>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="h-16 w-16 rounded-full p-0 flex-shrink-0 border-slate-300"
+                          onClick={live.pause}
+                          disabled={closing}
+                          title="Pausar conversación"
+                          aria-label="Pausar conversación"
+                        >
+                          <Pause size={24} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="default"
+                          className={`h-20 w-20 rounded-full p-0 flex-shrink-0 ${
+                            live.status === 'agentSpeaking'
+                              ? 'bg-violet-600 hover:bg-violet-700 animate-pulse'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
+                          onClick={live.disconnect}
+                          disabled={closing}
+                          title="Finalizar sesión de voz"
+                          aria-label="Finalizar sesión de voz"
+                        >
+                          <PhoneOff size={28} />
+                        </Button>
+                      </>
+                    )}
+                    {live.status === 'paused' && (
+                      <>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="default"
+                          className="h-20 w-20 rounded-full p-0 flex-shrink-0 bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => void live.resume()}
+                          disabled={closing}
+                          title="Retomar conversación"
+                          aria-label="Retomar conversación"
+                        >
+                          <Play size={28} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="h-16 w-16 rounded-full p-0 flex-shrink-0 border-rose-300 text-rose-600 hover:bg-rose-50"
+                          onClick={live.disconnect}
+                          disabled={closing}
+                          title="Finalizar sesión de voz"
+                          aria-label="Finalizar sesión de voz"
+                        >
+                          <PhoneOff size={24} />
+                        </Button>
+                      </>
+                    )}
+                    {live.status === 'connecting' && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-amber-300"
+                        disabled
+                        aria-label="Conectando"
+                      >
+                        <Phone size={28} className="opacity-50" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 text-center max-w-sm leading-relaxed">
+                    Modo voz en tiempo real: habla naturalmente, el asistente responde con voz de IA y ves la transcripción en vivo.
+                    Usa audífonos para mejor calidad.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2 items-end">
+                <Textarea
+                  placeholder="Cuéntame con tus palabras…"
+                  className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendUserMessage();
+                    }
+                  }}
+                  disabled={loading || closing}
+                />
+                <Button
+                  className="h-[64px] px-5 gap-2"
+                  onClick={sendUserMessage}
+                  disabled={loading || closing || !input.trim()}
+                >
+                  Enviar <ArrowRight size={14} />
+                </Button>
+              </div>
+            )}
           </div>
         </section>
 

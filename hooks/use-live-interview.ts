@@ -13,6 +13,7 @@ import {
 } from '@/lib/audio-pcm';
 import {
   buildLiveOpeningUserPrompt,
+  buildLiveOpeningUserPromptEmpresa,
   CLOSING_MESSAGE,
   MAX_USER_TURNS,
 } from '@/lib/interview-prompt';
@@ -26,13 +27,21 @@ export type LiveInterviewStatus =
   | 'error'
   | 'closed';
 
-function isClosingMessage(text: string): boolean {
+function defaultIsClosing(text: string): boolean {
   const t = text.toLowerCase();
   return t.includes('perfil de evidencia') || t.includes('construir tu perfil');
 }
 
 export function useLiveInterview(options: {
   firstName?: string;
+  /** Pass 'empresa' to use the empresa system instruction and closing message. */
+  mode?: 'joven' | 'empresa';
+  /** Company name — only used when mode === 'empresa'. */
+  companyName?: string;
+  /** Phrases to detect in agent output to trigger onInterviewComplete. Defaults to joven keywords. */
+  closingKeywords?: string[];
+  /** Message sent to the model to force-close after MAX_USER_TURNS. Defaults to joven CLOSING_MESSAGE. */
+  closingMessage?: string;
   onInterviewComplete?: (messages: ChatMessage[]) => void;
 }) {
   const [status, setStatus] = useState<LiveInterviewStatus>('idle');
@@ -59,10 +68,21 @@ export function useLiveInterview(options: {
   const sessionAliveRef = useRef(false);
   const micPausedRef = useRef(false);
   const onCompleteRef = useRef(options.onInterviewComplete);
+  const closingKeywordsRef = useRef(options.closingKeywords);
+  const closingMessageRef = useRef(options.closingMessage);
 
-  useEffect(() => {
-    onCompleteRef.current = options.onInterviewComplete;
-  }, [options.onInterviewComplete]);
+  useEffect(() => { onCompleteRef.current = options.onInterviewComplete; }, [options.onInterviewComplete]);
+  useEffect(() => { closingKeywordsRef.current = options.closingKeywords; }, [options.closingKeywords]);
+  useEffect(() => { closingMessageRef.current = options.closingMessage; }, [options.closingMessage]);
+
+  const checkIsClosingMessage = useCallback((text: string): boolean => {
+    const keywords = closingKeywordsRef.current;
+    if (keywords?.length) {
+      const t = text.toLowerCase();
+      return keywords.some((k) => t.includes(k.toLowerCase()));
+    }
+    return defaultIsClosing(text);
+  }, []);
 
   useEffect(() => {
     statusRef.current = status;
@@ -129,12 +149,12 @@ export function useLiveInterview(options: {
       agentTranscriptRef.current = '';
       setLiveAgentText('');
 
-      if (isClosingMessage(text) && !closingHandledRef.current) {
+      if (checkIsClosingMessage(text) && !closingHandledRef.current) {
         closingHandledRef.current = true;
         onCompleteRef.current?.(messagesRef.current);
       }
     }
-  }, [appendMessage]);
+  }, [appendMessage, checkIsClosingMessage]);
 
   const finalizeUserTurn = useCallback(() => {
     const text = userTranscriptRef.current.trim();
@@ -148,6 +168,7 @@ export function useLiveInterview(options: {
     setUserTurns(userTurnsRef.current);
 
     if (userTurnsRef.current >= MAX_USER_TURNS && sessionAliveRef.current && sessionRef.current && !closingHandledRef.current) {
+      const forceCloseMsg = closingMessageRef.current ?? CLOSING_MESSAGE;
       try {
         sessionRef.current.sendClientContent({
           turns: [
@@ -155,7 +176,7 @@ export function useLiveInterview(options: {
               role: 'user',
               parts: [
                 {
-                  text: `Llegamos al turno ${MAX_USER_TURNS}. Cerrá la entrevista con el mensaje: "${CLOSING_MESSAGE}"`,
+                  text: `Llegamos al turno ${MAX_USER_TURNS}. Cierra la entrevista con el mensaje: "${forceCloseMsg}"`,
                 },
               ],
             },
@@ -215,7 +236,7 @@ export function useLiveInterview(options: {
         if (
           userTurnsRef.current >= MAX_USER_TURNS &&
           !closingHandledRef.current &&
-          messagesRef.current.some((m) => m.role === 'agent' && isClosingMessage(m.content))
+          messagesRef.current.some((m) => m.role === 'agent' && checkIsClosingMessage(m.content))
         ) {
           closingHandledRef.current = true;
           onCompleteRef.current?.(messagesRef.current);
@@ -230,7 +251,7 @@ export function useLiveInterview(options: {
         }
       }
     },
-    [finalizeAgentTurn, finalizeUserTurn, schedulePcmPlayback, stopPlayback]
+    [checkIsClosingMessage, finalizeAgentTurn, finalizeUserTurn, schedulePcmPlayback, stopPlayback]
   );
 
   const stopMicCapture = useCallback(() => {
@@ -342,7 +363,11 @@ export function useLiveInterview(options: {
       const res = await fetch('/api/live/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: options.firstName }),
+        body: JSON.stringify({
+          firstName: options.firstName,
+          mode: options.mode ?? 'joven',
+          companyName: options.companyName,
+        }),
       });
       const data = (await res.json()) as {
         token?: string;
@@ -394,13 +419,12 @@ export function useLiveInterview(options: {
       });
       sessionRef.current = session;
 
+      const openingPrompt =
+        options.mode === 'empresa'
+          ? buildLiveOpeningUserPromptEmpresa(options.companyName)
+          : buildLiveOpeningUserPrompt(options.firstName);
       session.sendClientContent({
-        turns: [
-          {
-            role: 'user',
-            parts: [{ text: buildLiveOpeningUserPrompt(options.firstName) }],
-          },
-        ],
+        turns: [{ role: 'user', parts: [{ text: openingPrompt }] }],
         turnComplete: true,
       });
 
