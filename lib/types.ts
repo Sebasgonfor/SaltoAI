@@ -1,5 +1,61 @@
 export type Role = "agent" | "user";
 
+/**
+ * Documento que el joven subió a su perfil — diploma, certificado, constancia
+ * laboral, CV físico, etc. Persistido en Firestore (colección `documents`).
+ *
+ * Las skills extraídas por Gemini multimodal viven aparte en el campo
+ * `extractedSkills` con `evidence` (cita textual del documento) — sin cita
+ * no se agregan al perfil principal. Anti-alucinación.
+ */
+export type DocumentKind =
+  | "certificado_curso"
+  | "diploma"
+  | "titulo_universitario"
+  | "constancia_laboral"
+  | "cv_fisico"
+  | "otro";
+
+export interface DocumentSkill {
+  /** Habilidad inferida por la IA a partir del documento. */
+  skill: string;
+  /** Cita textual del documento que justifica la habilidad. SIN CITA, NO ENTRA. */
+  evidence: string;
+  /** 0-100: cuán segura está la IA de que la skill aparece. */
+  confidence: number;
+}
+
+export interface ProfileDocument {
+  id?: string;
+  profileId: string;
+  /** UID del usuario que subió el doc (para validar permisos de borrado). */
+  uploaderUid?: string;
+  /** URL pública servida por Cloudinary. */
+  url: string;
+  /** PublicId de Cloudinary, necesario para borrar el asset. */
+  publicId: string;
+  /** Tipo de archivo: pdf | jpg | png | webp */
+  format: string;
+  /** Tamaño en bytes (reportado por Cloudinary post-upload). */
+  bytes: number;
+  /** Nombre original del archivo que subió el joven. */
+  originalName: string;
+  /** Tipo de documento inferido por la IA o declarado por el joven. */
+  kind?: DocumentKind;
+  /** Institución emisora (ej. "SENA", "Platzi"). Inferida por la IA. */
+  institution?: string;
+  /** Título del programa/curso/grado. */
+  programTitle?: string;
+  /** Fecha de emisión (YYYY-MM) si se pudo inferir. */
+  issuedAt?: string;
+  /** Skills extraídas por Gemini multimodal — anti-alucinación con evidence. */
+  extractedSkills?: DocumentSkill[];
+  /** Estado del proceso de extracción. */
+  extractionStatus?: "pending" | "done" | "failed" | "skipped";
+  extractionError?: string;
+  createdAt: number;
+}
+
 /** Género declarado por la persona (no se infiere del nombre). */
 export type Gender = "mujer" | "hombre" | "otro" | "prefiero_no_decir";
 
@@ -63,6 +119,14 @@ export interface Profile {
   createdAt: number;
   latent?: LatentProfile;
   taskStats?: TaskOutcomeStat;
+  /**
+   * Skills extraídas por IA de los documentos del joven (diplomas,
+   * certificados). NO persistido en el documento `profiles`; se enriquece
+   * en runtime desde la colección `documents` cuando el motor de matching
+   * necesita evaluar si una skill está VERIFICADA por documento (pesa más)
+   * vs solo DECLARADA en entrevista.
+   */
+  documentSkills?: DocumentSkill[];
 }
 
 export type MicroTaskStatus =
@@ -174,6 +238,13 @@ export interface Match {
   redFlag: string;
   topSkills: string[];
   taskStats?: TaskOutcomeStat;
+  /**
+   * Skills del joven que están VERIFICADAS por documento (certificado,
+   * diploma) Y son relevantes para esta necesidad. La UI muestra un badge
+   * "✓ verificada por documento" para distinguirlas de las declaradas en
+   * entrevista — el founder confía más en estas.
+   */
+  verifiedSkills?: { skill: string; evidence: string }[];
 }
 
 /**
@@ -192,22 +263,78 @@ export type FeedbackSignal =
   | "microtask_outcome";
 
 /**
+ * Touchpoint del producto donde el feedback se captura. Cada pantalla
+ * importante emite señales para que el motor ICS y los prompts se
+ * recalibren con data REAL (PRD §6.2.6, §8.6 — el data flywheel).
+ *
+ * NOTA: los valores se persisten en Firestore, no renombrar después de
+ * tener entries. Si necesitás un nuevo touchpoint, agregalo acá.
+ */
+/**
+ * Alias local de UserRole para evitar import circular con lib/accounts.ts.
+ * Si el set de roles cambia (raro), actualizar ambos lados.
+ */
+type UserRole = "joven" | "empresa";
+
+export type FeedbackTouchpoint =
+  // ─── Lado joven ─────────────────────────────────────────────
+  | "interview_quality"        // post-entrevista: ¿la conversación entendió?
+  | "profile_accuracy"         // perfil generado: ¿te sentís representado?
+  | "evidence_quote"           // una cita específica del perfil
+  | "cv_generated"             // CV descargado (implícita: qué template eligió)
+  | "opportunity_click"        // joven clicó una need (interés débil)
+  | "microtask_clarity"        // ¿el brief de la tarea está claro?
+  | "microtask_evaluation"     // ¿la evaluación de la IA + founder fue justa?
+  | "latent_suggestion"        // rol latente sugerido (click o descarte)
+  | "course_recommendation"    // curso recomendado (click o ya hecho)
+  // ─── Lado empresa ───────────────────────────────────────────
+  | "need_structuring"         // ¿la IA capturó bien la necesidad?
+  | "match_useful"             // ¿este candidato es útil? (legacy, ya existe)
+  | "profile_click"            // founder clicó "Ver perfil completo"
+  | "microtask_proposed"       // founder propuso tarea pagada (interés fuerte)
+  | "microtask_outcome"        // rating final de la micro-tarea (ground truth)
+  | "ai_preeval_agreement"     // ¿coincides con la pre-eval de la IA?
+  | "post_hire_followup"       // ¿la contratación funcionó a 30/60/90 días?
+  | "red_flag_accuracy"        // ¿el red flag mostrado era acertado?
+  // ─── Bidireccional: empresa ↔ joven (no es sobre la IA) ─────
+  // Estos cierran el loop humano que ningún competidor da: el joven
+  // recibe feedback CUALITATIVO de empresas reales, y puede responder.
+  | "company_feedback_to_youth" // empresa deja comentario + rating sobre la
+                                //   candidatura del joven (no microtask outcome).
+  | "company_pass_reason"       // empresa abrió el perfil pero NO avanzó:
+                                //   le deja al joven la razón corta.
+  | "youth_reply_to_company";   // joven responde al feedback recibido
+                                //   (gracias / contraargumento / actualización).
+
+export type SignalKind = "explicit" | "implicit";
+
+/** A qué objeto del dominio se refiere la señal. */
+export type FeedbackTarget = "profile" | "need" | "match" | "microtask" | "evidence" | "suggestion";
+
+/**
  * Feedback de match: dato propietario que reentrena el ICS (PRD §8.6).
  * matchId = `${needId}__${profileId}` para idempotencia sin secuencias.
  *
- * v2 — agregamos `signalType`, `score` (para outcomes 1-5) y `icsAtTime`
- * (el score que el motor predijo cuando ocurrió la señal). Esto último es
- * clave para medir CALIBRACIÓN: si el motor predice 90% y el founder dice
- * "no útil", aprendemos que estamos inflados; si predice 40% y rate 5/5,
- * estamos siendo conservadores.
+ * v3 — extensión para cubrir los 17 touchpoints del producto. Campos
+ * VIEJOS (matchId, useful, source, signalType, score, icsAtTime) se
+ * mantienen para retrocompatibilidad con entries pre-v3 y con el flow
+ * de match-feedback existente. Campos NUEVOS (touchpoint, kind,
+ * targetType, targetId, userId, userRole, rating, binary, text,
+ * modelVersion) son opcionales pero recomendados para señales nuevas.
+ *
+ * Calibración del motor: `icsAtTime` permite medir si el modelo acierta
+ * cuando predice 90% (¿el founder confirma?). Si predice 40% y rate 5/5,
+ * estamos siendo conservadores → bajar peso de penalizaciones.
  */
 export interface FeedbackEntry {
   id?: string;
-  matchId: string;
+  timestamp: number;
+
+  // ── Campos legacy (match useful sí/no) ───────────────────────
+  matchId: string;             // requerido históricamente; en señales nuevas se construye con target
   needId?: string;
   profileId?: string;
-  useful: boolean;
-  timestamp: number;
+  useful: boolean;             // requerido históricamente; en señales no-binarias mapeamos rating ≥ 3 → true
   source?: "empresa_match" | "joven_perfil" | "other";
   note?: string;
   /** Default "explicit_vote" para retrocompatibilidad con entries viejos. */
@@ -216,6 +343,54 @@ export interface FeedbackEntry {
   score?: number;
   /** ICS que el motor predijo en el momento de la señal. Para correlación. */
   icsAtTime?: number;
+
+  // ── Campos v3 (touchpoint-aware) ─────────────────────────────
+  /** En qué función / pantalla del producto se emitió. */
+  touchpoint?: FeedbackTouchpoint;
+  /** Explicit (el user lo eligió) vs implicit (capturado del comportamiento). */
+  kind?: SignalKind;
+  /** Tipo del objeto evaluado. */
+  targetType?: FeedbackTarget;
+  /** ID del objeto evaluado (ej. profileId, matchId, taskId, evidenceQuoteHash). */
+  targetId?: string;
+  /** Quién emitió la señal. */
+  userId?: string;
+  /** Rol del emisor (necesario para weighting distinto por rol). */
+  userRole?: UserRole;
+  /** 1-5 stars (rating, accuracy). */
+  rating?: number;
+  /** Sí/no, true/false (útil, acertó, está claro). */
+  binary?: boolean;
+  /** Comentario libre — sobre todo en señales correctivas ("esto no es mío"). */
+  text?: string;
+  /** Versión del prompt/modelo activo cuando se emitió. Para A/B futuro. */
+  modelVersion?: string;
+
+  // ── v4: feedback bidireccional empresa ↔ joven ───────────────
+  /**
+   * Para hilos: id del feedback al que esta entry responde. Permite que el
+   * joven responda a un `company_feedback_to_youth` y que el dashboard
+   * arme la conversación. Solo se llena en `youth_reply_to_company`.
+   */
+  parentFeedbackId?: string;
+  /**
+   * Display name del emisor (ej. "Arepas El Primo", "Camila Silva"). El
+   * cliente lo lee directo en lugar de hacer un join contra accounts/needs.
+   * NO es PII oculta: ya es público en el producto (matches, microtasks).
+   */
+  authorDisplayName?: string;
+  /**
+   * Para feedback empresa→joven: razón pre-canónica del descarte cuando
+   * el founder eligió una opción del menú en `company_pass_reason`. Permite
+   * agregaciones limpias en el dashboard (skill_gap, context_mismatch, etc.)
+   * sin parsear el `text` libre.
+   */
+  reasonCode?:
+    | "skill_gap"
+    | "context_mismatch"
+    | "availability"
+    | "salary_range"
+    | "other";
 }
 
 export const ICS_WEIGHTS = {

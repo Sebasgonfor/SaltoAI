@@ -1,3 +1,4 @@
+import { formatExperienceEntry } from "./cv-evidence";
 import type { Gender, Profile } from "./types";
 
 const GENDER_LABEL: Record<Gender, string> = {
@@ -45,8 +46,10 @@ export function buildAtsCvText(profile: Profile): string {
   if (profile.evidence.length > 0) {
     lines.push("EXPERIENCIA Y LOGROS (evidencia verificada)");
     for (const ev of profile.evidence) {
-      lines.push(`${ev.skill}`);
-      lines.push(`  ${ev.quote}`);
+      const { competency, bullet } = formatExperienceEntry(ev.skill, ev.quote);
+      if (!bullet) continue;
+      lines.push(competency);
+      lines.push(`  ${bullet}`);
       lines.push("");
     }
   }
@@ -69,10 +72,12 @@ export function buildAtsCvHtml(profile: Profile): string {
   const skills = profile.skills.map((s) => `<li>${esc(s)}</li>`).join("");
   const traits = profile.traits.map((t) => `<li>${esc(t)}</li>`).join("");
   const evidence = profile.evidence
-    .map(
-      (e) =>
-        `<p><strong>${esc(e.skill)}</strong><br>${esc(e.quote)}</p>`
-    )
+    .map((e) => {
+      const { competency, bullet } = formatExperienceEntry(e.skill, e.quote);
+      if (!bullet) return "";
+      return `<p><strong>${esc(competency)}</strong><br>${esc(bullet)}</p>`;
+    })
+    .filter(Boolean)
     .join("");
 
   const genderLine =

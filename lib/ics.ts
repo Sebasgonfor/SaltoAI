@@ -25,6 +25,8 @@ import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "./gemini";
 import { isQuotaError } from "./gemini";
 import { loadFeedbackIndex } from "./feedback-signal";
+import { listDocumentsByProfile } from "./db";
+import type { DocumentSkill } from "./types";
 import {
   ICS_WEIGHTS,
   type CompanyNeed,
@@ -44,7 +46,8 @@ Recibes UNA necesidad de empresa y N candidatos (shortlist). Devuelves un objeto
 
 Para cada candidato devuelve:
 - profileId: copia EXACTAMENTE el profileId del candidato en esa posición. NO inventes IDs.
-- skillsFit (0-100): cuán bien las habilidades del candidato cubren los requiredSkills (semánticamente, no por keywords). "Atención al Cliente" cubre "manejo de clientes en local" → suma.
+- skillsFit (0-100): cuán bien las habilidades del candidato cubren los requiredSkills (semánticamente, no por keywords). "Atención al Cliente" cubre "manejo de clientes en local" → suma. CADA candidato trae dos listas de habilidades: "skills" (declaradas en entrevista, auto-reportadas) Y "verifiedSkills" (EXTRAÍDAS DE DOCUMENTOS reales como certificados/diplomas, con cita textual). Las verifiedSkills PESAN MÁS: si una verifiedSkill cubre una requiredSkill, súmale 15-20 puntos extra a skillsFit respecto a si solo estuviera en "skills". Si TODAS las requiredSkills están cubiertas por verifiedSkills, skillsFit debe estar en 85-100.
+- verifiedSkills (relacionadas al rol): de las verifiedSkills del candidato, identifica las que cubren requiredSkills. Devuélvelas en el campo "verifiedRelevant" del response.
 - behavioralFit (0-100): compatibilidad entre traits del candidato y desiredTraits de la empresa.
 - learningSignal (0-100): evidencia REAL de aprendizaje autónomo / resolver sin guía en el campo evidence. Si no hay evidencia clara, bajo (20-40). Si hay caso concreto (aprendió Excel por YouTube, descubrió cómo hacer X solo), alto (70+).
 - contextFit (0-100): cuán bien los traits aguantan el contexto operativo descrito (caos, ritmo rápido, multitarea, presencial, etc.). Si el contexto pide "tolerancia al caos" y el candidato tiene "metódico" pero ningún rasgo de tolerancia al caos, bajo.
@@ -69,6 +72,17 @@ const itemSchema = {
     penalties: { type: Type.NUMBER },
     reason: { type: Type.STRING },
     redFlag: { type: Type.STRING },
+    verifiedRelevant: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          skill: { type: Type.STRING },
+          evidence: { type: Type.STRING },
+        },
+        required: ["skill", "evidence"],
+      },
+    },
     topSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
   required: [
@@ -293,6 +307,7 @@ interface BatchItem {
   reason: string;
   redFlag: string;
   topSkills: string[];
+  verifiedRelevant?: { skill: string; evidence: string }[];
 }
 
 async function rankBatchWithLLM(
@@ -313,6 +328,14 @@ async function rankBatchWithLLM(
     skills: p.skills,
     traits: p.traits,
     evidence: p.evidence,
+    // verifiedSkills: skills extraídas de DOCUMENTOS (certificados, diplomas)
+    // — pesan MÁS porque tienen evidencia documental. Si está vacío, el
+    // candidato solo tiene skills auto-reportadas en la entrevista.
+    verifiedSkills: p.documentSkills?.map((ds) => ({
+      skill: ds.skill,
+      evidence: ds.evidence,
+      confidence: ds.confidence,
+    })) ?? [],
   }));
 
   const response = await withTimeout(
@@ -360,6 +383,11 @@ async function rankBatchWithLLM(
       reason: it.reason || "",
       redFlag: it.redFlag || "Ninguna señal negativa visible.",
       topSkills: Array.isArray(it.topSkills) ? it.topSkills.slice(0, 3) : [],
+      verifiedSkills: Array.isArray(it.verifiedRelevant)
+        ? it.verifiedRelevant
+            .filter((v) => v && typeof v.skill === "string" && typeof v.evidence === "string")
+            .slice(0, 5)
+        : undefined,
     });
   });
 
@@ -399,6 +427,47 @@ export interface ScoreResult {
  * Devuelve hasta `RETURN_SIZE` matches rankeados por ICS, con `degraded` y
  * `excluded` para que el frontend muestre estado honesto.
  */
+/**
+ * Enriquece cada perfil con sus `documentSkills` leyendo de la colección
+ * `documents`. Se hace antes del scoring para que el LLM tenga visibilidad
+ * de qué skills están verificadas por documento (certificado, diploma) y
+ * pueda ponderarlas más alto.
+ *
+ * Fail-soft: si la lectura falla para un perfil, ese candidato simplemente
+ * va sin documentSkills (igual de bien que antes). NO bloqueamos el match.
+ */
+async function enrichWithDocumentSkills(profiles: Profile[]): Promise<Profile[]> {
+  return Promise.all(
+    profiles.map(async (p) => {
+      if (!p.id) return p;
+      try {
+        const docs = await listDocumentsByProfile(p.id);
+        const allSkills: DocumentSkill[] = [];
+        for (const d of docs) {
+          if (d.extractionStatus !== "done") continue;
+          if (!d.extractedSkills) continue;
+          for (const s of d.extractedSkills) {
+            // Solo skills con cita textual y confianza alta (anti-alucinación).
+            if (s.skill && s.evidence && s.confidence >= 60) {
+              allSkills.push(s);
+            }
+          }
+        }
+        // Dedup por skill name (case-insensitive). Conservamos la más confiable.
+        const seen = new Map<string, DocumentSkill>();
+        for (const s of allSkills) {
+          const key = s.skill.toLowerCase().trim();
+          const prev = seen.get(key);
+          if (!prev || (s.confidence ?? 0) > (prev.confidence ?? 0)) seen.set(key, s);
+        }
+        return { ...p, documentSkills: Array.from(seen.values()) };
+      } catch {
+        return p; // sin documentSkills, el scorer trabaja igual
+      }
+    })
+  );
+}
+
 export async function scoreCandidates(
   need: CompanyNeed,
   shortlist: Profile[],
@@ -406,6 +475,9 @@ export async function scoreCandidates(
 ): Promise<ScoreResult> {
   const applyHardFilter = opts.applyHardFilter !== false;
   const useFeedbackSignal = opts.useFeedbackSignal !== false;
+  // Enriquecemos los perfiles con sus skills verificadas por documento ANTES
+  // de cualquier filtro o scoring. Así el LLM las ve y las pondera más.
+  shortlist = await enrichWithDocumentSkills(shortlist);
 
   // 1. Hard filter
   const excluded: { profileId: string; reason: string }[] = [];

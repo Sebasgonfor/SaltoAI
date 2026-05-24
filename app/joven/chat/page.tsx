@@ -30,14 +30,6 @@ function firstNameFrom(full: string): string {
   return full.trim().split(/\s+/)[0] || full.trim();
 }
 
-function buildOpeningMessage(name: string): ChatMessage {
-  const first = firstNameFrom(name);
-  return {
-    role: 'agent',
-    content: `Hola ${first}, soy tu asistente de SaltoAI. Hoy no vamos a llenar un currículum — vamos a conversar. Cuéntame: ¿cuál ha sido el desafío más grande que has resuelto en el último año, aunque nadie te haya pagado por hacerlo?`,
-  };
-}
-
 interface DetectedSignal {
   label: string;
   match: RegExp;
@@ -131,6 +123,8 @@ function ChatJoven() {
   const inputRef = useRef('');
   const voiceBaseRef = useRef('');
   const finishInterviewRef = useRef<(conversation: ChatMessage[]) => Promise<void>>(async () => {});
+  const resumeProfileBuildRef = useRef(false);
+  const profileBuildInFlightRef = useRef(false);
   const {
     isSupported: voiceSupported,
     isRecording,
@@ -197,6 +191,7 @@ function ChatJoven() {
       }
     }
     setRestored(true);
+    resumeProfileBuildRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -254,13 +249,10 @@ function ChatJoven() {
   }, [displayMessages]);
 
   const resetInterview = () => {
-    if (closing) return;
-    const ok =
-      typeof window === 'undefined' ||
-      window.confirm(
-        '¿Reiniciar la entrevista? Se borra todo lo que llevás escrito y volvés al paso 1. Tus datos básicos (nombre, edad) también se vacían.'
-      );
-    if (!ok) return;
+    const confirmMsg = closing
+      ? 'Todavía estamos construyendo tu perfil. ¿Cancelar y empezar la entrevista de cero?'
+      : '¿Reiniciar la entrevista? Se borra todo lo que llevás escrito y volvés al paso 1. Tus datos básicos (nombre, edad) también se vacían.';
+    if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return;
     cancelRecording('reset-interview');
     disconnectLive();
     clearPersisted(user?.uid);
@@ -276,9 +268,28 @@ function ChatJoven() {
     setClosing(false);
     setInterviewMode('text');
     setPhase('basics');
+    resumeProfileBuildRef.current = false;
+    profileBuildInFlightRef.current = false;
   };
 
-  const startInterview = () => {
+  const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
+    const res = await fetch('/api/entrevista', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        opening: true,
+        firstName: firstNameFrom(name),
+        age,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.nextQuestion) {
+      throw new Error(data.error || 'No pudimos preparar la entrevista.');
+    }
+    return data.nextQuestion as string;
+  }, []);
+
+  const startInterview = async () => {
     const name = formName.trim();
     const age = parseJovenAge(formAge);
     if (name.length < 2) {
@@ -296,19 +307,36 @@ function ChatJoven() {
     const b: JovenBasics = { name, age, gender: formGender };
     setBasics(b);
     setFormError(null);
+    setPhase('interview');
+
     if (interviewMode === 'text') {
-      setMessages([buildOpeningMessage(name)]);
+      setMessages([]);
+      setLoading(true);
+      try {
+        const opening = await fetchOpeningQuestion(name, age);
+        setMessages([{ role: 'agent', content: opening }]);
+      } catch (err) {
+        setFormError(
+          err instanceof Error ? err.message : 'No pudimos preparar la entrevista. Revisa tu conexión e intenta de nuevo.'
+        );
+        setPhase('basics');
+      } finally {
+        setLoading(false);
+      }
     } else {
       setMessages([]);
     }
-    setPhase('interview');
   };
 
   const finishInterview = useCallback(
     async (conversation: ChatMessage[]) => {
-      if (!basics || closing) return;
+      if (!basics || closing || profileBuildInFlightRef.current) return;
+      profileBuildInFlightRef.current = true;
       setClosing(true);
       setLoading(false);
+      setFormError(null);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 90_000);
       try {
         const closeRes = await fetch('/api/perfil', {
           method: 'POST',
@@ -319,9 +347,13 @@ function ChatJoven() {
             uid: user?.uid,
             displayName: user?.displayName,
           }),
+          signal: controller.signal,
         });
         const closeData = await closeRes.json();
-        if (closeData.id) {
+        // #region agent log
+        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'C',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil POST result',data:{ok:closeRes.ok,status:closeRes.status,hasId:!!closeData.id,code:closeData.code??null,msgCount:conversation.length,userTurns:conversation.filter(m=>m.role==='user').length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        if (closeRes.ok && closeData.id) {
           try {
             localStorage.setItem('salto_last_profile_id', closeData.id);
           } catch {
@@ -344,7 +376,15 @@ function ChatJoven() {
       } catch (err) {
         console.error(err);
         setClosing(false);
-        setFormError('Error de red al crear tu perfil.');
+        const timedOut = err instanceof Error && err.name === 'AbortError';
+        setFormError(
+          timedOut
+            ? 'La construcción del perfil tardó demasiado. Usa «Reiniciar» o «Terminar ahora» para intentar de nuevo.'
+            : 'Error de red al crear tu perfil. Revisa tu conexión e intenta de nuevo.'
+        );
+      } finally {
+        window.clearTimeout(timeout);
+        profileBuildInFlightRef.current = false;
       }
     },
     [basics, closing, router, user?.uid, user?.displayName]
@@ -353,6 +393,18 @@ function ChatJoven() {
   useEffect(() => {
     finishInterviewRef.current = finishInterview;
   }, [finishInterview]);
+
+  // Si el agente cerró la entrevista pero la construcción del perfil no llegó
+  // a completarse (refresh, error de red, timeout), reintentamos al restaurar.
+  useEffect(() => {
+    if (!restored || closing || !basics || phase !== 'interview') return;
+    if (resumeProfileBuildRef.current) return;
+    const last = messages[messages.length - 1];
+    if (last?.role !== 'agent' || last.content !== CLOSING_AGENT_MSG) return;
+    if (messages.filter((m) => m.role === 'user').length < MIN_TURNS) return;
+    resumeProfileBuildRef.current = true;
+    void finishInterview(messages);
+  }, [restored, closing, basics, phase, messages, finishInterview]);
 
   const sendUserMessage = async (textOverride?: string) => {
     cancelRecording('reset-interview');
@@ -379,10 +431,22 @@ function ChatJoven() {
       });
       const data = await res.json();
 
+      if (!res.ok) {
+        setLoading(false);
+        setFormError(data.error || 'No pudimos generar la siguiente pregunta. Intenta enviar de nuevo.');
+        return;
+      }
+
       const shouldClose = !!data.done || turnsAfterSend >= MAX_TURNS;
       const agentContent = shouldClose
         ? CLOSING_AGENT_MSG
-        : data.nextQuestion || '¿Qué hiciste tú concretamente en esa situación?';
+        : data.nextQuestion;
+
+      if (!shouldClose && !agentContent) {
+        setLoading(false);
+        setFormError('No recibimos una pregunta del agente. Intenta enviar de nuevo.');
+        return;
+      }
 
       const updated = [...history, { role: 'agent' as const, content: agentContent }];
       setMessages(updated);
@@ -447,7 +511,16 @@ function ChatJoven() {
     disconnectLive();
     setInterviewMode(mode);
     if (mode === 'text' && basics) {
-      setMessages([buildOpeningMessage(basics.name)]);
+      setMessages([]);
+      setLoading(true);
+      void fetchOpeningQuestion(basics.name, basics.age)
+        .then((opening) => setMessages([{ role: 'agent', content: opening }]))
+        .catch((err) =>
+          setFormError(
+            err instanceof Error ? err.message : 'No pudimos preparar la entrevista en modo texto.'
+          )
+        )
+        .finally(() => setLoading(false));
     } else {
       setMessages([]);
     }
@@ -520,6 +593,11 @@ function ChatJoven() {
                 </Badge>
               </span>
             )}
+            {user?.uid && (
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                Ya tienes perfil: puedes repetir la entrevista para actualizarlo, o usa «Reiniciar» para empezar de cero.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -573,9 +651,9 @@ function ChatJoven() {
             variant="ghost"
             size="sm"
             onClick={resetInterview}
-            disabled={loading || closing}
+            disabled={loading}
             className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 gap-1.5 -ml-1"
-            title="Empezar de cero la entrevista"
+            title="Empezar de cero la entrevista (también durante la construcción del perfil)"
           >
             <RotateCcw size={14} />
             Reiniciar
@@ -666,8 +744,12 @@ function ChatJoven() {
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                  {closing && (
+                  {closing ? (
                     <span className="text-xs text-emerald-700 ml-2 font-medium">Construyendo tu Perfil de Evidencia…</span>
+                  ) : (
+                    <span className="text-xs text-emerald-700 ml-2 font-medium">
+                      {messages.length === 0 ? 'Preparando tu entrevista…' : 'Pensando la siguiente pregunta…'}
+                    </span>
                   )}
                 </div>
               </div>

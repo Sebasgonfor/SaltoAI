@@ -97,12 +97,15 @@ const QUESTION_BANK: Record<(typeof TARGET_SLOTS)[number], string[]> = {
 };
 
 const SLOT_PATTERNS: Record<(typeof TARGET_SLOTS)[number], RegExp> = {
-  // vacante: matchea cuando el founder declara el rol concreto que va a contratar.
-  // Cubrimos cargos (dev, vendedor, cajero, community, etc) + verbos típicos
-  // ("buscamos", "necesitamos contratar", "queremos un/a", "el rol es") + el
-  // patrón "una persona/alguien que <verbo>" muy común en early stage.
+  // vacante: matchea cuando el founder declara el rol concreto que va a
+  // contratar. Cubrimos:
+  //  - verbos en cualquier persona/forma: buscamos, busco, buscando, busca
+  //  - "necesitamos/necesito", "queremos", "estamos contratando"
+  //  - patrones "alguien de/que/para", "una persona de/que/para"
+  //  - cargos típicos LATAM (dev, vendedor, cajero, community, marketplace, etc)
+  //  - menciones del POR QUÉ ("porque no tenemos ventas", "para crecer")
   vacante:
-    /(busc[oa]mos|necesit[oa]mos|queremos contratar|el rol es|el puesto|vacante|abrimos posición|una persona que|alguien que|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b)/i,
+    /(busc[oa]mos|busc[oa]ndo|busco|necesit[oa]mos|necesito|queremos|el rol es|el puesto|vacante|abrimos posición|alguien (de|que|para)|una persona (de|que|para)|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|marketplace|e-?commerce|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b|porque no (tenemos|hay)|para (crecer|vender|aumentar))/i,
   // tareas_del_rol: actividades concretas que hace la persona, no cargos.
   tareas_del_rol:
     /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin|escribir|disenar|cocinar|despachar|empacar|hacer rutas|llevar contabilidad|gestion|reportes?|ventas|cierre|prospect)/i,
@@ -136,10 +139,25 @@ OBJETIVO DE COBERTURA (5 slots, en este orden de prioridad):
 
 REGLAS DE COBERTURA:
 - Sigue el ORDEN: vacante primero, tareas_del_rol después. Si el founder responde algo distinto al slot que preguntaste, agradece lo dicho y redirige amablemente al slot pendiente.
-- NO repitas ángulos. Si un slot ya quedó cubierto, pasa al siguiente.
-- Si una respuesta es vaga (sin datos concretos), profundiza UNA VEZ con un follow-up, después pasa al siguiente slot — no te trabes.
+- ANTI-REDUNDANCIA CRÍTICA: si el founder YA contestó conceptualmente un slot (aunque no diste todos los detalles que pediste), MÁRCALO COMO CUBIERTO y avanza. NUNCA re-preguntes un slot completo "porque faltaban detalles" — eso enfurece al founder. Si necesitas un dato puntual, pídelo SOLO ESE DATO con UNA frase corta y específica (ej. "¿1 vacante o varias?"), no re-formules toda la pregunta del slot.
+- Antes de hacer cada pregunta, mira el historial: si alguna respuesta del founder YA respondió ese slot (incluso de forma corta), márcalo cubierto y SALTA al siguiente.
+- Si una respuesta es vaga (sin datos concretos), profundiza UNA VEZ con un follow-up corto, después pasa al siguiente slot — no te trabes ni machacques.
 - Haz puente narrativo con lo que el founder acaba de decir, no salto brusco.
 - No inventes contexto. Si el founder no menciona algo, no lo agregues a tu siguiente pregunta como si lo hubiera dicho.
+
+EJEMPLOS DE LO QUE NO HACER (re-pregunta redundante):
+  Founder: "Buscamos a alguien de marketplace, porque no tenemos casi ventas"
+  Agente MAL: "Para entender bien la vacante: ¿qué rol específico buscan?"
+  → ESO ESTÁ MAL. El founder YA dijo el rol (marketplace) y el porqué (sin ventas). El slot vacante está CUBIERTO. Pasa al siguiente.
+
+  Founder: "Whatsapp e instagram, español."
+  Agente MAL: "¿Hay alguna otra restricción dura?"
+  → MAL. Ya cubrió no_negociables. Avanza.
+
+  EJEMPLO DE LO QUE SÍ HACER (follow-up de un detalle puntual, máx 1):
+  Founder: "Buscamos a alguien de marketplace"
+  Agente OK: "Perfecto. ¿1 vacante o varias?"
+  → Pide UN dato puntual, NO re-formula el slot.
 
 ESTILO:
 - Español natural neutro latinoamericano, cercano, no corporativo.
@@ -152,7 +170,8 @@ PROHIBIDO PREGUNTAS SÍ/NO:
 - Si quieres explorar si algo ocurrió, pide directamente el ejemplo: "Cuéntame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
 
 CIERRE (done=true):
-- Marca done=true cuando tengas los 4 slots OBLIGATORIOS cubiertos (vacante, tareas_del_rol, contexto_equipo, no_negociables) con detalle concreto. El slot experiencia_previa es OPCIONAL — no esperes a cubrirlo si los 4 obligatorios están listos.
+- Marca done=true cuando tengas los 4 slots OBLIGATORIOS cubiertos (vacante, tareas_del_rol, contexto_equipo, no_negociables). "Cubierto" significa conceptualmente respondido — NO esperes a que el founder diga "tengo 3 vacantes, una está en marketing y otra en ventas" para considerar el slot completo. Si dijo "buscamos alguien de X", el slot está cubierto.
+- El slot experiencia_previa es OPCIONAL — no esperes a cubrirlo si los 4 obligatorios están listos.
 - Nunca marques done=true antes del turno 4 del founder.
 - Después del turno 6, marca done=true sí o sí (cap).
 - Cuando done=true, en nextQuestion devuelve un cierre breve: "Listo, con esto puedo armar la búsqueda. Voy a estructurar tu necesidad y buscar candidatos."
