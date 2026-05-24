@@ -266,6 +266,60 @@ export async function deleteNeed(id: string): Promise<boolean> {
   return deleted;
 }
 
+/**
+ * Borra un perfil + su entrada en memoria. Usado por el endpoint admin
+ * de cleanup de mocks. NO toca colecciones relacionadas (microtasks,
+ * documentos, feedback) — eso lo hace el endpoint llamador con los
+ * helpers específicos.
+ */
+export async function deleteProfile(id: string): Promise<boolean> {
+  let deleted = false;
+  if (useFirestore(PROFILES)) {
+    try {
+      await deleteDoc(doc(db, PROFILES, id));
+      deleted = true;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "deleteProfile", PROFILES);
+    }
+  }
+  if (memProfiles.delete(id)) deleted = true;
+  return deleted;
+}
+
+/** Borra una microtask por id. */
+export async function deleteMicroTask(id: string): Promise<boolean> {
+  let deleted = false;
+  if (useFirestore(MICROTASKS)) {
+    try {
+      await deleteDoc(doc(db, MICROTASKS, id));
+      deleted = true;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "deleteMicroTask", MICROTASKS);
+    }
+  }
+  if (memMicroTasks.delete(id)) deleted = true;
+  return deleted;
+}
+
+/** Borra un feedback por id. */
+export async function deleteFeedback(id: string): Promise<boolean> {
+  let deleted = false;
+  if (useFirestore(FEEDBACK)) {
+    try {
+      await deleteDoc(doc(db, FEEDBACK, id));
+      deleted = true;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "deleteFeedback", FEEDBACK);
+    }
+  }
+  const idx = memFeedback.findIndex((f) => f.id === id);
+  if (idx >= 0) {
+    memFeedback.splice(idx, 1);
+    deleted = true;
+  }
+  return deleted;
+}
+
 export async function getNeed(id: string): Promise<CompanyNeed | null> {
   if (useFirestore(NEEDS)) {
     try {

@@ -31,6 +31,14 @@ import { useAuth } from '@/lib/auth-context';
 import { loadSavedEmpresaLegal, saveEmpresaLegal } from '@/lib/user-onboarding-storage';
 import { useLiveInterview } from '@/hooks/use-live-interview';
 import { CLOSING_MESSAGE_EMPRESA } from '@/lib/interview-prompt';
+import {
+  validateCompanyName,
+  validateTaxId,
+  validatePersonName,
+  validateDocId,
+  type DocType,
+  DOC_TYPE_LABELS,
+} from '@/lib/input-validation';
 
 const MAX_TURNS = 6;
 
@@ -73,6 +81,7 @@ interface CompanyLegal {
   taxId: string;
   legalRepName: string;
   legalRepDocId: string;
+  legalRepDocType: DocType;
   acceptedTerms: boolean;
   acceptedAt: string;
 }
@@ -84,6 +93,8 @@ interface ChatPersistedState {
   messages: ChatMessage[];
   input: string;
 }
+
+// Eliminar validaciones locales — ahora viven en lib/input-validation.ts
 
 function storageKey(uid: string | null | undefined): string {
   return `salto_empresa_chat_${uid || 'anon'}`;
@@ -133,8 +144,6 @@ function buildOpeningMessage(name: string): ChatMessage {
   };
 }
 
-import { validateDocId, validateTaxId } from '@/lib/empresa-legal-validation';
-
 export default function ChatEmpresa() {
   const router = useRouter();
   const { user } = useAuth();
@@ -146,6 +155,7 @@ export default function ChatEmpresa() {
     taxId: '',
     legalRepName: '',
     legalRepDocId: '',
+    legalRepDocType: 'CC',
     acceptedTerms: false,
   });
   const [formError, setFormError] = useState<string | null>(null);
@@ -262,35 +272,33 @@ export default function ChatEmpresa() {
   };
 
   const startInterview = () => {
-    const name = form.companyName.trim();
-    const repName = form.legalRepName.trim();
-    if (name.length < 2) {
-      setFormError('Escribe la razón social o nombre comercial de la empresa.');
-      return;
-    }
+    const companyErr = validateCompanyName(form.companyName);
+    if (companyErr) { setFormError(companyErr); return; }
+
     const taxErr = validateTaxId(form.taxId);
-    if (taxErr) {
-      setFormError(taxErr);
-      return;
-    }
-    if (repName.length < 2) {
-      setFormError('Escribe el nombre completo del representante legal.');
-      return;
-    }
-    const docErr = validateDocId(form.legalRepDocId);
-    if (docErr) {
-      setFormError(docErr);
-      return;
-    }
+    if (taxErr) { setFormError(taxErr); return; }
+
+    const repErr = validatePersonName(form.legalRepName, {
+      requireFullName: true,
+      fieldLabel: 'El nombre del representante',
+    });
+    if (repErr) { setFormError(repErr); return; }
+
+    const docErr = validateDocId(form.legalRepDocId, form.legalRepDocType);
+    if (docErr) { setFormError(docErr); return; }
+
     if (!form.acceptedTerms) {
       setFormError('Tienes que aceptar los Términos y la Política de Privacidad para continuar.');
       return;
     }
+
+    const repName = form.legalRepName.trim();
     const legalRecord: CompanyLegal = {
-      companyName: name,
+      companyName: form.companyName.trim(),
       taxId: form.taxId.trim(),
       legalRepName: repName,
       legalRepDocId: form.legalRepDocId.trim(),
+      legalRepDocType: form.legalRepDocType,
       acceptedTerms: true,
       acceptedAt: new Date().toISOString(),
     };
@@ -511,13 +519,29 @@ export default function ChatEmpresa() {
                 <label className="block text-sm font-semibold text-slate-900 mb-2">
                   Documento de identidad
                 </label>
-                <Input
-                  placeholder="Ej. C.C. 1.001.234.567"
-                  value={form.legalRepDocId}
-                  onChange={(e) => setForm({ ...form, legalRepDocId: e.target.value })}
-                  className="h-12 text-base"
-                  autoComplete="off"
-                />
+                <div className="flex gap-2">
+                  <select
+                    value={form.legalRepDocType}
+                    onChange={(e) => setForm({ ...form, legalRepDocType: e.target.value as DocType })}
+                    className="h-11 sm:h-12 text-sm rounded-xl border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-shrink-0"
+                  >
+                    {(Object.entries(DOC_TYPE_LABELS) as [DocType, string][]).map(([k, v]) => (
+                      <option key={k} value={k}>{k} — {v}</option>
+                    ))}
+                  </select>
+                  <Input
+                    placeholder={
+                      form.legalRepDocType === 'CC' ? 'Ej. 1001234567' :
+                      form.legalRepDocType === 'CE' ? 'Ej. E123456' :
+                      form.legalRepDocType === 'PPN' ? 'Ej. AB123456' :
+                      'Ej. 900123456'
+                    }
+                    value={form.legalRepDocId}
+                    onChange={(e) => setForm({ ...form, legalRepDocId: e.target.value })}
+                    className="h-11 sm:h-12 text-sm sm:text-base flex-1"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             </div>
           </div>

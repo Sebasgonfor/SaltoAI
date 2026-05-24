@@ -32,6 +32,7 @@ import { useAuth } from '@/lib/auth-context';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 import { NeedRadiography } from '@/components/empresa/need-radiography';
+import MatchingAnimation from '@/components/matching-animation';
 import { emitSignal } from '@/lib/feedback';
 
 interface MatchResponse {
@@ -354,12 +355,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   const needClosed = data?.need ? isNeedClosed(data.need) : false;
 
   if (loading) {
-    return (
-      <MatchPulseLoader
-        label="Buscando candidatos compatibles…"
-        className="max-w-4xl mx-auto px-4 sm:px-6 min-h-[50vh]"
-      />
-    );
+    return <MatchingAnimation variant="candidates" />;
   }
 
   if (error || !data) {

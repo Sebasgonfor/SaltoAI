@@ -25,6 +25,7 @@ import {
 } from '@/lib/merge-opportunity-decisions';
 import { RoleGate } from '@/components/auth/role-gate';
 import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
+import MatchingAnimation from '@/components/matching-animation';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 const DECISION_POLL_MS = 12_000;
@@ -332,12 +333,7 @@ function ConectarContent() {
   }
 
   if (loading) {
-    return (
-      <MatchPulseLoader
-        label="Buscando oportunidades compatibles…"
-        className="max-w-5xl mx-auto px-4 sm:px-6 min-h-[50vh]"
-      />
-    );
+    return <MatchingAnimation variant="opportunities" />;
   }
 
   if (error) {

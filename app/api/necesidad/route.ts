@@ -5,7 +5,7 @@ import { embed } from "@/lib/embeddings";
 import { createNeed, getNeed } from "@/lib/db";
 import { computeMatchesForNeed } from "@/lib/match-need";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { validateNeedDescription } from "@/lib/input-validation";
+import { validateNeedDescription, validateCompanyName } from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { CompanyLegal, CompanyNeed } from "@/lib/types";
 
@@ -110,6 +110,15 @@ export async function POST(req: NextRequest) {
         { error: "companyName y rawDescription requeridos", code: "fields_required" },
         { status: 400 }
       );
+    }
+    const companyNameErr = validateCompanyName(companyName);
+    if (companyNameErr) {
+      log.end({ status: 400, extra: { reason: "invalid_company_name" } });
+      return NextResponse.json({ error: companyNameErr, code: "invalid_company_name" }, { status: 400 });
+    }
+    if (!ownerUid?.trim()) {
+      log.end({ status: 400, extra: { reason: "owner_uid_required" } });
+      return NextResponse.json({ error: "ownerUid requerido", code: "owner_uid_required" }, { status: 400 });
     }
 
     // §8.5: una necesidad sin contexto no se puede matchear honestamente.
