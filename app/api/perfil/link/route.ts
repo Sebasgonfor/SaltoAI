@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProfile, upsertProfileWithId, storageFromId } from "@/lib/db";
+import { getProfile, upsertProfileWithId, storageFromId, reassignMicroTasksProfileId } from "@/lib/db";
 import { startLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
 
     const existing = await getProfile(uid);
     if (existing) {
-      log.end({ status: 200, extra: { profileId: uid, mode: "already_linked" } });
+      await reassignMicroTasksProfileId(sourceId, uid);
+      log.end({ status: 200, extra: { profileId: uid, mode: "already_linked", sourceId } });
       return NextResponse.json({ id: uid, profile: existing, storage: storageFromId(uid) });
     }
 
@@ -39,6 +40,8 @@ export async function POST(req: NextRequest) {
       latent: source.latent,
       taskStats: source.taskStats,
     });
+
+    await reassignMicroTasksProfileId(sourceId, uid);
 
     const saved = await getProfile(uid);
     // #region agent log

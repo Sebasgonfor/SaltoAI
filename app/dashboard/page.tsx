@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '@/lib/auth-context';
+import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
 import { Badge } from '@/components/ui/badge';
@@ -200,6 +201,7 @@ export default function DashboardPage() {
   // (regresión introducida al lanzar el dashboard sin gating por rol).
   // Solución: si el `account.role` es `empresa`, redirigimos al hub de empresas.
   const { user, account, loading, roleLoading } = useAuth();
+  const jovenProfileId = useJovenProfileId();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tasks, setTasks] = useState<MicroTask[]>([]);
@@ -219,12 +221,24 @@ export default function DashboardPage() {
   }, [user, account, loading, roleLoading, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !jovenProfileId) return;
     (async () => {
       try {
+        let stored: string | null = null;
+        try {
+          stored = localStorage.getItem('salto_last_profile_id');
+        } catch {
+          /* ignore */
+        }
+        const aliases =
+          stored && stored !== jovenProfileId
+            ? `&aliases=${encodeURIComponent(stored)}`
+            : '';
         const [profRes, tasksRes] = await Promise.all([
-          fetch(`/api/perfil?id=${encodeURIComponent(user.uid)}`),
-          fetch(`/api/microtask/list?profileId=${encodeURIComponent(user.uid)}`),
+          fetch(`/api/perfil?id=${encodeURIComponent(jovenProfileId)}`),
+          fetch(
+            `/api/microtask/list?profileId=${encodeURIComponent(jovenProfileId)}${aliases}`,
+          ),
         ]);
         if (profRes.ok) {
           const d = await profRes.json();
@@ -240,7 +254,7 @@ export default function DashboardPage() {
         setDataLoading(false);
       }
     })();
-  }, [user]);
+  }, [user, jovenProfileId]);
 
   // close sidebar on outside click
   useEffect(() => {
@@ -380,7 +394,7 @@ export default function DashboardPage() {
           {!dataLoading && profile && (
             <JovenWidgets
               uid={user.uid}
-              profileId={user.uid}
+              profileId={jovenProfileId ?? user.uid}
               profile={profile}
               tasks={tasks}
             />

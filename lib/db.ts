@@ -398,13 +398,13 @@ export async function updateMicroTask(id: string, patch: Partial<MicroTask>): Pr
 export async function listMicroTasksByProfile(profileId: string): Promise<MicroTask[]> {
   if (useFirestore(MICROTASKS)) {
     try {
-      const q = query(
-        collection(db, MICROTASKS),
-        where("profileId", "==", profileId),
-        orderBy("createdAt", "desc")
-      );
+      // Sin orderBy en Firestore: evita índice compuesto profileId+createdAt.
+      // Ordenamos en memoria (mismo patrón que listDocumentsByProfile).
+      const q = query(collection(db, MICROTASKS), where("profileId", "==", profileId));
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }))
+        .sort((a, b) => b.createdAt - a.createdAt);
     } catch (e) {
       disableFirestoreWithWarning(e, "listMicroTasksByProfile", MICROTASKS);
     }
@@ -414,16 +414,40 @@ export async function listMicroTasksByProfile(profileId: string): Promise<MicroT
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
+/** Une tareas de varios profileIds (p. ej. uid + local_* previo al link). */
+export async function listMicroTasksForProfileIds(profileIds: string[]): Promise<MicroTask[]> {
+  const uniq = [...new Set(profileIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniq.length === 0) return [];
+  if (uniq.length === 1) return listMicroTasksByProfile(uniq[0]);
+  const batches = await Promise.all(uniq.map((id) => listMicroTasksByProfile(id)));
+  const byId = new Map<string, MicroTask>();
+  for (const t of batches.flat()) {
+    if (t.id) byId.set(t.id, t);
+  }
+  return Array.from(byId.values()).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Reasigna micro-tasks al vincular perfil anónimo → uid de Firebase. */
+export async function reassignMicroTasksProfileId(fromId: string, toId: string): Promise<number> {
+  if (!fromId || !toId || fromId === toId) return 0;
+  const tasks = await listMicroTasksByProfile(fromId);
+  let count = 0;
+  for (const t of tasks) {
+    if (!t.id) continue;
+    await updateMicroTask(t.id, { profileId: toId });
+    count++;
+  }
+  return count;
+}
+
 export async function listMicroTasksByCompany(companyId: string): Promise<MicroTask[]> {
   if (useFirestore(MICROTASKS)) {
     try {
-      const q = query(
-        collection(db, MICROTASKS),
-        where("companyId", "==", companyId),
-        orderBy("createdAt", "desc")
-      );
+      const q = query(collection(db, MICROTASKS), where("companyId", "==", companyId));
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }))
+        .sort((a, b) => b.createdAt - a.createdAt);
     } catch (e) {
       disableFirestoreWithWarning(e, "listMicroTasksByCompany", MICROTASKS);
     }
