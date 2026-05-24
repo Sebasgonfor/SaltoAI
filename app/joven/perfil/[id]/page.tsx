@@ -93,7 +93,6 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
     );
   }
 
-
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-10 sm:space-y-14">
       {/* Banner contextual: cuando un founder visita este perfil desde sus
@@ -121,48 +120,83 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
-      {/* HERO */}
-      <header className="relative space-y-4">
+      {/* HERO — sin avatar/foto (el producto no maneja foto de perfil).
+          Mantengo las clases responsive del HEAD remoto (sm:) para mobile. */}
+      <header className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-transparent">
-                <CheckCircle2 size={12} className="mr-1" />
-                Perfil de Evidencia · Verificado por Salto IA
-              </Badge>
-              <Badge variant="outline" className="border-slate-200 text-slate-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                Indexado para matching
-              </Badge>
-              {storage === 'firestore' ? (
-                <Badge variant="outline" className="border-emerald-200 bg-emerald-50/50 text-emerald-800">
-                  Guardado en la nube
-                </Badge>
-              ) : storage === 'memory' ? (
-                <Badge variant="outline" className="border-amber-200 bg-amber-50/50 text-amber-900">
-                  Solo en esta sesión · configura Firebase
-                </Badge>
-              ) : null}
-            </div>
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
-              {perfil.name}
-            </h1>
-            <p className="text-slate-600 mt-2">
-              {perfil.age ?? '—'} años
-              {perfil.gender && perfil.gender !== 'prefiero_no_decir' && GENDER_LABEL[perfil.gender]
-                ? ` · ${GENDER_LABEL[perfil.gender]}`
-                : ''}
-            </p>
-            {perfil.summary && (
-              <p className="text-lg md:text-xl text-slate-700 leading-relaxed max-w-3xl">
-                {perfil.summary}
-              </p>
-            )}
-            {/* CV ATS — one-click + panel opcional para completar contacto,
-                idiomas, educación. Los datos viajan como query params; el
-                renderer del CV los inyecta en las secciones estándar. */}
-            <div className="pt-2 max-w-2xl">
-              <CvCustomizer profileId={id} />
-            </div>
+          <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-transparent">
+            <CheckCircle2 size={12} className="mr-1" />
+            Perfil de Evidencia · Verificado por Salto IA
+          </Badge>
+          <Badge variant="outline" className="border-slate-200 text-slate-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+            Indexado para matching
+          </Badge>
+          {storage === 'firestore' ? (
+            <Badge variant="outline" className="border-emerald-200 bg-emerald-50/50 text-emerald-800">
+              Guardado en la nube
+            </Badge>
+          ) : storage === 'memory' ? (
+            <Badge variant="outline" className="border-amber-200 bg-amber-50/50 text-amber-900">
+              Solo en esta sesión · configura Firebase
+            </Badge>
+          ) : null}
+        </div>
+        <h1 className="text-3xl sm:text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
+          {perfil.name}
+        </h1>
+        <p className="text-slate-600">
+          {perfil.age ?? '—'} años
+          {perfil.gender && perfil.gender !== 'prefiero_no_decir' && GENDER_LABEL[perfil.gender]
+            ? ` · ${GENDER_LABEL[perfil.gender]}`
+            : ''}
+        </p>
+        {perfil.summary && (
+          <p className="text-base sm:text-lg md:text-xl text-slate-700 leading-relaxed max-w-3xl">
+            {perfil.summary}
+          </p>
+        )}
       </header>
+
+      {/* "Las empresas ya pueden verte" — antes era CTA al final de página.
+          Ahora va arriba para que sea la primera cosa que ve el joven al
+          terminar la entrevista: confirmación + call to action. */}
+      {!viewerIsEmpresa && (
+        <section className="bg-slate-950 text-white rounded-3xl p-8 md:p-10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl" aria-hidden />
+          <div className="relative max-w-3xl">
+            <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-300 border-transparent mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
+              Visible para empresas
+            </Badge>
+            <h2 className="font-display font-bold text-3xl md:text-4xl mb-3 tracking-tight leading-tight">
+              Las empresas ya pueden verte.
+            </h2>
+            <p className="text-slate-300 leading-relaxed mb-6 max-w-2xl">
+              Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, Salto calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás entre sus 3 candidatos.
+            </p>
+            <Link href={`/joven/conectar?profileId=${encodeURIComponent(id)}`}>
+              <Button className="gap-2 bg-white text-slate-900 hover:bg-slate-100">
+                <Building2 size={16} /> Conectar con empresas <ArrowRight size={14} />
+              </Button>
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* CV ATS — sale del hero (donde estaba apretado) y queda como sección
+          propia, con el form de contacto obligatorio bien visible. */}
+      <section>
+        <div className="mb-5">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
+            Tu CV listo para postular
+          </div>
+          <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
+            Elegí plantilla y completá tu contacto.
+          </h2>
+        </div>
+        <CvCustomizer profileId={id} />
+      </section>
 
       {/* Tu historia → Evidencia (pipeline pedagógico) */}
       <section className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200 rounded-3xl p-8 md:p-10">
@@ -307,27 +341,6 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         )}
       </section>
 
-      {/* CTA final */}
-      <section className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 md:p-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl" aria-hidden />
-        <div className="relative max-w-3xl">
-          <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-300 border-transparent mb-5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
-            Visible para empresas
-          </Badge>
-          <h3 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl mb-4 tracking-tight leading-tight">
-            Las empresas ya pueden verte.
-          </h3>
-          <p className="text-slate-300 leading-relaxed mb-6 max-w-2xl">
-            Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, Salto calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás entre sus 3 candidatos.
-          </p>
-          <Link href={`/joven/conectar?profileId=${encodeURIComponent(id)}`}>
-            <Button className="gap-2 bg-white text-slate-900 hover:bg-slate-100">
-              <Building2 size={16} /> Conectar con empresas <ArrowRight size={14} />
-            </Button>
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }

@@ -21,7 +21,6 @@ import {
   FileText,
   Printer,
   ChevronDown,
-  ChevronUp,
   Settings2,
   Eye,
   Star,
@@ -156,11 +155,33 @@ function AtsScore({ value }: { value: number }) {
   );
 }
 
+/**
+ * Campos obligatorios antes de poder generar / descargar el CV.
+ * Sin estos el CV ATS sale incompleto y las empresas no pueden contactar al
+ * candidato. Antes era opcional → casi nadie completaba → CVs inútiles.
+ */
+const REQUIRED_FIELDS = ['email', 'phone', 'city'] as const;
+type RequiredField = (typeof REQUIRED_FIELDS)[number];
+
+function isEmailValid(v: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+}
+function isPhoneValid(v: string): boolean {
+  const digits = v.replace(/\D/g, '');
+  return digits.length >= 7; // permisivo: cubre formatos LATAM con o sin prefijo
+}
+
 export default function CvCustomizer({ profileId }: { profileId: string }) {
-  const [open, setOpen] = useState(false);
   const [fields, setFields] = useState<CvFields>(EMPTY);
   const [style, setStyle] = useState<CvStyle>(DEFAULT_STYLE);
   const [hydrated, setHydrated] = useState(false);
+  // Bandera por campo: solo mostramos el error después de que el usuario lo
+  // tocó (UX estándar). Evita un mar rojo al cargar la página.
+  const [touched, setTouched] = useState<Record<RequiredField, boolean>>({
+    email: false,
+    phone: false,
+    city: false,
+  });
 
   useEffect(() => {
     setFields(loadFields(profileId));
@@ -205,11 +226,20 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
   const activeStyle = STYLES.find((s) => s.id === style) ?? STYLES[0];
   const isCreative = style === 'creative';
 
-  const completion = useMemo(() => {
-    const required = ['email', 'phone', 'city'] as const;
-    const filled = required.filter((k) => fields[k].trim().length > 0).length;
-    return { filled, total: required.length };
+  const validation = useMemo(() => {
+    const errors: Partial<Record<RequiredField, string>> = {};
+    if (!fields.email.trim()) errors.email = 'El email es obligatorio.';
+    else if (!isEmailValid(fields.email)) errors.email = 'Email inválido.';
+    if (!fields.phone.trim()) errors.phone = 'El teléfono es obligatorio.';
+    else if (!isPhoneValid(fields.phone)) errors.phone = 'Teléfono muy corto.';
+    if (!fields.city.trim()) errors.city = 'La ciudad es obligatoria.';
+    const ok = Object.keys(errors).length === 0;
+    const filled = REQUIRED_FIELDS.filter((k) => fields[k].trim().length > 0).length;
+    return { ok, errors, filled, total: REQUIRED_FIELDS.length };
   }, [fields]);
+
+  const markAllTouched = () =>
+    setTouched({ email: true, phone: true, city: true });
 
   return (
     <div className="space-y-4">
@@ -280,83 +310,110 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
         )}
       </div>
 
-      {/* ---------- Botones primarios ---------- */}
-      <div className="flex flex-wrap gap-2">
-        <a href={buildUrl({ autoprint: '1' })} target="_blank" rel="noopener noreferrer">
-          <Button variant="outline" className="gap-2">
-            <Printer size={14} /> Imprimir / Guardar PDF
-          </Button>
-        </a>
-        <a href={buildUrl({})} target="_blank" rel="noopener noreferrer">
-          <Button variant="ghost" size="sm" className="gap-2 text-slate-700">
-            <Eye size={14} /> Vista previa
-          </Button>
-        </a>
-        <a href={buildUrl({ download: '1' })} download>
-          <Button variant="ghost" size="sm" className="gap-2 text-slate-700">
-            <Download size={14} /> Descargar HTML
-          </Button>
-        </a>
-        <a href={buildUrl({ format: 'json' })} target="_blank" rel="noopener noreferrer">
-          <Button variant="ghost" size="sm" className="gap-2 text-slate-700">
-            <FileText size={14} /> Texto plano
-          </Button>
-        </a>
-      </div>
+      {/* ---------- Datos del candidato (SIEMPRE VISIBLE, OBLIGATORIO) ----------
+          Antes era colapsable y opcional → la mayoría imprimía CVs sin
+          email/teléfono/ciudad y las empresas no podían contactar. Ahora es
+          un bloque siempre abierto con validación inline; los botones de
+          imprimir/descargar quedan deshabilitados hasta completar lo mínimo.
+      */}
+      <div className="bg-white border-2 border-emerald-200 rounded-2xl overflow-hidden">
+        <div className="bg-emerald-50/60 border-b border-emerald-200 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
+                <Settings2 size={12} /> Paso obligatorio · antes de enviar
+              </div>
+              <h3 className="font-display font-semibold text-lg text-slate-900 leading-tight">
+                Completá tus datos de contacto
+              </h3>
+              <p className="text-xs text-slate-600 mt-1 max-w-md leading-relaxed">
+                Sin email, teléfono y ciudad, las empresas no pueden contactarte. Se guardan
+                solo en tu navegador.
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
+                Progreso
+              </div>
+              <div className={`text-2xl font-display font-bold tabular-nums ${
+                validation.ok ? 'text-emerald-600' : 'text-amber-600'
+              }`}>
+                {validation.filled}/{validation.total}
+              </div>
+            </div>
+          </div>
+        </div>
 
-      {/* ---------- Form colapsable de datos extras ---------- */}
-      <div className="bg-white border border-slate-200 rounded-2xl">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 rounded-2xl transition"
-          aria-expanded={open}
-        >
-          <span className="flex items-center gap-2 text-sm">
-            <Settings2 size={14} className="text-slate-500" />
-            <span className="font-medium text-slate-900">Personalizar antes de enviar</span>
-            <span className="text-[11px] text-slate-500">
-              {completion.filled}/{completion.total} contacto · idiomas · educación
-            </span>
-          </span>
-          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+        <div className="px-5 py-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="space-y-1">
+              <span className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-slate-700 font-semibold">
+                Email <span className="text-rose-600">*</span>
+              </span>
+              <Input
+                type="email"
+                inputMode="email"
+                placeholder="tu@email.com"
+                value={fields.email}
+                onChange={(e) => set('email', e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                aria-invalid={touched.email && !!validation.errors.email}
+                aria-describedby={touched.email && validation.errors.email ? 'cv-email-error' : undefined}
+                className={touched.email && validation.errors.email ? 'border-rose-300 focus-visible:ring-rose-500' : ''}
+              />
+              {touched.email && validation.errors.email && (
+                <p id="cv-email-error" className="text-[11px] text-rose-700" role="alert">
+                  {validation.errors.email}
+                </p>
+              )}
+            </label>
+            <label className="space-y-1">
+              <span className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-slate-700 font-semibold">
+                Teléfono <span className="text-rose-600">*</span>
+              </span>
+              <Input
+                type="tel"
+                inputMode="tel"
+                placeholder="+57 300 000 0000"
+                value={fields.phone}
+                onChange={(e) => set('phone', e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+                aria-invalid={touched.phone && !!validation.errors.phone}
+                className={touched.phone && validation.errors.phone ? 'border-rose-300 focus-visible:ring-rose-500' : ''}
+              />
+              {touched.phone && validation.errors.phone && (
+                <p className="text-[11px] text-rose-700" role="alert">
+                  {validation.errors.phone}
+                </p>
+              )}
+            </label>
+            <label className="space-y-1 sm:col-span-2">
+              <span className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-slate-700 font-semibold">
+                Ciudad <span className="text-rose-600">*</span>
+              </span>
+              <Input
+                placeholder="Barranquilla, Colombia"
+                value={fields.city}
+                onChange={(e) => set('city', e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, city: true }))}
+                aria-invalid={touched.city && !!validation.errors.city}
+                className={touched.city && validation.errors.city ? 'border-rose-300 focus-visible:ring-rose-500' : ''}
+              />
+              {touched.city && validation.errors.city && (
+                <p className="text-[11px] text-rose-700" role="alert">
+                  {validation.errors.city}
+                </p>
+              )}
+            </label>
+          </div>
 
-        {open && (
-          <div className="px-4 pb-4 pt-1 space-y-4 border-t border-slate-100">
-            <p className="text-xs text-slate-500">
-              Estos campos completan el CV con datos que el Perfil de Evidencia no captura. Todo es opcional; se guardan localmente en tu navegador.
-            </p>
-
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Email</span>
-                <Input
-                  type="email"
-                  inputMode="email"
-                  placeholder="tu@email.com"
-                  value={fields.email}
-                  onChange={(e) => set('email', e.target.value)}
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Teléfono</span>
-                <Input
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="+57 300 000 0000"
-                  value={fields.phone}
-                  onChange={(e) => set('phone', e.target.value)}
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Ciudad</span>
-                <Input
-                  placeholder="Barranquilla, Colombia"
-                  value={fields.city}
-                  onChange={(e) => set('city', e.target.value)}
-                />
-              </label>
+          {/* Campos opcionales en un detail/summary, no en collapsable custom */}
+          <details className="group">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-700 hover:text-emerald-700 inline-flex items-center gap-1.5 select-none">
+              <ChevronDown size={14} className="group-open:rotate-180 transition-transform" />
+              Agregar LinkedIn, idiomas, educación y certificaciones (opcional)
+            </summary>
+            <div className="mt-3 grid sm:grid-cols-2 gap-3">
               <label className="space-y-1">
                 <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">LinkedIn</span>
                 <Input
@@ -365,12 +422,12 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                   onChange={(e) => set('linkedin', e.target.value)}
                 />
               </label>
-              <label className="space-y-1 sm:col-span-2">
+              <label className="space-y-1">
                 <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-                  Subtítulo / Headline profesional
+                  Subtítulo profesional
                 </span>
                 <Input
-                  placeholder="Por defecto: tus 3 skills principales separadas por ·"
+                  placeholder="Por defecto: tus 3 skills principales"
                   value={fields.headline}
                   onChange={(e) => set('headline', e.target.value)}
                 />
@@ -404,24 +461,69 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 />
               </label>
             </div>
+          </details>
+        </div>
+      </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <a href={buildUrl({ autoprint: '1' })} target="_blank" rel="noopener noreferrer">
-                <Button className="gap-2">
-                  <Printer size={14} /> Imprimir con estos datos
-                </Button>
-              </a>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-slate-500"
-                onClick={() => setFields(EMPTY)}
-              >
-                Limpiar campos
-              </Button>
-            </div>
+      {/* ---------- Botones primarios (deshabilitados hasta completar) ----------
+          Si el usuario clickea con errores, marcamos todos los campos como
+          tocados para que se vean los mensajes inline.
+      */}
+      <div>
+        {!validation.ok && (
+          <div className="flex items-start gap-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg mb-3">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+            <span>
+              Completá email, teléfono y ciudad arriba para habilitar la descarga de tu CV.
+            </span>
           </div>
         )}
+        <div className="flex flex-wrap gap-2">
+          {validation.ok ? (
+            <a href={buildUrl({ autoprint: '1' })} target="_blank" rel="noopener noreferrer">
+              <Button className="gap-2">
+                <Printer size={14} /> Imprimir / Guardar PDF
+              </Button>
+            </a>
+          ) : (
+            <Button className="gap-2" disabled onClick={markAllTouched}>
+              <Printer size={14} /> Imprimir / Guardar PDF
+            </Button>
+          )}
+          {validation.ok ? (
+            <a href={buildUrl({})} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="sm" className="gap-2 text-slate-700">
+                <Eye size={14} /> Vista previa
+              </Button>
+            </a>
+          ) : (
+            <Button variant="ghost" size="sm" className="gap-2 text-slate-700" disabled>
+              <Eye size={14} /> Vista previa
+            </Button>
+          )}
+          {validation.ok ? (
+            <a href={buildUrl({ download: '1' })} download>
+              <Button variant="ghost" size="sm" className="gap-2 text-slate-700">
+                <Download size={14} /> Descargar HTML
+              </Button>
+            </a>
+          ) : (
+            <Button variant="ghost" size="sm" className="gap-2 text-slate-700" disabled>
+              <Download size={14} /> Descargar HTML
+            </Button>
+          )}
+          {validation.ok ? (
+            <a href={buildUrl({ format: 'txt' })} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="sm" className="gap-2 text-slate-700">
+                <FileText size={14} /> Texto plano
+              </Button>
+            </a>
+          ) : (
+            <Button variant="ghost" size="sm" className="gap-2 text-slate-700" disabled>
+              <FileText size={14} /> Texto plano
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

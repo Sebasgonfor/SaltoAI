@@ -50,39 +50,21 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
     );
   }
 
-  const initials = (user.displayName || user.email || '?')
-    .split(' ')
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
   return (
     <div ref={menuRef} className={cn('relative', className)}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex items-center gap-2 rounded-full pl-1 pr-2 py-1 transition-colors',
+          // Sin avatar/foto: solo nombre + chevron. El producto no maneja
+          // foto de perfil (decisión de producto, no técnica).
+          'flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors',
           variant === 'dark'
             ? 'hover:bg-slate-800 text-slate-100'
             : 'hover:bg-slate-100 text-slate-700'
         )}
       >
-        {user.photoURL ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.photoURL}
-            alt={user.displayName || 'avatar'}
-            referrerPolicy="no-referrer"
-            className="h-8 w-8 rounded-full"
-          />
-        ) : (
-          <span className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold flex items-center justify-center">
-            {initials}
-          </span>
-        )}
-        <span className="text-sm font-medium max-w-[120px] truncate hidden sm:inline">
+        <span className="text-sm font-medium max-w-[160px] truncate">
           {user.displayName?.split(' ')[0] || user.email}
         </span>
         <ChevronDown size={14} className="opacity-60" />
