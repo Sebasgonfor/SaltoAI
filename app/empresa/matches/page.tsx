@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import type { CompanyNeed } from '@/lib/types';
+import { isNeedClosed } from '@/lib/need-status';
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString('es-CO', {
@@ -73,7 +74,7 @@ export default function MatchesIndex() {
 
   if (authLoading || loading) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="h-8 w-1/3 bg-slate-200 rounded animate-pulse mb-3" />
         <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse mb-8" />
         <div className="grid md:grid-cols-2 gap-4">
@@ -87,7 +88,7 @@ export default function MatchesIndex() {
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-24 text-center">
         <AlertCircle className="text-rose-500 mx-auto mb-4" size={32} />
         <p className="text-slate-700 mb-6">{error}</p>
         <Link href="/empresa">
@@ -100,7 +101,7 @@ export default function MatchesIndex() {
   // Empty state
   if (needs.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-24 text-center">
         <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-slate-900 text-emerald-400 flex items-center justify-center">
           <Sparkles size={28} strokeWidth={1.75} />
         </div>
@@ -139,13 +140,14 @@ export default function MatchesIndex() {
             Mis necesidades publicadas
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            {needs.length === 1
-              ? 'Tu necesidad activa'
-              : `Tus ${needs.length} necesidades activas`}
+            Tus necesidades publicadas
           </h1>
           <p className="text-slate-600 mt-2 text-sm leading-relaxed max-w-xl">
-            Cada una con su shortlist de hasta 10 candidatos rankeados por ICS. Hacé clic para
-            ver el desglose por candidato.
+            {needs.filter((n) => !isNeedClosed(n)).length} activa
+            {needs.filter((n) => !isNeedClosed(n)).length !== 1 ? 's' : ''}
+            {needs.some(isNeedClosed) &&
+              ` · ${needs.filter(isNeedClosed).length} cerrada${needs.filter(isNeedClosed).length !== 1 ? 's' : ''}`}
+            . Las cerradas no reciben nuevos candidatos.
           </p>
         </div>
         <Link href="/empresa/chat">
@@ -158,11 +160,24 @@ export default function MatchesIndex() {
       <div className="grid md:grid-cols-2 gap-4">
         {needs.map((need) => (
           <Link key={need.id} href={`/empresa/matches/${need.id}`}>
-            <article className="group bg-white border border-slate-200 rounded-2xl p-5 hover:border-emerald-300 hover:shadow-sm transition-all h-full flex flex-col">
+            <article
+              className={`group bg-white border rounded-2xl p-5 transition-all h-full flex flex-col ${
+                isNeedClosed(need)
+                  ? 'border-slate-200 hover:border-slate-300'
+                  : 'border-slate-200 hover:border-emerald-300 hover:shadow-sm'
+              }`}
+            >
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
-                    {need.companyName}
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold">
+                      {need.companyName}
+                    </div>
+                    {isNeedClosed(need) && (
+                      <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600">
+                        Cerrada
+                      </Badge>
+                    )}
                   </div>
                   <h3 className="font-display font-semibold text-lg text-slate-900 leading-tight">
                     {need.role || 'Necesidad sin título'}

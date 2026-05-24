@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +19,16 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { Gender, OpportunityMatch, Profile } from '@/lib/types';
+import {
+  mergeDecisionsIntoOpportunities,
+  type EnrichedDecision,
+} from '@/lib/merge-opportunity-decisions';
 import { RoleGate } from '@/components/auth/role-gate';
 import MatchingAnimation from '@/components/matching-animation';
+import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
+
+const DECISION_POLL_MS = 12_000;
 
 // --- Cache cliente de oportunidades (5 min) ---
 //
@@ -249,7 +256,8 @@ function ConectarContent() {
       setLoading(false);
       return;
     }
-    void fetchOpportunities(profileId, { useCache: true });
+    clearCacheFor(profileId);
+    void fetchOpportunities(profileId, { useCache: false });
   }, [profileId, fetchOpportunities]);
 
   const forceRefresh = () => {
@@ -257,6 +265,55 @@ function ConectarContent() {
     clearCacheFor(profileId);
     void fetchOpportunities(profileId, { useCache: false });
   };
+
+  const refreshDecisions = useCallback(
+    async (pid: string) => {
+      try {
+        const res = await fetch(
+          `/api/match/decision?profileId=${encodeURIComponent(pid)}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as { decisions?: EnrichedDecision[] };
+        const decisions = json.decisions ?? [];
+        setOpportunities((prev) => {
+          if (prev.length === 0 && decisions.length === 0) return prev;
+          const next = mergeDecisionsIntoOpportunities(prev, decisions);
+          writeCache(pid, {
+            profile: profile ?? ({ id: pid } as Profile),
+            opportunities: next,
+            note,
+            warning,
+          });
+          return next;
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [profile, note, warning]
+  );
+
+  useEffect(() => {
+    if (!profileId || loading) return;
+
+    void refreshDecisions(profileId);
+    const timer = window.setInterval(() => {
+      void refreshDecisions(profileId);
+    }, DECISION_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshDecisions(profileId);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [profileId, loading, refreshDecisions]);
 
   if (!profileId && !loading) {
     return (
@@ -292,7 +349,10 @@ function ConectarContent() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
+    <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
+      {refreshing && (
+        <MatchPulseLoader variant="overlay" label="Recalculando oportunidades…" />
+      )}
       <header>
         <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
           Conectar con empresas
@@ -333,6 +393,18 @@ function ConectarContent() {
 
       {opportunities.length > 0 && (
         <section className="space-y-4">
+          {opportunities.some((o) => o.companyStatus === 'interested') && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 text-sm text-emerald-900">
+                <strong>
+                  {opportunities.filter((o) => o.companyStatus === 'interested').length}
+                </strong>{' '}
+                empresa
+                {opportunities.filter((o) => o.companyStatus === 'interested').length === 1
+                  ? ' mostró interés'
+                  : 's mostraron interés'}{' '}
+                en tu perfil. Revisa las oportunidades marcadas abajo.
+              </div>
+          )}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500 font-semibold">
               <Network size={14} className="text-emerald-500" />
@@ -368,15 +440,29 @@ function ConectarContent() {
               <article
                 key={opp.needId}
                 className={`bg-white border rounded-2xl p-4 sm:p-6 md:p-8 transition-all ${
-                  i === 0 ? 'border-emerald-200 shadow-md shadow-emerald-100/40' : 'border-slate-200'
+                  opp.companyStatus === 'interested'
+                    ? 'border-emerald-300 shadow-md shadow-emerald-100/50 ring-1 ring-emerald-200'
+                    : i === 0
+                      ? 'border-emerald-200 shadow-md shadow-emerald-100/40'
+                      : 'border-slate-200'
                 }`}
               >
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
-                    {i === 0 && (
+                    {i === 0 && !opp.companyStatus && (
                       <Badge className="bg-emerald-100 text-emerald-800 border-transparent mb-1">
                         <Sparkles size={12} className="mr-1" />
                         Mejor encaje
+                      </Badge>
+                    )}
+                    {opp.companyStatus === 'interested' && (
+                      <Badge className="bg-emerald-600 text-white border-transparent mb-1">
+                        Empresa interesada en tu perfil
+                      </Badge>
+                    )}
+                    {opp.companyStatus === 'discarded' && (
+                      <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 mb-1">
+                        No avanzó en esta búsqueda
                       </Badge>
                     )}
                     <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900">{opp.companyName}</h2>

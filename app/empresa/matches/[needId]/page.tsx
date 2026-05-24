@@ -1,8 +1,9 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
 import { Button } from '@/components/ui/button';
 import {
   Sparkles,
@@ -12,14 +13,22 @@ import {
   Network,
   Layers,
   ChevronRight,
+  ChevronDown,
   Quote,
   AlertCircle,
   CheckCircle2,
+  ThumbsUp,
+  ThumbsDown,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
-import type { CompanyNeed, Match, ICSBreakdown } from '@/lib/types';
+import type { CompanyNeed, Match, ICSBreakdown, MatchDecision } from '@/lib/types';
+import { isNeedClosed } from '@/lib/need-status';
+import { CloseNeedControl } from '@/components/empresa/close-need-control';
+import { storeMatchForNavigation } from '@/lib/match-navigation-storage';
 import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
+import { useAuth } from '@/lib/auth-context';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 import { NeedRadiography } from '@/components/empresa/need-radiography';
@@ -85,6 +94,21 @@ function recordImplicitSignal(
     profileId,
     icsAtTime,
   });
+}
+
+function candidateHref(needId: string, profileId: string) {
+  return `/empresa/candidatos/${profileId}?needId=${encodeURIComponent(needId)}`;
+}
+
+function openCandidate(needId: string, match: Match) {
+  storeMatchForNavigation(needId, match.profileId, match);
+}
+
+function decisionFor(
+  decisions: MatchDecision[],
+  profileId: string
+): MatchDecision['status'] | undefined {
+  return decisions.find((d) => d.profileId === profileId)?.status;
 }
 
 function BreakdownBars({
@@ -214,35 +238,58 @@ function clearMatchCache(needId: string) {
 
 export default function MatchesPorNecesidad({ params }: { params: Promise<{ needId: string }> }) {
   const { needId } = use(params);
+  const { user } = useAuth();
   const [data, setData] = useState<MatchResponse | null>(null);
+  const [decisions, setDecisions] = useState<MatchDecision[]>([]);
+  const [showDiscarded, setShowDiscarded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMatches = async (opts: { useCache: boolean }) => {
-    if (opts.useCache) {
+  const fetchDecisions = async () => {
+    try {
+      const decisionRes = await fetch(
+        `/api/match/decision?needId=${encodeURIComponent(needId)}`,
+      );
+      const decisionJson = decisionRes.ok ? await decisionRes.json() : { decisions: [] };
+      setDecisions(decisionJson.decisions ?? []);
+    } catch {
+      /* decisions are non-blocking */
+    }
+  };
+
+  const fetchMatches = async (opts: { useCache: boolean; force?: boolean }) => {
+    if (opts.useCache && !opts.force) {
       const cached = readMatchCache(needId);
       if (cached) {
         setData(cached.data);
         setFromCache(true);
         setLoading(false);
+        void fetchDecisions();
         return;
       }
     }
     setRefreshing(true);
     try {
-      const res = await fetch('/api/match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ needId }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
+      const matchRes = opts.force
+        ? await fetch('/api/match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ needId, force: true }),
+          })
+        : await fetch(`/api/match?needId=${encodeURIComponent(needId)}`);
+      const [json, decisionRes] = await Promise.all([
+        matchRes.json(),
+        fetch(`/api/match/decision?needId=${encodeURIComponent(needId)}`),
+      ]);
+      if (!matchRes.ok) {
         setError(json.error || 'No pudimos calcular los matches.');
         return;
       }
+      const decisionJson = decisionRes.ok ? await decisionRes.json() : { decisions: [] };
       setData(json);
+      setDecisions(decisionJson.decisions ?? []);
       setFromCache(false);
       writeMatchCache(needId, json);
     } catch {
@@ -258,11 +305,54 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needId]);
 
+  const { activeMatches, discardedMatches } = useMemo(() => {
+    if (!data?.matches) return { activeMatches: [], discardedMatches: [] };
+    const active: Match[] = [];
+    const discarded: Match[] = [];
+    for (const m of data.matches) {
+      const st = decisionFor(decisions, m.profileId);
+      if (st === 'discarded') discarded.push(m);
+      else active.push(m);
+    }
+    return { activeMatches: active, discardedMatches: discarded };
+  }, [data?.matches, decisions]);
+
+  async function quickDecision(profileId: string, status: 'interested' | 'discarded', ics?: number) {
+    if (!user?.uid) return;
+    await fetch('/api/match/decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        needId,
+        profileId,
+        companyId: user.uid,
+        status,
+        ...(typeof ics === 'number' && { icsAtTime: ics }),
+      }),
+    });
+    setDecisions((prev) => {
+      const id = `${needId}__${profileId}`;
+      const next = prev.filter((d) => d.profileId !== profileId);
+      next.push({
+        id,
+        needId,
+        profileId,
+        companyId: user.uid,
+        status,
+        updatedAt: Date.now(),
+        ...(typeof ics === 'number' && { icsAtTime: ics }),
+      });
+      return next;
+    });
+  }
+
   const forceRefresh = () => {
-    if (refreshing) return;
+    if (refreshing || (data?.need && isNeedClosed(data.need))) return;
     clearMatchCache(needId);
-    void fetchMatches({ useCache: false });
+    void fetchMatches({ useCache: false, force: true });
   };
+
+  const needClosed = data?.need ? isNeedClosed(data.need) : false;
 
   if (loading) {
     return <MatchingAnimation variant="candidates" />;
@@ -270,7 +360,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
 
   if (error || !data) {
     return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-24 text-center">
         <AlertCircle size={32} className="text-rose-500 mx-auto mb-4" />
         <h2 className="text-xl font-display font-medium mb-2">{error || 'No encontramos la necesidad'}</h2>
         <Link href="/empresa/chat">
@@ -281,10 +371,13 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   }
 
   const { need, matches } = data;
-  const [top, ...rest] = matches;
+  const [top, ...rest] = activeMatches;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
+    <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
+      {refreshing && (
+        <MatchPulseLoader variant="overlay" label="Recalculando candidatos…" />
+      )}
       {/* Necesidad estructurada */}
       <header className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -324,24 +417,54 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={forceRefresh}
-              disabled={refreshing}
-              className="gap-1.5"
-              title="Recalcular el ranking de candidatos contra esta necesidad"
-            >
-              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Recalculando…' : 'Recalcular'}
-            </Button>
+            {needClosed ? (
+              <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 gap-1">
+                <Lock size={12} /> Vacante cerrada
+              </Badge>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={forceRefresh}
+                  disabled={refreshing}
+                  className="gap-1.5"
+                  title="Recalcular el ranking de candidatos contra esta necesidad"
+                >
+                  <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+                  {refreshing ? 'Recalculando…' : 'Recalcular'}
+                </Button>
+                {user?.uid && (
+                  <CloseNeedControl
+                    need={need}
+                    companyId={user.uid}
+                    onClosed={(closed) => setData((prev) => (prev ? { ...prev, need: closed } : prev))}
+                  />
+                )}
+              </>
+            )}
             <Link href="/empresa/chat">
-              <Button variant="outline" size="sm">Editar necesidad</Button>
+              <Button variant="outline" size="sm">Nueva necesidad</Button>
             </Link>
           </div>
         </div>
 
-        {fromCache && !refreshing && (
+        {needClosed && (
+          <div
+            role="status"
+            className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 flex items-start gap-2"
+          >
+            <Lock size={16} className="text-slate-500 mt-0.5 shrink-0" />
+            <p className="leading-relaxed">
+              Esta vacante está <strong>cerrada</strong>. Los candidatos que ves son el ranking
+              histórico; ningún joven nuevo la verá en Oportunidades ni recibirá match automático.
+              {need.hiredOnClose === true && ' Reportaste contratación exitosa.'}
+              {need.hiredOnClose === false && ' Cerraste sin contratación de esta búsqueda.'}
+            </p>
+          </div>
+        )}
+
+        {fromCache && !refreshing && !needClosed && (
           <p className="text-[11px] text-slate-400 italic flex items-center gap-1">
             <CheckCircle2 size={11} className="text-emerald-500" />
             Resultados cacheados (15 min). Si publicaste cambios o subieron nuevos perfiles, dale a "Recalcular".
@@ -422,7 +545,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       )}
 
       {/* Pipeline visual */}
-      {matches.length > 0 && (
+      {activeMatches.length > 0 && (
         <section className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
@@ -431,13 +554,13 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 <strong className="text-slate-900">Embeddings</strong> hacen shortlist semántico → <strong className="text-slate-900">LLM</strong> calcula el desglose ICS.
               </div>
             </div>
-            <PipelineVisual totalProfiles={matches.length + 5} shortlistSize={15} returnSize={matches.length} />
+            <PipelineVisual totalProfiles={activeMatches.length + 5} shortlistSize={15} returnSize={activeMatches.length} />
           </div>
         </section>
       )}
 
       {/* Sin matches */}
-      {matches.length === 0 && (
+      {activeMatches.length === 0 && discardedMatches.length === 0 && (
         <section className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-2xl p-12 text-center">
           <UserCheck size={32} className="text-slate-400 mx-auto mb-4" />
           <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">Aún no hay perfiles en SaltoAI</h3>
@@ -463,6 +586,9 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
                     {top.profileName}
                   </h2>
+                  {decisionFor(decisions, top.profileId) === 'interested' && (
+                    <Badge className="mt-2 bg-emerald-600 text-white border-transparent">Interesado</Badge>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {top.topSkills.map((s) => {
                       const verified = top.verifiedSkills?.find(
@@ -498,16 +624,37 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Link
-                    href={`/joven/perfil/${top.profileId}`}
-                    className="flex-1"
-                    onClick={() => recordImplicitSignal(needId, top.profileId, 'connect', top.ics)}
+                    href={candidateHref(needId, top.profileId)}
+                    className="flex-1 min-w-[140px]"
+                    onClick={() => {
+                      openCandidate(needId, top);
+                      recordImplicitSignal(needId, top.profileId, 'connect', top.ics);
+                    }}
                   >
                     <Button className="w-full gap-2">
                       Ver perfil completo <ArrowRight size={14} />
                     </Button>
                   </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Me interesa"
+                    onClick={() => void quickDecision(top.profileId, 'interested', top.ics)}
+                  >
+                    <ThumbsUp size={16} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Descartar"
+                    onClick={() => void quickDecision(top.profileId, 'discarded', top.ics)}
+                  >
+                    <ThumbsDown size={16} />
+                  </Button>
                   <Link
                     href={`/empresa/probar/${top.profileId}?needId=${needId}`}
                     onClick={() => recordImplicitSignal(needId, top.profileId, 'microtask_proposed', top.ics)}
@@ -589,6 +736,11 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                       #{idx + 2}
                     </div>
                     <h3 className="font-display font-semibold text-2xl text-slate-900 tracking-tight">{m.profileName}</h3>
+                    {decisionFor(decisions, m.profileId) === 'interested' && (
+                      <Badge className="mt-1 bg-emerald-600 text-white border-transparent text-[10px]">
+                        Interesado
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="font-display font-bold text-4xl text-slate-700 tabular-nums leading-none">{m.ics}</div>
@@ -622,19 +774,42 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <p className="text-sm text-slate-700 leading-relaxed italic">"{m.reason}"</p>
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-slate-100 flex items-start justify-between gap-3">
-                  <div className="text-xs text-slate-500 flex gap-1.5 items-start flex-1">
+                <div className="mt-auto pt-4 border-t border-slate-100 flex items-start justify-between gap-3 flex-wrap">
+                  <div className="text-xs text-slate-500 flex gap-1.5 items-start flex-1 min-w-[180px]">
                     <Info size={12} className="mt-0.5 flex-shrink-0" />
                     <span><strong className="text-slate-700">Red flag:</strong> {m.redFlag}</span>
                   </div>
-                  <Link
-                    href={`/joven/perfil/${m.profileId}`}
-                    onClick={() => recordImplicitSignal(needId, m.profileId, 'connect', m.ics)}
-                  >
-                    <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0">
-                      Ver perfil <ArrowRight size={12} />
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Me interesa"
+                      onClick={() => void quickDecision(m.profileId, 'interested', m.ics)}
+                    >
+                      <ThumbsUp size={14} />
                     </Button>
-                  </Link>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Descartar"
+                      onClick={() => void quickDecision(m.profileId, 'discarded', m.ics)}
+                    >
+                      <ThumbsDown size={14} />
+                    </Button>
+                    <Link
+                      href={candidateHref(needId, m.profileId)}
+                      onClick={() => {
+                        openCandidate(needId, m);
+                        recordImplicitSignal(needId, m.profileId, 'connect', m.ics);
+                      }}
+                    >
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        Ver perfil <ArrowRight size={12} />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="pt-3 mt-3 border-t border-slate-100">
@@ -646,8 +821,58 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         </section>
       )}
 
+      {discardedMatches.length > 0 && (
+        <section className="border border-slate-200 rounded-2xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowDiscarded((v) => !v)}
+            className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-slate-50 hover:bg-slate-100/80 text-left transition-colors"
+          >
+            <span className="text-sm font-semibold text-slate-700">
+              Descartados ({discardedMatches.length})
+            </span>
+            <ChevronDown
+              size={18}
+              className={`text-slate-500 transition-transform ${showDiscarded ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {showDiscarded && (
+            <div className="p-5 space-y-3 border-t border-slate-200 bg-white">
+              {discardedMatches.map((m) => (
+                <div
+                  key={m.profileId}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0"
+                >
+                  <div>
+                    <div className="font-medium text-slate-800">{m.profileName}</div>
+                    <div className="text-xs text-slate-500">ICS {m.ics}%</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      href={candidateHref(needId, m.profileId)}
+                      onClick={() => openCandidate(needId, m)}
+                    >
+                      <Button size="sm" variant="outline">
+                        Ver perfil
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void quickDecision(m.profileId, 'interested', m.ics)}
+                    >
+                      Recuperar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Filosofía Salto */}
-      {matches.length > 0 && (
+      {data.matches.length > 0 && (
         <section className="bg-slate-950 text-white rounded-2xl p-6 sm:p-8 md:p-10 text-center relative overflow-hidden">
           <UserCheck size={28} className="mx-auto mb-4 text-emerald-400" />
           <h3 className="font-display font-semibold text-2xl md:text-3xl mb-3 tracking-tight">

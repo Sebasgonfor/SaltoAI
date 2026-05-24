@@ -26,7 +26,9 @@ import {
   Play,
 } from 'lucide-react';
 import type { ChatMessage } from '@/lib/types';
+import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
 import { useAuth } from '@/lib/auth-context';
+import { loadSavedEmpresaLegal, saveEmpresaLegal } from '@/lib/user-onboarding-storage';
 import { useLiveInterview } from '@/hooks/use-live-interview';
 import { CLOSING_MESSAGE_EMPRESA } from '@/lib/interview-prompt';
 import {
@@ -120,6 +122,17 @@ function clearPersisted(uid: string | null | undefined): void {
   }
 }
 
+function legalToForm(legal: CompanyLegal): Omit<CompanyLegal, 'acceptedAt'> {
+  return {
+    companyName: legal.companyName,
+    taxId: legal.taxId,
+    legalRepName: legal.legalRepName,
+    legalRepDocId: legal.legalRepDocId,
+    legalRepDocType: legal.legalRepDocType,
+    acceptedTerms: legal.acceptedTerms,
+  };
+}
+
 function buildOpeningMessage(name: string): ChatMessage {
   const short = name.split(/\s+/)[0] || name;
   return {
@@ -159,15 +172,45 @@ export default function ChatEmpresa() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = loadPersisted(user?.uid);
-    if (saved) {
-      if (saved.phase) setPhase(saved.phase);
-      if (saved.legal) setLegal(saved.legal);
-      if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
-      if (Array.isArray(saved.messages)) setMessages(saved.messages);
-      if (typeof saved.input === 'string') setInput(saved.input);
+    let cancelled = false;
+
+    async function restore() {
+      const saved = loadPersisted(user?.uid);
+      if (saved) {
+        if (Array.isArray(saved.messages)) setMessages(saved.messages);
+        if (typeof saved.input === 'string') setInput(saved.input);
+      }
+
+      const savedLegal = loadSavedEmpresaLegal(user?.uid);
+      if (cancelled) return;
+
+      const hasInterviewProgress = (saved?.messages?.length ?? 0) > 0;
+
+      if (savedLegal) {
+        setLegal(savedLegal);
+        setForm(legalToForm(savedLegal));
+        if (hasInterviewProgress) {
+          setPhase('interview');
+        } else {
+          setPhase('interview');
+          setMessages([buildOpeningMessage(savedLegal.legalRepName)]);
+        }
+      } else if (saved) {
+        if (saved.phase) setPhase(saved.phase);
+        if (saved.legal) {
+          setLegal(saved.legal);
+          saveEmpresaLegal(user?.uid, saved.legal);
+        }
+        if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
+      }
+
+      setRestored(true);
     }
-    setRestored(true);
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -192,20 +235,43 @@ export default function ChatEmpresa() {
   }, [user, form.legalRepName]);
 
 
-  const resetAll = () => {
+  const resetInterview = () => {
     if (closing) return;
     const ok =
       typeof window === 'undefined' ||
-      window.confirm('¿Reiniciar la conversación? Se borra la entrevista actual y empiezas de nuevo con los mismos datos de empresa.');
+      window.confirm(
+        '¿Reiniciar la entrevista? Se borra la conversación actual. Los datos legales de la empresa se mantienen.'
+      );
     if (!ok) return;
     live.disconnect();
     live.resetMessages();
     setMessages([]);
     setInput('');
+    setFormError(null);
     setSubmitError(null);
     setLoading(false);
     setClosing(false);
     setInterviewMode('text');
+
+    const savedLegal = loadSavedEmpresaLegal(user?.uid) ?? legal;
+    if (savedLegal) {
+      setLegal(savedLegal);
+      setForm(legalToForm(savedLegal));
+      setPhase('interview');
+      setMessages([buildOpeningMessage(savedLegal.legalRepName)]);
+      return;
+    }
+
+    setLegal(null);
+    setForm({
+      companyName: '',
+      taxId: '',
+      legalRepName: user?.displayName ?? '',
+      legalRepDocId: '',
+      legalRepDocType: 'CC',
+      acceptedTerms: false,
+    });
+    setPhase('legal');
   };
 
   const startInterview = () => {
@@ -240,6 +306,7 @@ export default function ChatEmpresa() {
       acceptedAt: new Date().toISOString(),
     };
     setLegal(legalRecord);
+    saveEmpresaLegal(user?.uid, legalRecord);
     setFormError(null);
     setMessages([buildOpeningMessage(repName)]);
     setPhase('interview');
@@ -276,6 +343,7 @@ export default function ChatEmpresa() {
         return;
       }
       clearPersisted(user?.uid);
+      if (legal) saveEmpresaLegal(user?.uid, legal);
       router.push(`/empresa/matches/${data.id}`);
     } catch {
       setSubmitError('Error de red. Prueba enviar de nuevo en un momento.');
@@ -533,7 +601,13 @@ export default function ChatEmpresa() {
     // sticky del layout (h-20). El header del chat y el grid se reparten ese
     // espacio sin generar scroll externo en el body. En mobile/pantallas
     // bajas se relaja a min-h para no aplastar el contenido.
-    <div className="md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+    <div className="relative md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+      {closing && (
+        <MatchPulseLoader
+          variant="fullscreen"
+          label="Estructurando tu necesidad y buscando candidatos…"
+        />
+      )}
       <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
@@ -552,6 +626,16 @@ export default function ChatEmpresa() {
                   {legal.taxId}
                 </Badge>
               </span>
+            )}
+            {user?.uid && (
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                Los datos legales ya están guardados.{' '}
+                <Link href="/empresa#datos-empresa" className="text-emerald-700 underline">
+                  Editar en tu perfil
+                </Link>
+                {' · '}
+                «Reiniciar» solo borra esta conversación.
+              </p>
             )}
           </div>
         </div>
@@ -611,10 +695,10 @@ export default function ChatEmpresa() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={resetAll}
+            onClick={resetInterview}
             disabled={loading || closing}
             className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 gap-1.5 -ml-1"
-            title="Reiniciar todo desde el paso 1"
+            title="Reiniciar la entrevista (los datos legales se mantienen)"
           >
             <RotateCcw size={14} />
             Reiniciar

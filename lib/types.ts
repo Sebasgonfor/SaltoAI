@@ -105,6 +105,19 @@ export interface TaskOutcomeStat {
   averageRating: number;
 }
 
+/** Datos de contacto del joven para CV y vista empresa. Persistidos en `profiles.contact`. */
+export interface ProfileContact {
+  email?: string;
+  phone?: string;
+  city?: string;
+  linkedin?: string;
+  languages?: string;
+  education?: string;
+  certifications?: string;
+  headline?: string;
+  cvStyle?: string;
+}
+
 export interface Profile {
   id?: string;
   name: string;
@@ -119,6 +132,7 @@ export interface Profile {
   createdAt: number;
   latent?: LatentProfile;
   taskStats?: TaskOutcomeStat;
+  contact?: ProfileContact;
   /**
    * Transcripción cruda de la entrevista que generó este perfil. Sirve a:
    *   1. Auditoría: ver POR QUÉ se extrajo cada skill (releer el contexto).
@@ -196,6 +210,20 @@ export interface OpportunityMatch {
   breakdown?: ICSBreakdown;
   redFlag?: string;
   topSkills?: string[];
+  /** Decisión de la empresa sobre este match (si existe). */
+  companyStatus?: "interested" | "discarded" | null;
+}
+
+export type MatchDecisionStatus = "pending" | "interested" | "discarded";
+
+export interface MatchDecision {
+  id: string;
+  needId: string;
+  profileId: string;
+  companyId: string;
+  status: MatchDecisionStatus;
+  icsAtTime?: number;
+  updatedAt: number;
 }
 
 export interface CompanyLegal {
@@ -206,11 +234,14 @@ export interface CompanyLegal {
   legalRepName: string;
   legalRepDocId: string;
   /** Tipo de documento del representante legal: CC, CE, PPN, NIT. */
-  legalRepDocType: string;
+  legalRepDocType: import('./input-validation').DocType;
   acceptedTerms: boolean;
   /** ISO timestamp del momento en que el founder aceptó TyC. */
   acceptedAt: string;
 }
+
+/** Vacante publicada por la empresa. `closed` = no recibe nuevos matches. */
+export type NeedStatus = "open" | "closed";
 
 export interface CompanyNeed {
   id?: string;
@@ -237,6 +268,12 @@ export interface CompanyNeed {
   /** Breve explicación de POR QUÉ se clasificó así. Útil para auditoría
    * humana cuando el founder dice "no entiendo por qué este candidato sale alto". */
   jobNatureReason?: string;
+  /** Ausente o `open` = activa. `closed` = vacante cerrada, sin matching nuevo. */
+  status?: NeedStatus;
+  closedAt?: number;
+  /** Reporte al cerrar: ¿contrataron de esta búsqueda? (flywheel post_hire) */
+  hiredOnClose?: boolean;
+  hiredProfileId?: string;
 }
 
 export interface ICSBreakdown {
@@ -263,6 +300,23 @@ export interface Match {
    * entrevista — el founder confía más en estas.
    */
   verifiedSkills?: { skill: string; evidence: string }[];
+}
+
+/** Resultado persistido del ICS para una necesidad (calculado una vez al publicar). */
+export interface NeedMatchSnapshot {
+  needId: string;
+  matches: Match[];
+  rankingMode: "llm" | "degraded";
+  degradedReason?: string;
+  excluded: { profileId: string; reason: string }[];
+  meta: {
+    shortlistSize: number;
+    llmHits: number;
+    heuristicHits: number;
+    profileCount: number;
+  };
+  warning?: string;
+  computedAt: number;
 }
 
 /**

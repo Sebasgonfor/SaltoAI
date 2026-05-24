@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { AuthForm } from '@/components/auth/auth-form';
 import { SaltoLogo } from '@/components/ui/salto-logo';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useAuth, type UserRole } from '@/lib/auth-context';
 
 function isSafeNext(value: string | null): string {
@@ -50,11 +51,7 @@ function AuthPageInner() {
   }, [user, account, loading, next, router]);
 
   if (loading || user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-        Cargando…
-      </div>
-    );
+    return <LoadingSpinner variant="full" />;
   }
 
   return (
@@ -86,13 +83,7 @@ function AuthPageInner() {
 
 export default function AuthPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-          Cargando…
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingSpinner variant="full" />}>
       <AuthPageInner />
     </Suspense>
   );

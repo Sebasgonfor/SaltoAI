@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,18 +17,17 @@ import {
 import type { MicroTask } from '@/lib/types';
 import { RoleGate } from '@/components/auth/role-gate';
 import { useAuth } from '@/lib/auth-context';
+import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
+
+const TASK_POLL_MS = 12_000;
+const LS_PROFILE_KEY = 'salto_last_profile_id';
 
 /**
  * Listado de micro-tareas del joven. Privado — solo el dueño debe verlo.
  *
- * ANTES: pedía pegar el `profileId` a mano en un input. Mala UX y propenso
- * a typos. El joven YA está autenticado en este punto (RoleGate role="joven"
- * lo garantiza), así que usamos `user.uid` del AuthContext directamente —
- * mismo UID que la empresa usa como `profileId` cuando crea la microtask
- * desde `/empresa/probar/[profileId]`.
- *
- * El fallback al localStorage `salto_last_profile_id` lo conservamos para
- * perfiles legacy (cuentas creadas con `local_…` IDs antes del auth real).
+ * Auto-carga con el profileId resuelto (uid vinculado o legacy en localStorage).
+ * La empresa crea tareas con el profileId del match; buscamos también aliases
+ * por si la tarea quedó en un id `local_*` previo al link.
  */
 export default function TareasJovenPage() {
   return (
@@ -39,64 +38,82 @@ export default function TareasJovenPage() {
 }
 
 function TareasJoven() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
+  const resolvedProfileId = useJovenProfileId();
   const [tasks, setTasks] = useState<MicroTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchAt, setLastFetchAt] = useState<number | null>(null);
 
-  // Resolución del profileId con prioridad:
-  //   1. user.uid del AuthContext (caso normal post-auth)
-  //   2. localStorage 'salto_last_profile_id' (perfiles legacy `local_…`)
-  const resolvedProfileId = (() => {
-    if (user?.uid) return user.uid;
-    if (typeof window !== 'undefined') {
-      try {
-        return localStorage.getItem('salto_last_profile_id') ?? null;
-      } catch {
-        return null;
-      }
+  const loadTasks = useCallback(async (pid: string, opts?: { silent?: boolean }) => {
+    if (!pid.trim()) return;
+    if (!opts?.silent) {
+      setLoading(true);
+      setError(null);
     }
-    return null;
-  })();
-
-  const fetchTasks = async (pid: string) => {
-    setLoading(true);
-    setError(null);
+    let stored: string | null = null;
     try {
-      const res = await fetch(
-        `/api/microtask/list?profileId=${encodeURIComponent(pid)}`,
-      );
+      stored = localStorage.getItem(LS_PROFILE_KEY);
+    } catch {
+      /* ignore */
+    }
+    const aliases = stored && stored !== pid.trim() ? [stored] : [];
+    const params = new URLSearchParams({ profileId: pid.trim() });
+    if (aliases.length > 0) params.set('aliases', aliases.join(','));
+    try {
+      const res = await fetch(`/api/microtask/list?${params.toString()}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) {
-        setError('No pudimos cargar tus tareas. Reintenta en un momento.');
-        setTasks([]);
+        if (!opts?.silent) {
+          setError('No pudimos cargar tus tareas. Reintenta en un momento.');
+          setTasks([]);
+        }
         return;
       }
       const data = await res.json();
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
       setLastFetchAt(Date.now());
     } catch {
-      setError('Error de red.');
-      setTasks([]);
+      if (!opts?.silent) {
+        setError('Error de red.');
+        setTasks([]);
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
-  };
+  }, []);
 
-  // Auto-fetch al montar cuando ya tenemos el profileId resuelto.
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || !resolvedProfileId) return;
+    void loadTasks(resolvedProfileId);
+  }, [authLoading, resolvedProfileId, loadTasks]);
+
+  useEffect(() => {
     if (!resolvedProfileId) return;
-    void fetchTasks(resolvedProfileId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, resolvedProfileId]);
+
+    const timer = window.setInterval(() => {
+      void loadTasks(resolvedProfileId, { silent: true });
+    }, TASK_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadTasks(resolvedProfileId, { silent: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [resolvedProfileId, loadTasks]);
 
   const active = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
   const delivered = tasks.filter((t) => t.status === 'delivered');
   const completed = tasks.filter((t) => t.status === 'evaluated' || t.status === 'paid');
 
-  // Estado de loading inicial (auth todavía resolviéndose o primer fetch).
-  if (authLoading || (loading && tasks.length === 0)) {
+  if (authLoading || (loading && tasks.length === 0 && !error)) {
     return (
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
         <div className="h-12 w-2/3 bg-slate-100 rounded animate-pulse" />
@@ -110,8 +127,6 @@ function TareasJoven() {
     );
   }
 
-  // El RoleGate ya garantizó user logueado con role=joven; si por algún
-  // edge case no hay profileId resuelto, prompt para volver al onboarding.
   if (!resolvedProfileId) {
     return (
       <div className="max-w-md mx-auto px-6 py-24 text-center">
@@ -144,11 +159,17 @@ function TareasJoven() {
             <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
               Cada micro-tarea es ingresos reales para vos y evidencia
               verificada para tu perfil. Mejor que un CV.
+              {active.length > 0 && (
+                <span className="block mt-2 text-emerald-700 font-medium">
+                  Tenés {active.length} tarea{active.length === 1 ? '' : 's'} activa
+                  {active.length === 1 ? '' : 's'} — se actualiza sola cada pocos segundos.
+                </span>
+              )}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => fetchTasks(resolvedProfileId)}
+            onClick={() => void loadTasks(resolvedProfileId)}
             disabled={loading}
             className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-700 disabled:opacity-50 flex-shrink-0 mt-2"
             title="Recargar lista"
@@ -199,7 +220,7 @@ function TareasJoven() {
               {active.length}
             </Badge>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             {active.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
@@ -217,7 +238,7 @@ function TareasJoven() {
               {delivered.length}
             </Badge>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             {delivered.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
@@ -234,7 +255,7 @@ function TareasJoven() {
               {completed.length}
             </Badge>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             {completed.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
@@ -245,7 +266,7 @@ function TareasJoven() {
       {lastFetchAt && tasks.length > 0 && (
         <p className="text-[11px] text-slate-400 text-center">
           Actualizado {new Date(lastFetchAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}.
-          Si una empresa te propone una tarea, dale a Recargar para verla.
+          Si una empresa te propone una tarea, dale a Recargar para verla al instante.
         </p>
       )}
     </div>
@@ -269,7 +290,7 @@ function TaskRow({ task }: { task: MicroTask }) {
           : 'Evaluada';
 
   return (
-    <Link href={`/joven/tareas/${task.id}`}>
+    <Link href={`/joven/tareas/${task.id}`} className="block">
       <article className="bg-white border border-slate-200 hover:border-emerald-200 hover:shadow-sm rounded-2xl p-5 transition-colors flex items-start gap-4 cursor-pointer">
         <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
           <Briefcase size={18} />

@@ -36,7 +36,10 @@ import {
   Layers,
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask } from '@/lib/types';
+import { isNeedClosed } from '@/lib/need-status';
+import { LegalEditor } from '@/components/empresa/legal-editor';
 import { EmpresaWidgets } from '@/components/dashboard/empresa-widgets';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -92,7 +95,7 @@ function KpiCard({
           <Icon size={16} strokeWidth={1.75} />
         </div>
       </div>
-      <div className="font-display font-bold text-3xl text-slate-900 tabular-nums leading-none">
+      <div className="font-display font-bold text-2xl sm:text-3xl text-slate-900 tabular-nums leading-none">
         {value}
       </div>
       <div className="text-sm text-slate-700 font-medium mt-1">{label}</div>
@@ -103,13 +106,27 @@ function KpiCard({
 
 function NeedCard({ need }: { need: CompanyNeed }) {
   const isLegal = !!need.legal;
+  const closed = isNeedClosed(need);
   return (
     <Link href={`/empresa/matches/${need.id}`}>
-      <div className="group bg-white border border-slate-200 rounded-2xl p-5 hover:border-emerald-300 hover:shadow-sm transition-all">
+      <div
+        className={`group bg-white border rounded-2xl p-5 transition-all ${
+          closed
+            ? 'border-slate-200 opacity-90 hover:border-slate-300'
+            : 'border-slate-200 hover:border-emerald-300 hover:shadow-sm'
+        }`}
+      >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
-              {need.companyName}
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold">
+                {need.companyName}
+              </div>
+              {closed && (
+                <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 border-slate-300">
+                  Cerrada
+                </Badge>
+              )}
             </div>
             <h3 className="font-display font-semibold text-lg text-slate-900 leading-tight">
               {need.role || 'Necesidad sin título'}
@@ -173,8 +190,8 @@ function TaskRow({ task }: { task: MicroTask }) {
   const urgent = task.status === 'delivered'; // empresa debe evaluar
 
   return (
-    <Link href={`/empresa/tareas/${task.id}`}>
-      <div className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-slate-50 transition-colors group border border-transparent hover:border-slate-200">
+    <Link href={`/empresa/tareas/${task.id}`} className="block">
+      <div className="bg-white border border-slate-200 flex items-start gap-3 p-3.5 rounded-2xl hover:border-emerald-200 hover:shadow-sm transition-colors group">
         <div
           className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
             urgent ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-300/40' : 'bg-slate-100 text-slate-600'
@@ -192,7 +209,7 @@ function TaskRow({ task }: { task: MicroTask }) {
           <p className="text-xs text-slate-500 mt-0.5">
             Candidato: <span className="text-slate-700">{task.profileName}</span>
           </p>
-          <div className="flex items-center gap-4 mt-1.5 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-slate-500">
             <span className="flex items-center gap-1">
               <DollarSign size={11} className="text-emerald-600" />
               {formatCOP(task.amountCOP)} COP
@@ -335,11 +352,7 @@ export default function EmpresaDashboardPage() {
   );
 
   if (loading || !user) {
-    return (
-      <div className="max-w-6xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
-        Cargando tu sesión…
-      </div>
-    );
+    return <LoadingSpinner variant="full" label="Cargando tu sesión…" />;
   }
 
   const firstName = user.displayName?.split(' ')[0] || 'fundador/a';
@@ -359,6 +372,8 @@ export default function EmpresaDashboardPage() {
           en curso. Calidad sobre volumen — 10 candidatos por necesidad, no 200 CVs.
         </p>
       </header>
+
+      {user?.uid && <LegalEditor uid={user.uid} />}
 
       {/* KPIs base — operacional. Las activas/por-evaluar/cerradas son las que
           el founder mira primero para saber QUÉ está pendiente HOY. */}
@@ -415,8 +430,8 @@ export default function EmpresaDashboardPage() {
         />
 
         {dataLoading ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-sm text-slate-500">
-            Cargando necesidades…
+          <div className="bg-white border border-slate-200 rounded-2xl p-6">
+            <LoadingSpinner variant="block" label="Cargando necesidades…" />
           </div>
         ) : needs.length === 0 ? (
           <div className="bg-gradient-to-br from-emerald-50/40 via-white to-amber-50/30 border border-emerald-200/40 rounded-2xl p-10 text-center">
@@ -465,8 +480,8 @@ export default function EmpresaDashboardPage() {
         />
 
         {dataLoading ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-sm text-slate-500">
-            Cargando tareas…
+          <div className="bg-white border border-slate-200 rounded-2xl p-6">
+            <LoadingSpinner variant="block" label="Cargando tareas…" />
           </div>
         ) : tasks.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
@@ -483,7 +498,7 @@ export default function EmpresaDashboardPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-1">
+          <div className="flex flex-col gap-3">
             {visibleTasks.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}

@@ -206,7 +206,7 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
     return (
       <section className="space-y-5" aria-label="Tu pasaporte de talento">
         <div className="h-44 rounded-3xl bg-slate-100 animate-pulse" />
-        <div className="grid lg:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-72 rounded-3xl bg-slate-100 animate-pulse" />
           ))}
@@ -246,7 +246,7 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
       {/* items-stretch (default en grid) + flex flex-col en cada card hace
           que las 3 queden a la MISMA altura, sin la card más corta dejando
           aire muerto al final. */}
-      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
         <RadarCard
           title="ADN de talento"
           subtitle="Tu perfil en 5 ejes"
@@ -271,7 +271,7 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
       </div>
 
       {/* ─── Estilo + Historial ──────────────────────────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
         <StyleGrid
           tiles={inferStyleTiles(profile, data, tasks)}
           className="lg:col-span-2"
@@ -280,7 +280,7 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
       </div>
 
       {/* ─── Inbox preview + Visibilidad de mercado ──────────────────── */}
-      <div className="grid lg:grid-cols-2 gap-4 items-stretch">
+      <div className="grid md:grid-cols-2 gap-4 items-stretch">
         <InboxCard inbox={data.inboxSummary} profileId={profileId} />
         <MarketSkillsCard topSkills={data.marketVisibility.topSkillsInDemand} />
       </div>
@@ -372,8 +372,13 @@ function HeroDark({
         </div>
 
         {/* Ring score */}
-        <div className="flex-shrink-0 flex flex-col items-center">
-          <RingScore value={ringValue} size={108} />
+        <div className="flex-shrink-0 flex flex-col items-center self-center md:self-auto">
+          <div className="md:hidden">
+            <RingScore value={ringValue} size={88} />
+          </div>
+          <div className="hidden md:block">
+            <RingScore value={ringValue} size={108} />
+          </div>
           {/* text-stone-500 sobre fondo stone-950 daba contraste insuficiente
               ("PULSO LABORAL" apenas legible). amber-200/80 mantiene el aire
               cálido del hero y pasa contraste WCAG AA holgado. */}
@@ -644,7 +649,7 @@ function EarningsCard({
     <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Ingresos por microtasks" />
       <div className="mt-3">
-        <div className="font-display font-bold text-4xl text-stone-900 tabular-nums leading-none">
+        <div className="font-display font-bold text-2xl sm:text-3xl md:text-4xl text-stone-900 tabular-nums leading-none break-all sm:break-normal">
           ${totalCOP.toLocaleString('es-CO')}
         </div>
         <div className="text-xs text-stone-500 mt-1">
@@ -1144,7 +1149,7 @@ function InboxCard({
           </span>
         )}
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 flex-1">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
         <MiniMetric emoji="⭐" label="Positivos" value={inbox.positiveFeedback} tone="emerald" />
         <MiniMetric emoji="🚪" label="Descartes" value={inbox.passReasons} tone="amber" />
         <MiniMetric emoji="✉️" label="Pendientes" value={inbox.unreplied} tone="slate" />

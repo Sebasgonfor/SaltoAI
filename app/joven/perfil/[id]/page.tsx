@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,11 +16,13 @@ import {
   Building2,
   AlertCircle,
 } from 'lucide-react';
-import type { Gender, Profile } from '@/lib/types';
+import type { Gender, Profile, JovenBasics } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
 import SkillsGap from '@/components/skills-gap';
 import DocumentsManager from '@/components/documents-manager';
+import { BasicsEditor } from '@/components/joven/basics-editor';
+import { profileToJovenBasics } from '@/lib/user-onboarding-storage';
 import InterviewTranscript from '@/components/interview-transcript';
 import { useAuth } from '@/lib/auth-context';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
@@ -45,8 +48,10 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
   // ver al candidato sin chocar contra un muro. El banner contextual abajo
   // se ocupa de la UX cuando el viewer es founder.
   const { id } = use(params);
-  const { account } = useAuth();
+  const router = useRouter();
+  const { account, user } = useAuth();
   const viewerIsEmpresa = account?.role === 'empresa';
+  const viewerIsOwner = !!user?.uid && user.uid === id;
   const emit = useEmitSignal();
   // Perfiles demo (seed_xxx, legacy local_xxx) NO tienen user real al
   // otro lado. El founder no debe poder dejarles feedback ni proponerles
@@ -64,11 +69,43 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
       try {
         const res = await fetch(`/api/perfil?id=${encodeURIComponent(id)}`);
         if (!res.ok) {
+          const ownerOnUid = !!user?.uid && user.uid === id && account?.role === 'joven';
+          if (ownerOnUid) {
+            let storedId: string | null = null;
+            try {
+              storedId = localStorage.getItem('salto_last_profile_id');
+            } catch {
+              /* ignore */
+            }
+            if (storedId && storedId !== id) {
+              const linkRes = await fetch('/api/perfil/link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: id, sourceId: storedId }),
+              });
+              if (linkRes.ok) {
+                try {
+                  localStorage.setItem('salto_last_profile_id', id);
+                } catch {
+                  /* ignore */
+                }
+                if (!cancelled) router.replace(`/joven/perfil/${id}`);
+                return;
+              }
+              if (!cancelled) router.replace(`/joven/perfil/${storedId}`);
+              return;
+            }
+          }
           if (!cancelled) setError('Perfil no encontrado');
           return;
         }
         const data = await res.json();
         if (!cancelled) {
+          // #region agent log
+          let storedId: string | null = null;
+          try { storedId = localStorage.getItem('salto_last_profile_id'); } catch { /* */ }
+          fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'app/joven/perfil/[id]/page.tsx',message:'perfil_load',data:{routeId:id,ok:res.ok,hasProfile:!!data.profile,userUid:user?.uid??null,storedId,idsMatch:id===user?.uid,routeIsLocal:id.startsWith('local_')},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           setPerfil(data.profile);
           setStorage(data.storage ?? (id.startsWith('local_') ? 'memory' : 'firestore'));
           try {
@@ -86,7 +123,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, user?.uid, account?.role, router]);
 
   if (loading) {
     return (
@@ -174,6 +211,19 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           <p className="text-base sm:text-lg md:text-xl text-slate-700 leading-relaxed max-w-3xl">
             {perfil.summary}
           </p>
+        )}
+        {viewerIsOwner && profileToJovenBasics(perfil) && (
+          <div className="pt-2">
+            <BasicsEditor
+              key={`${perfil.name}-${perfil.age}-${perfil.gender}`}
+              profileId={id}
+              uid={user!.uid}
+              initial={profileToJovenBasics(perfil)!}
+              onSaved={(basics: JovenBasics) =>
+                setPerfil((p) => (p ? { ...p, name: basics.name, age: basics.age, gender: basics.gender } : p))
+              }
+            />
+          </div>
         )}
       </header>
 

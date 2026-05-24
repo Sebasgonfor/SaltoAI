@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Lock, UserCog, Building2, GraduationCap, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AuthForm } from '@/components/auth/auth-form';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useAuth, type UserRole } from '@/lib/auth-context';
 
 const COPY: Record<UserRole, { eyebrow: string; title: string; desc: string }> = {
@@ -41,11 +42,7 @@ export function RoleGate({ role, children }: Props) {
   }, [user, account, loading, roleLoading, pathname, router]);
 
   if (loading || roleLoading) {
-    return (
-      <div className="max-w-6xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
-        Cargando tu sesión…
-      </div>
-    );
+    return <LoadingSpinner variant="full" label="Cargando tu sesión…" />;
   }
 
   if (!user) {
@@ -74,11 +71,7 @@ export function RoleGate({ role, children }: Props) {
   }
 
   if (!account) {
-    return (
-      <div className="max-w-6xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
-        Llevándote a elegir tu rol…
-      </div>
-    );
+    return <LoadingSpinner variant="full" label="Llevándote a elegir tu rol…" />;
   }
 
   if (account.role !== role) {

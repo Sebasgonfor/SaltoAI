@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +19,11 @@ import {
   MAX_USER_TURNS,
   MIN_USER_TURNS,
 } from '@/lib/interview-prompt';
+import {
+  fetchJovenBasicsFromProfile,
+  loadSavedJovenBasics,
+  saveJovenBasics,
+} from '@/lib/user-onboarding-storage';
 
 const MIN_TURNS = MIN_USER_TURNS;
 const MAX_TURNS = MAX_USER_TURNS;
@@ -28,6 +34,21 @@ type InterviewMode = 'text' | 'voice';
 
 function firstNameFrom(full: string): string {
   return full.trim().split(/\s+/)[0] || full.trim();
+}
+
+function applyBasicsToForm(
+  basics: JovenBasics,
+  setters: {
+    setFormName: (v: string) => void;
+    setFormAge: (v: string) => void;
+    setFormGender: (v: Gender | '') => void;
+    setBasicsStep: (v: 0 | 1 | 2) => void;
+  }
+) {
+  setters.setFormName(basics.name);
+  setters.setFormAge(String(basics.age));
+  setters.setFormGender(basics.gender);
+  setters.setBasicsStep(2);
 }
 
 interface DetectedSignal {
@@ -125,6 +146,7 @@ function ChatJoven() {
   const finishInterviewRef = useRef<(conversation: ChatMessage[]) => Promise<void>>(async () => {});
   const resumeProfileBuildRef = useRef(false);
   const profileBuildInFlightRef = useRef(false);
+  const skipAutoOpeningRef = useRef(false);
   const {
     isSupported: voiceSupported,
     isRecording,
@@ -184,31 +206,112 @@ function ChatJoven() {
     inputRef.current = input;
   }, [input]);
 
+  const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
+    const res = await fetch('/api/entrevista', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        opening: true,
+        firstName: firstNameFrom(name),
+        age,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.nextQuestion) {
+      throw new Error(data.error || 'No pudimos preparar la entrevista.');
+    }
+    return data.nextQuestion as string;
+  }, []);
+
+  const beginInterview = useCallback(
+    async (b: JovenBasics, opts?: { keepMessages?: boolean }) => {
+      saveJovenBasics(user?.uid, b);
+      setBasics(b);
+      applyBasicsToForm(b, { setFormName, setFormAge, setFormGender, setBasicsStep });
+      setFormError(null);
+      setPhase('interview');
+
+      if (interviewMode === 'text' && !opts?.keepMessages) {
+        setMessages([]);
+        setLoading(true);
+        try {
+          const opening = await fetchOpeningQuestion(b.name, b.age);
+          setMessages([{ role: 'agent', content: opening }]);
+        } catch (err) {
+          setFormError(
+            err instanceof Error ? err.message : 'No pudimos preparar la entrevista. Revisa tu conexión e intenta de nuevo.'
+          );
+        } finally {
+          setLoading(false);
+        }
+      } else if (!opts?.keepMessages) {
+        setMessages([]);
+      }
+    },
+    [fetchOpeningQuestion, interviewMode, user?.uid]
+  );
+
   // Restaurar estado al montar (una vez por uid). Si la sesión cambia de
   // usuario, leemos la persistencia del usuario nuevo y descartamos el
   // estado en memoria.
   useEffect(() => {
-    const saved = loadPersisted(user?.uid);
-    if (saved) {
-      if (saved.phase) setPhase(saved.phase);
-      if (saved.basics) setBasics(saved.basics);
-      if (typeof saved.formName === 'string') setFormName(saved.formName);
-      if (typeof saved.formAge === 'string') setFormAge(saved.formAge);
-      else if (typeof saved.formAge === 'number' && Number.isFinite(saved.formAge)) {
-        setFormAge(String(saved.formAge));
+    let cancelled = false;
+
+    async function restore() {
+      const saved = loadPersisted(user?.uid);
+      if (saved) {
+        if (Array.isArray(saved.messages)) setMessages(saved.messages);
+        if (typeof saved.input === 'string') setInput(saved.input);
+        if (saved.interviewMode === 'voice' || saved.interviewMode === 'text') {
+          setInterviewMode(saved.interviewMode);
+        }
       }
-      if (typeof saved.formGender === 'string') setFormGender(saved.formGender as Gender | '');
-      if (saved.basicsStep === 0 || saved.basicsStep === 1 || saved.basicsStep === 2) {
-        setBasicsStep(saved.basicsStep);
+
+      let resolvedBasics = loadSavedJovenBasics(user?.uid);
+      if (!resolvedBasics && user?.uid) {
+        resolvedBasics = await fetchJovenBasicsFromProfile(user.uid);
+        if (resolvedBasics) saveJovenBasics(user.uid, resolvedBasics);
       }
-      if (Array.isArray(saved.messages)) setMessages(saved.messages);
-      if (typeof saved.input === 'string') setInput(saved.input);
-      if (saved.interviewMode === 'voice' || saved.interviewMode === 'text') {
-        setInterviewMode(saved.interviewMode);
+      if (!resolvedBasics && saved?.basics) {
+        resolvedBasics = saved.basics;
+        saveJovenBasics(user?.uid, resolvedBasics);
       }
+
+      if (cancelled) return;
+
+      const hasInterviewProgress = (saved?.messages?.length ?? 0) > 0;
+
+      if (resolvedBasics) {
+        setBasics(resolvedBasics);
+        applyBasicsToForm(resolvedBasics, { setFormName, setFormAge, setFormGender, setBasicsStep });
+        if (hasInterviewProgress) {
+          setPhase('interview');
+        } else {
+          setPhase('interview');
+          skipAutoOpeningRef.current = false;
+        }
+      } else if (saved) {
+        if (saved.phase) setPhase(saved.phase);
+        if (saved.basics) setBasics(saved.basics);
+        if (typeof saved.formName === 'string') setFormName(saved.formName);
+        if (typeof saved.formAge === 'string') setFormAge(saved.formAge);
+        else if (typeof saved.formAge === 'number' && Number.isFinite(saved.formAge)) {
+          setFormAge(String(saved.formAge));
+        }
+        if (typeof saved.formGender === 'string') setFormGender(saved.formGender as Gender | '');
+        if (saved.basicsStep === 0 || saved.basicsStep === 1 || saved.basicsStep === 2) {
+          setBasicsStep(saved.basicsStep);
+        }
+      }
+
+      setRestored(true);
+      resumeProfileBuildRef.current = false;
     }
-    setRestored(true);
-    resumeProfileBuildRef.current = false;
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -293,10 +396,11 @@ function ChatJoven() {
   const resetInterview = () => {
     const confirmMsg = closing
       ? 'Todavía estamos construyendo tu perfil. ¿Cancelar y empezar la entrevista de cero?'
-      : '¿Reiniciar la conversación? Se borra la entrevista actual y empiezas de nuevo.';
+      : '¿Reiniciar la entrevista? Se borra la conversación actual. Tus datos básicos (nombre, edad, género) se mantienen.';
     if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return;
     cancelRecording('reset-interview');
     disconnectLive();
+    clearPersisted(user?.uid);
     resetLiveMessages();
     setMessages([]);
     setInput('');
@@ -306,24 +410,20 @@ function ChatJoven() {
     setInterviewMode('text');
     resumeProfileBuildRef.current = false;
     profileBuildInFlightRef.current = false;
-  };
-
-  const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
-    const res = await fetch('/api/entrevista', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        opening: true,
-        firstName: firstNameFrom(name),
-        age,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.nextQuestion) {
-      throw new Error(data.error || 'No pudimos preparar la entrevista.');
+    const savedBasics = loadSavedJovenBasics(user?.uid) ?? basics;
+    if (savedBasics) {
+      skipAutoOpeningRef.current = true;
+      void beginInterview(savedBasics);
+      return;
     }
-    return data.nextQuestion as string;
-  }, []);
+
+    setBasics(null);
+    setFormName(user?.displayName ?? '');
+    setFormAge('');
+    setFormGender('');
+    setBasicsStep(0);
+    setPhase('basics');
+  };
 
   const startInterview = async () => {
     const name = formName.trim();
@@ -340,29 +440,29 @@ function ChatJoven() {
       setFormError('Selecciona cómo te identificas.');
       return;
     }
-    const b: JovenBasics = { name, age, gender: formGender };
-    setBasics(b);
-    setFormError(null);
-    setPhase('interview');
+    skipAutoOpeningRef.current = true;
+    await beginInterview({ name, age, gender: formGender });
+  };
 
-    if (interviewMode === 'text') {
-      setMessages([]);
-      setLoading(true);
-      try {
-        const opening = await fetchOpeningQuestion(name, age);
-        setMessages([{ role: 'agent', content: opening }]);
-      } catch (err) {
+  // Datos básicos ya guardados: abrir entrevista en texto sin repetir el wizard.
+  useEffect(() => {
+    if (!restored || phase !== 'interview' || !basics || messages.length > 0 || loading || closing) return;
+    if (interviewMode !== 'text') return;
+    if (skipAutoOpeningRef.current) {
+      skipAutoOpeningRef.current = false;
+      return;
+    }
+    skipAutoOpeningRef.current = true;
+    setLoading(true);
+    void fetchOpeningQuestion(basics.name, basics.age)
+      .then((opening) => setMessages([{ role: 'agent', content: opening }]))
+      .catch((err) =>
         setFormError(
           err instanceof Error ? err.message : 'No pudimos preparar la entrevista. Revisa tu conexión e intenta de nuevo.'
-        );
-        setPhase('basics');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setMessages([]);
-    }
-  };
+        )
+      )
+      .finally(() => setLoading(false));
+  }, [restored, phase, basics, messages.length, loading, closing, interviewMode, fetchOpeningQuestion]);
 
   const finishInterview = useCallback(
     async (conversation: ChatMessage[]) => {
@@ -387,9 +487,13 @@ function ChatJoven() {
         });
         const closeData = await closeRes.json();
         // #region agent log
+        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil_created',data:{ok:closeRes.ok,profileId:closeData.id??null,hadUid:!!user?.uid,uid:user?.uid??null,idMatchesUid:closeData.id===user?.uid},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        // #region agent log
         fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'C',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil POST result',data:{ok:closeRes.ok,status:closeRes.status,hasId:!!closeData.id,code:closeData.code??null,msgCount:conversation.length,userTurns:conversation.filter(m=>m.role==='user').length},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         if (closeRes.ok && closeData.id) {
+          if (basics) saveJovenBasics(user?.uid, basics);
           try {
             localStorage.setItem('salto_last_profile_id', closeData.id);
           } catch {
@@ -606,19 +710,19 @@ function ChatJoven() {
     // Full-height layout: ocupa todo el viewport menos los 80px del topbar
     // sticky del layout (h-20). El header del chat y el grid se reparten ese
     // espacio sin generar scroll externo en el body.
-    <div className="md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
-      <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 flex-shrink-0">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
+    <div className="lg:h-[calc(100dvh-5rem)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-5 sm:py-6 pb-8">
+      <header className="mb-6 sm:mb-5 flex flex-col sm:flex-row sm:items-end justify-between gap-5 sm:gap-4 flex-shrink-0">
+        <div className="space-y-3 sm:space-y-2.5">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold">
             Paso 2 de 2 · Entrevista
           </div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-snug">
             Cuéntame tu historia, {basics ? firstNameFrom(basics.name) : ''}.
           </h1>
           {/* `<Badge>` renderiza un `<div>`, así que el contenedor NO puede
               ser `<p>` (HTML inválido → hydration error). Usamos `<div>` y
               mantenemos el styling. */}
-          <div className="text-slate-600 mt-2 max-w-xl">
+          <div className="text-slate-600 max-w-xl space-y-3">
             {basics && (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="font-normal border-slate-200">
@@ -630,14 +734,19 @@ function ChatJoven() {
               </span>
             )}
             {user?.uid && (
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Ya tienes perfil: puedes repetir la entrevista para actualizarlo, o usa «Reiniciar» para empezar de cero.
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Tus datos básicos ya están guardados.{' '}
+                <Link href={`/joven/perfil/${user.uid}#datos-personales`} className="text-emerald-700 underline">
+                  Editar en tu perfil
+                </Link>
+                {' · '}
+                «Reiniciar» solo borra la conversación.
               </p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-white">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap w-full sm:w-auto sm:justify-end">
+          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-white shrink-0">
             <Button
               type="button"
               variant={interviewMode === 'text' ? 'default' : 'ghost'}
@@ -661,6 +770,7 @@ function ChatJoven() {
               Voz
             </Button>
           </div>
+          <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             {Array.from({ length: MAX_TURNS }).map((_, i) => (
               <span
@@ -678,6 +788,8 @@ function ChatJoven() {
           <span className="text-xs text-slate-500 tabular-nums font-medium">
             {displayTurns}/{MAX_TURNS}
           </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {userTurns >= MIN_TURNS && !atTurnLimit && (
             <Button type="button" variant="outline" size="sm" onClick={finishEarly} disabled={loading || closing}>
               Terminar ahora
@@ -688,12 +800,13 @@ function ChatJoven() {
             size="sm"
             onClick={resetInterview}
             disabled={loading}
-            className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 gap-1.5 -ml-1"
+            className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 gap-1.5"
             title="Empezar de cero la entrevista (también durante la construcción del perfil)"
           >
             <RotateCcw size={14} />
             Reiniciar
           </Button>
+          </div>
         </div>
       </header>
 
@@ -701,8 +814,8 @@ function ChatJoven() {
         <div className="mb-4 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3">{formError}</div>
       )}
 
-      <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[360px] sm:min-h-[480px] md:min-h-0 overflow-hidden">
+      <div className="grid lg:grid-cols-12 gap-5 sm:gap-6 flex-1 min-h-0">
+        <section className="lg:col-span-7 order-1 lg:order-none bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[min(70dvh,520px)] sm:min-h-[480px] lg:min-h-0 overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 min-h-0">
             {displayMessages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -805,7 +918,7 @@ function ChatJoven() {
             )}
           </div>
 
-          <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/50 space-y-3">
             {interviewMode === 'voice' ? (
               <>
                 {liveError && (
@@ -950,12 +1063,12 @@ function ChatJoven() {
                     {voiceError}
                   </p>
                 )}
-                <div className="flex gap-2 items-end">
+                <div className="flex gap-2.5 sm:gap-2 items-stretch sm:items-end">
                   {voiceSupported && (
                     <Button
                       type="button"
                       variant={isRecording ? 'default' : 'outline'}
-                      className={`h-11 w-11 sm:h-[64px] sm:w-[64px] flex-shrink-0 p-0 ${
+                      className={`h-11 w-11 sm:h-[64px] sm:w-[64px] flex-shrink-0 p-0 self-end sm:self-auto ${
                         isRecording ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' : ''
                       }`}
                       onClick={() => void toggleVoice()}
@@ -980,7 +1093,8 @@ function ChatJoven() {
                     </Button>
                   )}
                   <Textarea
-                    className="resize-none h-11 sm:h-[64px] min-h-[44px] sm:min-h-[64px] bg-white text-sm sm:text-[15px] leading-relaxed"
+                    className="resize-none flex-1 min-h-[2.75rem] sm:min-h-[64px] sm:h-[64px] py-2 sm:py-2 px-2.5 sm:px-3 bg-white text-[11px] sm:text-sm md:text-[15px] leading-snug placeholder:text-[11px] sm:placeholder:text-sm placeholder:text-slate-400"
+                    rows={1}
                     value={input}
                     onChange={(e) => {
                       if (isRecording) cancelRecording('textarea-edit');
@@ -996,18 +1110,18 @@ function ChatJoven() {
                     disabled={loading || closing || atTurnLimit || isRecording || isTranscribing}
                     placeholder={
                       atTurnLimit
-                        ? 'Generando tu perfil…'
+                        ? 'Generando perfil…'
                         : isTranscribing
-                        ? 'Transcribiendo tu respuesta…'
+                        ? 'Transcribiendo…'
                         : isRecording
-                        ? 'Grabando… habla ahora. Toca el micrófono otra vez para enviar.'
+                        ? 'Grabando… toca mic para enviar'
                         : voiceSupported
-                        ? 'Escribe o usa el micrófono para responder…'
-                        : 'Cuéntame con tus palabras…'
+                        ? 'Escribe o dicta…'
+                        : 'Tu respuesta…'
                     }
                   />
                   <Button
-                    className="h-11 sm:h-[64px] px-3 sm:px-5 gap-1.5 sm:gap-2 flex-shrink-0"
+                    className="h-11 sm:h-[64px] px-2.5 sm:px-5 gap-1.5 sm:gap-2 flex-shrink-0 self-end sm:self-auto"
                     onClick={() => void sendUserMessage()}
                     disabled={loading || closing || atTurnLimit || isRecording || isTranscribing || !input.trim()}
                   >
@@ -1016,7 +1130,7 @@ function ChatJoven() {
                   </Button>
                 </div>
                 {voiceSupported && !atTurnLimit && (
-                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                  <p className="text-[11px] sm:text-xs text-slate-500 leading-relaxed px-0.5">
                     Puedes hablar o escribir. Toca el micrófono, cuenta tu respuesta y toca de nuevo para enviar.
                   </p>
                 )}
@@ -1025,20 +1139,20 @@ function ChatJoven() {
           </div>
         </section>
 
-        <aside className="lg:col-span-5 space-y-3 sm:space-y-4 order-first lg:order-none lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
-          <div className="bg-slate-950 text-white rounded-3xl p-5 sm:p-6 relative overflow-hidden">
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles size={14} className="text-emerald-400" />
+        <aside className="lg:col-span-5 order-2 lg:order-none space-y-4 lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
+          <div className="bg-slate-950 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 relative overflow-hidden">
+            <div className="relative space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-emerald-400 shrink-0" />
                 <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Detectando en vivo</span>
               </div>
-              <h2 className="font-display font-bold text-2xl tracking-tight mb-1 leading-tight">Señales en tu historia</h2>
+              <h2 className="font-display font-bold text-xl sm:text-2xl tracking-tight leading-snug">Señales en tu historia</h2>
               {detected.size === 0 ? (
-                <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl p-4 text-center mt-4">
+                <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl px-4 py-5 sm:py-4 text-center leading-relaxed">
                   Cuéntame qué hiciste, no qué quisiste hacer.
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-1.5 mt-4">
+                <div className="flex flex-wrap gap-2 pt-1">
                   {SIGNALS.map((s) => {
                     const active = detected.has(s.label);
                     return (
