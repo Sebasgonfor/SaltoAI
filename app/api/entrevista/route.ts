@@ -16,6 +16,8 @@ import {
   isLastAnswerTooShort,
   isYesNoQuestion,
   lastAgentMessage,
+  validateChatMessage,
+  CHAT_MESSAGE_MAX_CHARS,
 } from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
@@ -217,10 +219,21 @@ export async function POST(req: NextRequest) {
     };
 
     const opening = body.opening === true;
-    const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
+    const firstName = typeof body.firstName === "string" ? body.firstName.trim().slice(0, 60) : "";
     const age = typeof body.age === "number" ? body.age : undefined;
     const messages = Array.isArray(body.messages) ? body.messages : [];
     messagesSnapshot = messages;
+
+    // Validar que los mensajes del usuario no superen el límite de caracteres
+    for (const m of messages) {
+      if (m.role === 'user' && typeof m.content === 'string') {
+        const err = validateChatMessage(m.content);
+        if (err) {
+          log.end({ status: 400, extra: { reason: 'message_too_long' } });
+          return NextResponse.json({ error: err, code: 'message_too_long', done: false }, { status: 400 });
+        }
+      }
+    }
 
     if (opening) {
       if (!hasGeminiKey()) {

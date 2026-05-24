@@ -195,6 +195,8 @@ export interface CompanyLegal {
   taxId: string;
   legalRepName: string;
   legalRepDocId: string;
+  /** Tipo de documento del representante legal: CC, CE, PPN, NIT. */
+  legalRepDocType: string;
   acceptedTerms: boolean;
   /** ISO timestamp del momento en que el founder aceptó TyC. */
   acceptedAt: string;
