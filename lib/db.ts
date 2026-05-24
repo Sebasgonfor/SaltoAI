@@ -383,15 +383,29 @@ export async function updateMicroTask(id: string, patch: Partial<MicroTask>): Pr
 }
 
 export async function listMicroTasksByProfile(profileId: string): Promise<MicroTask[]> {
+  // CRÍTICO: Firestore exige un compound index cuando combinás `where` con
+  // `orderBy` sobre campos distintos (profileId + createdAt). Si el index
+  // no está creado, la query throw → fallback a memoria que está VACÍO
+  // porque la microtask se persistió en Firestore.
+  //
+  // Resultado del bug: empresa crea task → backend OK → joven no la ve
+  // porque la query del joven cae a memoria con 0 entries.
+  //
+  // Fix: NO usar orderBy en Firestore. Ordenamos in-memory post-fetch.
+  // Una tarea por joven raramente excede 50 docs → sort O(n log n) en
+  // cliente es despreciable y evita necesitar índices compuestos.
   if (useFirestore(MICROTASKS)) {
     try {
       const q = query(
         collection(db, MICROTASKS),
         where("profileId", "==", profileId),
-        orderBy("createdAt", "desc")
       );
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }));
+      const remote = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<MicroTask, "id">),
+      }));
+      return remote.sort((a, b) => b.createdAt - a.createdAt);
     } catch (e) {
       disableFirestoreWithWarning(e, "listMicroTasksByProfile", MICROTASKS);
     }
@@ -402,15 +416,20 @@ export async function listMicroTasksByProfile(profileId: string): Promise<MicroT
 }
 
 export async function listMicroTasksByCompany(companyId: string): Promise<MicroTask[]> {
+  // Mismo razonamiento que listMicroTasksByProfile: sin orderBy para no
+  // requerir compound index. Sort post-fetch.
   if (useFirestore(MICROTASKS)) {
     try {
       const q = query(
         collection(db, MICROTASKS),
         where("companyId", "==", companyId),
-        orderBy("createdAt", "desc")
       );
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MicroTask, "id">) }));
+      const remote = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<MicroTask, "id">),
+      }));
+      return remote.sort((a, b) => b.createdAt - a.createdAt);
     } catch (e) {
       disableFirestoreWithWarning(e, "listMicroTasksByCompany", MICROTASKS);
     }
