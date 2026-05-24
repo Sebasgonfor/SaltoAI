@@ -26,7 +26,7 @@ import {
   Play,
 } from 'lucide-react';
 import type { ChatMessage } from '@/lib/types';
-import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
+import MatchingAnimation from '@/components/matching-animation';
 import { useAuth } from '@/lib/auth-context';
 import { loadSavedEmpresaLegal, saveEmpresaLegal } from '@/lib/user-onboarding-storage';
 import { useLiveInterview } from '@/hooks/use-live-interview';
@@ -602,10 +602,12 @@ export default function ChatEmpresa() {
     // bajas se relaja a min-h para no aplastar el contenido.
     <div className="relative md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
       {closing && (
-        <MatchPulseLoader
-          variant="fullscreen"
-          label="Estructurando tu necesidad y buscando candidatos…"
-        />
+        <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm overflow-y-auto">
+          <MatchingAnimation
+            variant="candidates"
+            helperText="Estamos cerrando la entrevista, estructurando tu necesidad y midiendo el encaje con cada candidato indexado. Esto toma unos segundos."
+          />
+        </div>
       )}
       <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 flex-shrink-0">
         <div>
