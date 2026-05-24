@@ -66,7 +66,7 @@ export function RoleGate({ role, children }: Props) {
             onSuccess={() => {}}
           />
           <p className="text-xs text-slate-400 text-center mt-6">
-            Si ya tenés cuenta con otro rol, te llevamos a tu área correcta.
+            Si ya tienes cuenta con otro rol, te llevamos a tu área correcta.
           </p>
         </div>
       </div>

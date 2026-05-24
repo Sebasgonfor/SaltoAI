@@ -78,7 +78,7 @@ export const CV_STYLES: CvStyleMeta[] = [
     label: "Funcional",
     tagline: "Agrupado por competencia, sin fechas",
     description:
-      "Tu evidencia laboral se ordena por habilidad, no por timeline. Ideal cuando tu trayectoria es informal y querés que cada skill brille con sus logros.",
+      "Tu evidencia laboral se ordena por habilidad, no por timeline. Ideal cuando tu trayectoria es informal y quieres que cada skill brille con sus logros.",
     atsScore: 4,
     bestFor: "Junior sin historial cronológico formal; cambios de carrera.",
   },
@@ -87,7 +87,7 @@ export const CV_STYLES: CvStyleMeta[] = [
     label: "Cronológico",
     tagline: "Experiencia con fechas, formato clásico",
     description:
-      "El formato corporativo estándar: experiencia en orden reverso con períodos. Útil si tenés educación/cursos con fechas concretas para mostrar.",
+      "El formato corporativo estándar: experiencia en orden reverso con períodos. Útil si tienes educación/cursos con fechas concretas para mostrar.",
     atsScore: 5,
     bestFor: "Postulaciones a roles corporativos o sectores tradicionales.",
   },
@@ -167,7 +167,7 @@ function buildContactLine(opts: CvOptions): { html: string; hasContact: boolean 
   }
   return {
     html: `<p class="contact placeholder">[Email] · [Teléfono] · [Ciudad] · [LinkedIn]</p>
-<p class="screen-only contact-hint">Completá tus datos de contacto antes de enviar. Volvé al perfil para pasarlos como parámetros o editá el PDF luego de imprimir.</p>`,
+<p class="screen-only contact-hint">Completá tus datos de contacto antes de enviar. Vuelve al perfil para pasarlos como parámetros o editá el PDF luego de imprimir.</p>`,
     hasContact: false,
   };
 }
@@ -695,7 +695,7 @@ function renderCreative(p: Profile, opts: CvOptions): string {
     </header>
     ${tailoredBadge(opts)}
     <p class="creative-warning screen-only">
-      <strong>Aviso:</strong> este formato es visualmente atractivo pero <strong>NO pasa todos los ATS estrictos</strong> (algunos rompen al ver layouts de 2 columnas). Usalo para roles creativos / diseño / marketing. Para postulaciones corporativas, elegí "ATS minimalista" o "Híbrido".
+      <strong>Aviso:</strong> este formato es visualmente atractivo pero <strong>NO pasa todos los ATS estrictos</strong> (algunos rompen al ver layouts de 2 columnas). Usalo para roles creativos / diseño / marketing. Para postulaciones corporativas, elige "ATS minimalista" o "Híbrido".
     </p>
     ${summaryBlock(p)}
     ${evidenceByCompetencyBlock(p)}

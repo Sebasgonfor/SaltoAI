@@ -51,7 +51,7 @@ const SIGNALS: DetectedSignal[] = [
   { label: 'Atención al cliente', match: /(client[ea]s?|reclam[oa]s?|atend[íi]|respondí)/i },
   { label: 'Trabajo en equipo', match: /(equipo|colaboré|junto a|compañer[oa]s?|coordin[éa])/i },
   { label: 'Adaptación al cambio', match: /(cambio|adaptarme|me ajusté|nuevo|de repente|sin previo)/i },
-  { label: 'Persistencia', match: /(insist[íi]|seguí|no me rendí|volv[íi] a intentar|terminé)/i },
+  { label: 'Persistencia', match: /(insist[íi]|sigue|no me rendí|volv[íi] a intentar|terminé)/i },
 ];
 
 // Persistencia en localStorage para que la entrevista sobreviva navegación
@@ -334,7 +334,7 @@ function ChatJoven() {
           // devolvemos la conversación al usuario con el mensaje honesto.
           const fallback =
             closeData.error ||
-            'No pudimos construir tu perfil con lo que contaste. Profundizá un poco más con un ejemplo concreto.';
+            'No pudimos construir tu perfil con lo que contaste. Profundiza un poco más con un ejemplo concreto.';
           setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
           setClosing(false);
           setFormError(closeData.error || 'No pudimos crear tu perfil. Intenta de nuevo.');
@@ -683,13 +683,13 @@ function ChatJoven() {
                       </>
                     )}
                     {liveStatus === 'idle' && !liveActive && (
-                      <span>Tocá el botón para iniciar la conversación por voz</span>
+                      <span>Toca el botón para iniciar la conversación por voz</span>
                     )}
                     {liveStatus === 'closed' && !closing && (
                       <span>Sesión de voz finalizada</span>
                     )}
                     {liveStatus === 'error' && (
-                      <span className="text-rose-600">Error de conexión — probá de nuevo o usá modo texto</span>
+                      <span className="text-rose-600">Error de conexión — prueba de nuevo o usa modo texto</span>
                     )}
                   </div>
                   <Button
@@ -711,7 +711,7 @@ function ChatJoven() {
                     {liveActive ? <PhoneOff size={28} /> : <Phone size={28} />}
                   </Button>
                   <p className="text-[11px] text-slate-500 text-center max-w-sm leading-relaxed">
-                    Modo voz en tiempo real: hablá naturalmente, el agente responde con voz de IA y ves la transcripción en vivo.
+                    Modo voz en tiempo real: habla naturalmente, el agente responde con voz de IA y ves la transcripción en vivo.
                   </p>
                 </div>
               </>
@@ -772,9 +772,9 @@ function ChatJoven() {
                         : isTranscribing
                         ? 'Transcribiendo tu respuesta…'
                         : isRecording
-                        ? 'Grabando… hablá ahora. Tocá el micrófono otra vez para enviar.'
+                        ? 'Grabando… habla ahora. Toca el micrófono otra vez para enviar.'
                         : voiceSupported
-                        ? 'Escribí o usá el micrófono para responder…'
+                        ? 'Escribe o usa el micrófono para responder…'
                         : 'Cuéntame con tus palabras…'
                     }
                   />
@@ -788,7 +788,7 @@ function ChatJoven() {
                 </div>
                 {voiceSupported && !atTurnLimit && (
                   <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                    Podés hablar o escribir. Tocá el micrófono, contá tu respuesta y tocá de nuevo para enviar.
+                    Puedes hablar o escribir. Toca el micrófono, cuenta tu respuesta y toca de nuevo para enviar.
                   </p>
                 )}
               </>

@@ -201,7 +201,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               Próximo paso
             </div>
             <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
-              ¿Cómo querés evaluar a {perfil.name.split(' ')[0]}?
+              ¿Cómo quieres evaluar a {perfil.name.split(' ')[0]}?
             </h2>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-wrap gap-3 items-start">
@@ -233,7 +233,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               Tu CV listo para postular
             </div>
             <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
-              Elegí plantilla y completá tu contacto.
+              Elige plantilla y completa tu contacto.
             </h2>
           </div>
           <CvCustomizer profileId={id} />

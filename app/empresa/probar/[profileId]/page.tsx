@@ -136,7 +136,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
           Listo. {profile.name.split(' ')[0]} ya puede empezar.
         </h1>
         <p className="text-slate-600 leading-relaxed">
-          La micro-tarea está activa. Cuando entregue, vas a recibir una pre-evaluación de Salto IA contra los criterios estructurados, y vos das la calificación final.
+          La micro-tarea está activa. Cuando entregue, vas a recibir una pre-evaluación de Salto IA contra los criterios estructurados, y tú das la calificación final.
         </p>
 
         {warning && (
@@ -192,7 +192,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
 
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
-                ¿Qué querés que haga? <span className="text-slate-400 font-normal">(con tus palabras)</span>
+                ¿Qué quieres que haga? <span className="text-slate-400 font-normal">(con tus palabras)</span>
               </label>
               <Textarea
                 placeholder="Ej. Que escriba 3 captions para mi Instagram de panadería, mostrando los pandebonos del día. Tono cercano, pueblerino, no corporativo. Que muestre iniciativa: si quiere proponer un hashtag o un ángulo distinto, bienvenido."
@@ -295,7 +295,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
                 'Gemini estructura tu intención en brief + criterios + deadline + monto.',
                 `${profile.name.split(' ')[0]} recibe la tarea y entrega.`,
                 'Salto IA hace pre-evaluación contra los criterios.',
-                'Vos das la calificación final. Outcome queda en su perfil.',
+                'Tú das la calificación final. Outcome queda en su perfil.',
               ].map((step, i) => (
                 <li key={i} className="flex gap-3 leading-relaxed">
                   <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs font-mono font-semibold flex-shrink-0">

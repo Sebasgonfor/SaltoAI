@@ -51,8 +51,8 @@ Otros campos:
 - summary: 2-3 frases en lenguaje natural describiendo a la persona y su trayectoria informal.
 - name: si la persona dijo su nombre, úsalo; si no, "Candidato/a Salto".
 
-Idioma: español natural rioplatense/colombiano.
-Devolvé JSON estricto con el schema indicado.`;
+Idioma: español natural neutro LATAM.
+Devuelve JSON estricto con el schema indicado.`;
 
 const schema = {
   type: Type.OBJECT,
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "No pudimos anclar evidencia concreta en lo que contaste. Volvé al chat y profundizá con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
+              "No pudimos anclar evidencia concreta en lo que contaste. Volvé al chat y profundiza con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
             code: "no_evidence_extracted",
           },
           { status: 422 }

@@ -144,7 +144,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-2 flex items-center gap-1.5">
-            <Target size={11} /> Qué tenés que entregar
+            <Target size={11} /> Qué tienes que entregar
           </div>
           <p className="text-slate-800 leading-relaxed">{task.expectedDeliverable}</p>
         </div>
@@ -168,7 +168,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         <section className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-6 md:p-8">
           <h2 className="font-display font-bold text-xl text-slate-900 mb-1">Tu entrega</h2>
           <p className="text-sm text-slate-600 mb-4">
-            Podés pegar tu trabajo directamente, o un link a Google Drive / Notion / lo que uses. Sé concreto y mostrá tu razonamiento si vale la pena.
+            Puedes pegar tu trabajo directamente, o un link a Google Drive / Notion / lo que uses. Sé concreto y mostrá tu razonamiento si vale la pena.
           </p>
           <Textarea
             placeholder="Pegá tu entregable acá. Si es un archivo externo, incluí el link y un resumen corto."

@@ -25,7 +25,7 @@ Reglas:
 CRÍTICO:
 - NO inventes skills no respaldadas por la evidencia.
 - NO repitas skills ya listadas en el perfil. El objetivo es REVELAR, no enumerar.
-- Si la evidencia es muy pobre, devolvé hiddenSkills vacío y un closingMessage honesto ("aún no tenemos suficiente para revelar más, contanos más").
+- Si la evidencia es muy pobre, devuelve hiddenSkills vacío y un closingMessage honesto ("aún no tenemos suficiente para revelar más, contanos más").
 - Idioma: español natural, registro LATAM.`;
 
 const hiddenSkillSchema = {
