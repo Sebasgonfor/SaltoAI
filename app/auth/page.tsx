@@ -58,7 +58,7 @@ function AuthPageInner() {
           </div>
           <AuthForm
             intendedRole={role}
-            title="Entra a Salto"
+            title="Entra a SaltoAI"
             subtitle="Regístrate o inicia sesión con email y contraseña, o usa Google."
             onSuccess={() => {
               /* onAuthStateChanged + useEffect redirigen */

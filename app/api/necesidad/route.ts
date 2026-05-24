@@ -10,7 +10,7 @@ import type { CompanyLegal, CompanyNeed } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const STRUCTURE_PROMPT = `Eres el estructurador de necesidades de Salto.
+const STRUCTURE_PROMPT = `Eres el estructurador de necesidades de SaltoAI.
 Un founder de una empresa temprana describió en lenguaje libre qué necesita. Tu trabajo es estructurar eso en señales comparables para el motor de matching.
 
 Reglas:

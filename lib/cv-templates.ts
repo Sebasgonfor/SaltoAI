@@ -390,7 +390,7 @@ function evidenceListBlock(p: Profile, heading = "Experiencia y logros"): string
     .join("\n");
   return `<section>
   <h2>${heading}</h2>
-  <p class="section-note">Trayectoria informal y proyectos personales · evidencia verificada por Salto IA.</p>
+  <p class="section-note">Trayectoria informal y proyectos personales · evidencia verificada por SaltoAI.</p>
   <ul class="experience-list">
 ${items}
   </ul>
@@ -481,7 +481,7 @@ function htmlShell(args: {
 <head>
 <meta charset="utf-8" />
 <title>CV — ${args.name}</title>
-<meta name="generator" content="Salto · Perfil de Evidencia · ${args.styleId}" />
+<meta name="generator" content="SaltoAI · Perfil de Evidencia · ${args.styleId}" />
 <meta name="cv-style" content="${args.styleId}" />
 <meta name="profile-id" content="${escapeHtml(args.profileIdMeta || "")}" />
 <style>
@@ -499,7 +499,7 @@ ${autoprintScript({ autoprint: args.autoprint } as CvOptions)}
 function header(p: Profile, opts: CvOptions): string {
   const { html: contactHtml } = buildContactLine(opts);
   return `  <header>
-    <h1>${escapeHtml(p.name || "Candidato/a Salto")}</h1>
+    <h1>${escapeHtml(p.name || "Candidato/a SaltoAI")}</h1>
     <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     ${contactHtml}
   </header>`;
@@ -539,7 +539,7 @@ function renderChronological(p: Profile, opts: CvOptions): string {
     p.evidence.length > 0
       ? `<section>
   <h2>Experiencia y trayectoria</h2>
-  <p class="section-note">Trayectoria informal y proyectos personales — orden por relevancia. Evidencia verificada por Salto IA.</p>
+  <p class="section-note">Trayectoria informal y proyectos personales — orden por relevancia. Evidencia verificada por SaltoAI.</p>
 ${p.evidence
   .map(
     (e) => `  <div class="entry">
@@ -733,7 +733,7 @@ function renderCreative(p: Profile, opts: CvOptions): string {
   const inner = `<main class="creative">
   <section class="creative-main" style="grid-column: 2;">
     <header>
-      <h1>${escapeHtml(p.name || "Candidato/a Salto")}</h1>
+      <h1>${escapeHtml(p.name || "Candidato/a SaltoAI")}</h1>
       <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     </header>
     ${tailoredBadge(opts)}

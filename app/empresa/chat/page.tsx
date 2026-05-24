@@ -454,7 +454,7 @@ export default function ChatEmpresa() {
               <Link href="/legal/privacidad" className="text-emerald-700 underline">
                 Política de Privacidad
               </Link>{' '}
-              de Salto, incluyendo el tratamiento de datos personales de candidatos.
+              de SaltoAI, incluyendo el tratamiento de datos personales de candidatos.
             </span>
           </label>
 

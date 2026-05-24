@@ -124,7 +124,7 @@ function ConectarContent() {
           Conectar con empresas
         </div>
         <h1 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-          Así te ven las empresas en Salto.
+          Así te ven las empresas en SaltoAI.
         </h1>
         {profile && (
           <p className="mt-4 text-slate-600 max-w-2xl leading-relaxed">

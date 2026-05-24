@@ -6,7 +6,7 @@ import type { LatentProfile } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const LATENT_PROMPT = `Eres el Detector de Talento Latente de Salto.
+const LATENT_PROMPT = `Eres el Detector de Talento Latente de SaltoAI.
 Recibes un Perfil de Evidencia ya extraído (skills, traits, evidence citada). Tu trabajo es revelar lo que el joven HIZO pero NO sabe que tiene valor de mercado.
 
 Reglas:

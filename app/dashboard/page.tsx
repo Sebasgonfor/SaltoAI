@@ -288,7 +288,7 @@ export default function DashboardPage() {
           </button>
           <Link href="/" className="flex items-center gap-2">
             <SaltoLogo variant="full" size={26} />
-            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">Salto</span>
+            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">SaltoAI</span>
           </Link>
         </div>
         <UserButton />
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between p-4 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <SaltoLogo variant="full" size={24} />
-                    <span className="font-display font-semibold text-slate-900 text-sm">Salto</span>
+                    <span className="font-display font-semibold text-slate-900 text-sm">SaltoAI</span>
                   </div>
                   <button
                     type="button"

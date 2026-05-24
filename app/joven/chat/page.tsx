@@ -34,7 +34,7 @@ function buildOpeningMessage(name: string): ChatMessage {
   const first = firstNameFrom(name);
   return {
     role: 'agent',
-    content: `Hola ${first}, soy tu asistente de Salto. Hoy no vamos a llenar un currículum — vamos a conversar. Cuéntame: ¿cuál ha sido el desafío más grande que has resuelto en el último año, aunque nadie te haya pagado por hacerlo?`,
+    content: `Hola ${first}, soy tu asistente de SaltoAI. Hoy no vamos a llenar un currículum — vamos a conversar. Cuéntame: ¿cuál ha sido el desafío más grande que has resuelto en el último año, aunque nadie te haya pagado por hacerlo?`,
   };
 }
 

@@ -11,7 +11,7 @@ import type { MicroTask } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const STRUCTURE_PROMPT = `Eres el estructurador de micro-tareas pagadas de Salto.
+const STRUCTURE_PROMPT = `Eres el estructurador de micro-tareas pagadas de SaltoAI.
 Recibes:
 1. El contexto del candidato (perfil de evidencia ya extraído).
 2. La intención libre de la empresa: qué quiere probar y cuánto va a pagar.
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const previousCount = await countMicroTasksBetween(body.companyId, body.profileId);
     const exploitationWarning =
       previousCount >= 2
-        ? "Ya propusiste 2 o más micro-tareas a este candidato. Si confías en su trabajo, considera ofrecerle una contratación formal — Salto monitorea uso recurrente sin oferta para proteger a los jóvenes."
+        ? "Ya propusiste 2 o más micro-tareas a este candidato. Si confías en su trabajo, considera ofrecerle una contratación formal — SaltoAI monitorea uso recurrente sin oferta para proteger a los jóvenes."
         : null;
 
     let structured: ReturnType<typeof mockStructure>;
