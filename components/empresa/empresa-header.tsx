@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
 import { NavLink } from '@/components/nav-link';
 import { UserButton } from '@/components/auth/user-button';
 import { ResponsiveRoleHeader } from '@/components/layout/responsive-role-header';
@@ -18,7 +17,7 @@ function EmpresaNav({
       className={
         isCol
           ? 'flex flex-col items-stretch gap-0.5 p-3 text-sm font-medium'
-          : 'flex gap-1 items-center text-sm font-medium'
+          : 'flex gap-0.5 sm:gap-1 items-center text-sm font-medium min-w-0'
       }
     >
       <NavLink
@@ -29,34 +28,16 @@ function EmpresaNav({
         onNavigate={onNavigate}
         className={isCol ? 'w-full' : undefined}
       />
-      {isCol ? (
-        <NavLink
-          href="/empresa/chat"
-          label="Publicar necesidad"
-          hint="Conversa con la IA para describir el rol."
-          onNavigate={onNavigate}
-          className="w-full"
-        />
-      ) : (
-        <>
-          <NavLink
-            href="/empresa/chat"
-            label="Publicar necesidad"
-            hint="Conversa con la IA para describir el rol."
-            onNavigate={onNavigate}
-            className="hidden xl:inline-flex"
-          />
-          <NavLink
-            href="/empresa/chat"
-            label="Publicar"
-            hint="Conversa con la IA para describir el rol."
-            onNavigate={onNavigate}
-            className="xl:hidden"
-          />
-        </>
-      )}
       <NavLink
-        href="/empresa"
+        href="/empresa/chat"
+        label="Publicar necesidad"
+        shortLabel={isCol ? undefined : 'Publicar'}
+        hint="Conversa con la IA para describir el rol."
+        onNavigate={onNavigate}
+        className={isCol ? 'w-full' : undefined}
+      />
+      <NavLink
+        href="/empresa/matches"
         label="Mis matches"
         hint="Tus necesidades y shortlists por ICS."
         onNavigate={onNavigate}
@@ -64,10 +45,7 @@ function EmpresaNav({
       />
       {!isCol && (
         <>
-          <Button variant="outline" size="sm" className="hidden lg:inline-flex ml-2">
-            Ayuda
-          </Button>
-          <div className="h-5 w-px bg-slate-200 mx-2" />
+          <div className="h-5 w-px bg-slate-200 mx-1 sm:mx-2 shrink-0" />
           <UserButton />
         </>
       )}

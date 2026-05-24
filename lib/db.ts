@@ -279,6 +279,29 @@ export async function getNeed(id: string): Promise<CompanyNeed | null> {
   return memNeeds.get(id) ?? null;
 }
 
+export async function updateNeed(
+  id: string,
+  patch: Partial<Omit<CompanyNeed, "id">>
+): Promise<CompanyNeed | null> {
+  const existing = await getNeed(id);
+  if (!existing) return null;
+  const next: CompanyNeed = { ...existing, ...patch, id };
+  memNeeds.set(id, next);
+  if (useFirestore(NEEDS)) {
+    try {
+      const { id: _id, ...data } = next;
+      await updateDoc(
+        doc(db, NEEDS, id),
+        stripUndefined(data as unknown as Record<string, unknown>)
+      );
+      return next;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "updateNeed", NEEDS);
+    }
+  }
+  return next;
+}
+
 export async function recordFeedback(
   entry: Omit<FeedbackEntry, "id" | "timestamp">
 ): Promise<string> {

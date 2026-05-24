@@ -13,3 +13,19 @@ body {
 *::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes match-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12);
+  }
+}
+
+.animate-match-glow {
+  animation: match-glow-pulse 2.5s ease-in-out infinite;
+}

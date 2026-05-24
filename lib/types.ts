@@ -228,6 +228,9 @@ export interface CompanyLegal {
   acceptedAt: string;
 }
 
+/** Vacante publicada por la empresa. `closed` = no recibe nuevos matches. */
+export type NeedStatus = "open" | "closed";
+
 export interface CompanyNeed {
   id?: string;
   companyName: string;
@@ -253,6 +256,12 @@ export interface CompanyNeed {
   /** Breve explicación de POR QUÉ se clasificó así. Útil para auditoría
    * humana cuando el founder dice "no entiendo por qué este candidato sale alto". */
   jobNatureReason?: string;
+  /** Ausente o `open` = activa. `closed` = vacante cerrada, sin matching nuevo. */
+  status?: NeedStatus;
+  closedAt?: number;
+  /** Reporte al cerrar: ¿contrataron de esta búsqueda? (flywheel post_hire) */
+  hiredOnClose?: boolean;
+  hiredProfileId?: string;
 }
 
 export interface ICSBreakdown {

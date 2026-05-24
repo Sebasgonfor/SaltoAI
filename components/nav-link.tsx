@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -7,6 +8,8 @@ import { cn } from '@/lib/utils';
 interface Props {
   href: string;
   label: string;
+  /** Etiqueta corta en viewports < xl (un solo `<Link>`, evita hydration mismatch). */
+  shortLabel?: string;
   /** Si true, marca activo también cuando el pathname empieza con `href` (rutas con subpáginas). */
   matchPrefix?: boolean;
   /** Texto explicativo que aparece en tooltip al hacer hover — UX profesional. */
@@ -32,6 +35,7 @@ interface Props {
 export function NavLink({
   href,
   label,
+  shortLabel,
   matchPrefix = true,
   hint,
   emphasis = false,
@@ -39,9 +43,14 @@ export function NavLink({
   className,
 }: Props) {
   const pathname = usePathname() || '';
-  const isActive = matchPrefix
-    ? pathname === href || pathname.startsWith(href + '/')
-    : pathname === href;
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
+  const isActive =
+    hydrated &&
+    (matchPrefix
+      ? pathname === href || pathname.startsWith(href + '/')
+      : pathname === href);
 
   return (
     <Link
@@ -50,7 +59,7 @@ export function NavLink({
       aria-current={isActive ? 'page' : undefined}
       onClick={onNavigate}
       className={cn(
-        'px-3 py-1.5 rounded-md transition-colors',
+        'px-3 py-1.5 rounded-md transition-colors whitespace-nowrap',
         className,
         isActive
           ? emphasis
@@ -61,7 +70,14 @@ export function NavLink({
             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
       )}
     >
-      {label}
+      {shortLabel ? (
+        <>
+          <span className="hidden xl:inline">{label}</span>
+          <span className="xl:hidden">{shortLabel}</span>
+        </>
+      ) : (
+        label
+      )}
     </Link>
   );
 }

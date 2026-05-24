@@ -220,7 +220,7 @@ function TareasJoven() {
               {active.length}
             </Badge>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             {active.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
@@ -238,7 +238,7 @@ function TareasJoven() {
               {delivered.length}
             </Badge>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             {delivered.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
@@ -255,7 +255,7 @@ function TareasJoven() {
               {completed.length}
             </Badge>
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             {completed.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
@@ -290,7 +290,7 @@ function TaskRow({ task }: { task: MicroTask }) {
           : 'Evaluada';
 
   return (
-    <Link href={`/joven/tareas/${task.id}`}>
+    <Link href={`/joven/tareas/${task.id}`} className="block">
       <article className="bg-white border border-slate-200 hover:border-emerald-200 hover:shadow-sm rounded-2xl p-5 transition-colors flex items-start gap-4 cursor-pointer">
         <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
           <Briefcase size={18} />

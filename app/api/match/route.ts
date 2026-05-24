@@ -5,6 +5,7 @@ import {
   getOrComputeMatchesForNeed,
   snapshotToMatchResponse,
 } from "@/lib/match-need";
+import { isNeedClosed } from "@/lib/need-status";
 import { startLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -89,6 +90,16 @@ export async function POST(req: NextRequest) {
       if (!need) {
         log.end({ status: 404, extra: { needId } });
         return NextResponse.json({ error: "need not found" }, { status: 404 });
+      }
+      if (isNeedClosed(need)) {
+        log.end({ status: 400, extra: { needId, reason: "need_closed" } });
+        return NextResponse.json(
+          {
+            error: "Esta vacante está cerrada; no se pueden recalcular matches.",
+            code: "need_closed",
+          },
+          { status: 400 }
+        );
       }
       const snapshot = await computeMatchesForNeed(need);
       log.end({

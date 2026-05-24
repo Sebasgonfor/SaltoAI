@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
 import { Button } from '@/components/ui/button';
 import {
   Sparkles,
@@ -20,8 +20,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import type { CompanyNeed, Match, ICSBreakdown, MatchDecision } from '@/lib/types';
+import { isNeedClosed } from '@/lib/need-status';
+import { CloseNeedControl } from '@/components/empresa/close-need-control';
 import { storeMatchForNavigation } from '@/lib/match-navigation-storage';
 import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
@@ -343,17 +346,18 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   }
 
   const forceRefresh = () => {
-    if (refreshing) return;
+    if (refreshing || (data?.need && isNeedClosed(data.need))) return;
     clearMatchCache(needId);
     void fetchMatches({ useCache: false, force: true });
   };
 
+  const needClosed = data?.need ? isNeedClosed(data.need) : false;
+
   if (loading) {
     return (
-      <LoadingSpinner
-        variant="section"
-        label="Cargando candidatos…"
-        containerClassName="max-w-4xl mx-auto px-4 sm:px-6"
+      <MatchPulseLoader
+        label="Buscando candidatos compatibles…"
+        className="max-w-4xl mx-auto px-4 sm:px-6 min-h-[50vh]"
       />
     );
   }
@@ -374,7 +378,10 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   const [top, ...rest] = activeMatches;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
+    <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
+      {refreshing && (
+        <MatchPulseLoader variant="overlay" label="Recalculando candidatos…" />
+      )}
       {/* Necesidad estructurada */}
       <header className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -414,24 +421,54 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={forceRefresh}
-              disabled={refreshing}
-              className="gap-1.5"
-              title="Recalcular el ranking de candidatos contra esta necesidad"
-            >
-              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Recalculando…' : 'Recalcular'}
-            </Button>
+            {needClosed ? (
+              <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 gap-1">
+                <Lock size={12} /> Vacante cerrada
+              </Badge>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={forceRefresh}
+                  disabled={refreshing}
+                  className="gap-1.5"
+                  title="Recalcular el ranking de candidatos contra esta necesidad"
+                >
+                  <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+                  {refreshing ? 'Recalculando…' : 'Recalcular'}
+                </Button>
+                {user?.uid && (
+                  <CloseNeedControl
+                    need={need}
+                    companyId={user.uid}
+                    onClosed={(closed) => setData((prev) => (prev ? { ...prev, need: closed } : prev))}
+                  />
+                )}
+              </>
+            )}
             <Link href="/empresa/chat">
-              <Button variant="outline" size="sm">Editar necesidad</Button>
+              <Button variant="outline" size="sm">Nueva necesidad</Button>
             </Link>
           </div>
         </div>
 
-        {fromCache && !refreshing && (
+        {needClosed && (
+          <div
+            role="status"
+            className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 flex items-start gap-2"
+          >
+            <Lock size={16} className="text-slate-500 mt-0.5 shrink-0" />
+            <p className="leading-relaxed">
+              Esta vacante está <strong>cerrada</strong>. Los candidatos que ves son el ranking
+              histórico; ningún joven nuevo la verá en Oportunidades ni recibirá match automático.
+              {need.hiredOnClose === true && ' Reportaste contratación exitosa.'}
+              {need.hiredOnClose === false && ' Cerraste sin contratación de esta búsqueda.'}
+            </p>
+          </div>
+        )}
+
+        {fromCache && !refreshing && !needClosed && (
           <p className="text-[11px] text-slate-400 italic flex items-center gap-1">
             <CheckCircle2 size={11} className="text-emerald-500" />
             Resultados cacheados (15 min). Si publicaste cambios o subieron nuevos perfiles, dale a "Recalcular".

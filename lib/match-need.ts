@@ -1,6 +1,7 @@
 import { cosineSimilarity } from "@/lib/embeddings";
 import { getAllProfiles, getNeed, getNeedMatches, getProfile, saveNeedMatches } from "@/lib/db";
 import { scoreCandidates, SHORTLIST_SIZE } from "@/lib/ics";
+import { isNeedClosed } from "@/lib/need-status";
 import type { CompanyNeed, NeedMatchSnapshot } from "@/lib/types";
 
 function buildWarning(need: CompanyNeed, degradedReason?: string): string | undefined {
@@ -19,6 +20,21 @@ function buildWarning(need: CompanyNeed, degradedReason?: string): string | unde
 export async function computeMatchesForNeed(need: CompanyNeed): Promise<NeedMatchSnapshot> {
   if (!need.id) {
     throw new Error("need_id_required");
+  }
+
+  if (isNeedClosed(need)) {
+    const cached = await getNeedMatches(need.id);
+    if (cached) return cached;
+    const empty: NeedMatchSnapshot = {
+      needId: need.id,
+      matches: [],
+      rankingMode: "degraded",
+      excluded: [],
+      meta: { shortlistSize: 0, llmHits: 0, heuristicHits: 0, profileCount: 0 },
+      computedAt: Date.now(),
+      warning: "Esta vacante está cerrada; no se generan nuevos matches.",
+    };
+    return empty;
   }
 
   const profilesRaw = await getAllProfiles();
@@ -77,6 +93,13 @@ export async function getOrComputeMatchesForNeed(
   const need = await getNeed(needId);
   if (!need) return null;
 
+  if (isNeedClosed(need)) {
+    const cached = await getNeedMatches(needId);
+    if (cached) return { need, snapshot: cached };
+    const snapshot = await computeMatchesForNeed(need);
+    return { need, snapshot };
+  }
+
   if (!opts.force) {
     const cached = await getNeedMatches(needId);
     if (cached) return { need, snapshot: cached };
@@ -94,8 +117,16 @@ export function snapshotToMatchResponse(need: CompanyNeed, snapshot: NeedMatchSn
     excluded: snapshot.excluded,
     cached: true,
     computedAt: snapshot.computedAt,
+    closed: isNeedClosed(need),
     ...(snapshot.warning && { warning: snapshot.warning }),
+    ...(isNeedClosed(need) && {
+      note: "need_closed",
+      warning:
+        snapshot.warning ??
+        "Vacante cerrada: no recibe nuevos candidatos. El ranking es histórico.",
+    }),
     ...(snapshot.matches.length === 0 &&
-      snapshot.meta.profileCount === 0 && { note: "no_profiles" }),
+      snapshot.meta.profileCount === 0 &&
+      !isNeedClosed(need) && { note: "no_profiles" }),
   };
 }

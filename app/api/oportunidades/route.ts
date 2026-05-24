@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cosineSimilarity } from "@/lib/embeddings";
 import { getAllNeeds, getNeed, getNeedMatches, getProfile, listDecisionsForProfile } from "@/lib/db";
 import { RETURN_SIZE } from "@/lib/ics";
+import { isNeedOpen } from "@/lib/need-status";
 import { startLog } from "@/lib/logger";
 import type { OpportunityMatch } from "@/lib/types";
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
-    const needs = await getAllNeeds();
+    const needs = (await getAllNeeds()).filter(isNeedOpen);
     if (needs.length === 0) {
       log.end({ status: 200, extra: { profileId, note: "no_needs" } });
       return NextResponse.json({ profile, opportunities: [], note: "no_needs" });
