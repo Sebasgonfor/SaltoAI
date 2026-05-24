@@ -215,7 +215,7 @@ const STORIES = [
 
 export default function ImpactoDashboard() {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10 lg:py-14 space-y-14">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 lg:py-14 space-y-14">
 
       {/* HEADER */}
       <FadeUp>
@@ -227,7 +227,7 @@ export default function ImpactoDashboard() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />
             Barranqui-IA 2026 · Demo en vivo
           </Badge>
-          <h1 className="text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
             El impacto de Salto,{' '}
             <span className="text-emerald-600">en números reales.</span>
           </h1>
@@ -408,7 +408,7 @@ export default function ImpactoDashboard() {
 
       {/* CTA */}
       <FadeUp>
-        <section className="bg-slate-950 text-white rounded-3xl p-8 md:p-12 relative overflow-hidden">
+        <section className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 md:p-12 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl" aria-hidden />
           <div className="relative max-w-3xl">
             <div className="flex items-center gap-2 mb-5">
@@ -417,7 +417,7 @@ export default function ImpactoDashboard() {
                 Para aliados e inversores
               </span>
             </div>
-            <h2 className="font-display font-bold text-3xl md:text-4xl mb-4 tracking-tight leading-tight">
+            <h2 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl mb-4 tracking-tight leading-tight">
               ¿Quieres que estos números{' '}
               <span className="text-emerald-400">sean tuyos también?</span>
             </h2>

@@ -378,7 +378,7 @@ export default function DashboardPage() {
 
           {/* STAT CARDS */}
           {!dataLoading && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <StatCard
                 icon={Layers}
                 value={profile?.skills.length ?? 0}
@@ -496,7 +496,7 @@ export default function DashboardPage() {
               <h2 className="text-xs uppercase tracking-[0.18em] text-slate-500 font-semibold mb-3">
                 Acciones rápidas
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {[
                   { icon: MessageSquareQuote, label: profile ? 'Repetir entrevista' : 'Empezar entrevista', href: '/joven/chat', color: 'text-emerald-700', bg: 'bg-emerald-50' },
                   { icon: Network, label: 'Oportunidades', href: '/joven/conectar', color: 'text-slate-700', bg: 'bg-slate-50' },

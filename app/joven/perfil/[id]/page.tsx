@@ -101,7 +101,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
     .toUpperCase();
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10 space-y-14">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-10 sm:space-y-14">
       {/* Banner contextual: cuando un founder visita este perfil desde sus
           matches, le damos contexto + camino de vuelta. Sin esto, ve el
           chrome del joven ("Entrevista", "Mis tareas") sin entender por
@@ -155,7 +155,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 </Badge>
               ) : null}
             </div>
-            <h1 className="text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-display font-bold text-slate-900 tracking-tight leading-[1.05]">
               {perfil.name}
             </h1>
             <p className="text-slate-600 mt-2">
@@ -296,21 +296,21 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             {perfil.evidence.map((ev, i) => (
               <article
                 key={i}
-                className="group relative bg-white border border-slate-200 rounded-2xl p-6 md:p-8 hover:border-emerald-200 transition-colors"
+                className="group relative bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 md:p-8 hover:border-emerald-200 transition-colors"
               >
-                <div className="grid md:grid-cols-12 gap-6 items-start">
+                <div className="grid md:grid-cols-12 gap-4 sm:gap-6 items-start">
                   <div className="md:col-span-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-2">Habilidad #{i + 1}</div>
-                    <h4 className="font-display font-semibold text-lg text-slate-900 leading-tight">{ev.skill}</h4>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-1 sm:mb-2">Habilidad #{i + 1}</div>
+                    <h4 className="font-display font-semibold text-base sm:text-lg text-slate-900 leading-tight">{ev.skill}</h4>
                   </div>
                   <div className="md:col-span-9">
-                    <div className="relative pl-6 md:pl-10">
+                    <div className="relative pl-5 md:pl-10">
                       <Quote
-                        size={28}
+                        size={22}
                         className="absolute -left-1 top-0 text-emerald-200 group-hover:text-emerald-300 transition-colors"
                         fill="currentColor"
                       />
-                      <blockquote className="font-display text-xl md:text-2xl text-slate-800 leading-snug italic">
+                      <blockquote className="font-display text-lg sm:text-xl md:text-2xl text-slate-800 leading-snug italic">
                         "{ev.quote}"
                       </blockquote>
                     </div>
@@ -323,14 +323,14 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
       </section>
 
       {/* CTA final */}
-      <section className="bg-slate-950 text-white rounded-3xl p-8 md:p-12 relative overflow-hidden">
+      <section className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 md:p-12 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl" aria-hidden />
         <div className="relative max-w-3xl">
           <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-300 border-transparent mb-5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
             Visible para empresas
           </Badge>
-          <h3 className="font-display font-bold text-3xl md:text-4xl mb-4 tracking-tight leading-tight">
+          <h3 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl mb-4 tracking-tight leading-tight">
             Las empresas ya pueden verte.
           </h3>
           <p className="text-slate-300 leading-relaxed mb-6 max-w-2xl">
