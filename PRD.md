@@ -350,6 +350,11 @@ Colección `feedback` en Firestore, schema v3 — cada interacción del producto
 | 15 | `ai_preeval_agreement` | explicit | "¿coincide la pre-eval de la IA con tu juicio?" |
 | 16 | `post_hire_followup` | explicit | "Lo contraté formalmente / no funcionó después de N días" |
 | 17 | `red_flag_accuracy` | explicit | "¿el red flag fue acertado?" |
+| 18 | `company_feedback_to_youth` | explicit | **Empresa → joven** · rating + comentario sobre la candidatura |
+| 19 | `company_pass_reason` | explicit | **Empresa → joven** · razón corta cuando NO avanza con el perfil |
+| 20 | `youth_reply_to_company` | explicit | **Joven → empresa** · respuesta al feedback recibido (cierra el loop humano) |
+
+Los 3 últimos (18-20) son el canal **bidireccional empresa ↔ joven** (v4 — feb 2026). No miden a la IA: capturan feedback humano que cierra el loop que ningún competidor da. El joven raramente recibe feedback de calidad en LinkedIn/Computrabajo cuando lo descartan; acá lo recibe siempre, incluso un "no avanzo porque te falta X" con razón canónica (`reasonCode`) para agregar en el dashboard.
 
 **Infraestructura (Fase A — feb 2026):** [`lib/feedback.ts`](lib/feedback.ts) (`emitSignal`, `emitSignalBatch`, dedup vía localStorage), primitives [`components/feedback/{thumbs,rating,inline-prompt}.tsx`](components/feedback/), hook [`hooks/use-emit-signal.ts`](hooks/use-emit-signal.ts) para señales implícitas, endpoint [`app/api/feedback/route.ts`](app/api/feedback/route.ts) que acepta legacy + v3 + batch (backward compatible).
 
@@ -377,7 +382,14 @@ Colección `feedback` en Firestore, schema v3 — cada interacción del producto
 | red_flag_accuracy | [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) bajo red flag del top | thumbs silent |
 | latent_suggestion | pendiente (la feature de roles latentes no está montada todavía) | — |
 
-16 de 17 touchpoints están vivos. El que falta (`latent_suggestion`) espera a que la feature de sugerencia de roles latentes salga del backlog.
+16 de 17 touchpoints unidireccionales están vivos. El que falta (`latent_suggestion`) espera a que la feature de sugerencia de roles latentes salga del backlog.
+
+**Canal bidireccional empresa ↔ joven (v4):**
+- [`/joven/perfil/[id]`](app/joven/perfil/[id]/page.tsx) cuando `viewerIsEmpresa`: `<CompanyFeedbackToYouth>` (form rating+comentario) + `<PassReasonButton>` (modal con razones canónicas).
+- [`/joven/perfil/[id]`](app/joven/perfil/[id]/page.tsx) cuando el dueño: `<YouthFeedbackInbox profileId>` lista los hilos recibidos con `<Textarea>` de respuesta inline.
+- Endpoint dedicado: [`/api/feedback/youth?profileId=X`](app/api/feedback/youth/route.ts) arma los threads (parents + replies anidadas por `parentFeedbackId`).
+
+Los componentes viven en [`components/feedback/company-to-youth.tsx`](components/feedback/company-to-youth.tsx) y [`components/feedback/youth-inbox.tsx`](components/feedback/youth-inbox.tsx).
 
 **Dashboard del flywheel (Fase E — feb 2026):** [`/api/admin/flywheel`](app/api/admin/flywheel/route.ts) (endpoint público de agregados — solo counts y rates, sin PII) consumido por [`/aliados/impacto`](app/aliados/impacto/page.tsx). Muestra:
 - Total de señales (explícitas vs implícitas).

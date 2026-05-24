@@ -259,6 +259,10 @@ const TOUCHPOINT_LABELS: Record<string, string> = {
   ai_preeval_agreement: 'Acuerdo con pre-eval IA',
   post_hire_followup: 'Contratación formal',
   red_flag_accuracy: 'Acierto del red flag',
+  // v4 bidireccional empresa ↔ joven
+  company_feedback_to_youth: 'Feedback empresa → joven',
+  company_pass_reason: 'Razón de descarte',
+  youth_reply_to_company: 'Respuesta del joven',
   legacy: 'Señal legacy (pre-v3)',
 };
 

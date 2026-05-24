@@ -43,6 +43,15 @@ export interface EmitSignalInput {
   icsAtTime?: number;
   modelVersion?: string;
   note?: string;
+  // v4: bidireccional empresa ↔ joven
+  parentFeedbackId?: string;
+  authorDisplayName?: string;
+  reasonCode?:
+    | "skill_gap"
+    | "context_mismatch"
+    | "availability"
+    | "salary_range"
+    | "other";
 }
 
 function lsKey(touchpoint: FeedbackTouchpoint, targetId: string): string {
@@ -62,10 +71,27 @@ export function hasEmittedExplicit(touchpoint: FeedbackTouchpoint, targetId: str
   }
 }
 
-function markEmitted(touchpoint: FeedbackTouchpoint, targetId: string, value: string) {
+/**
+ * Marca un (touchpoint, targetId) como ya emitido en localStorage. Usado
+ * internamente por `emitSignal` cuando el server responde 200 explícito,
+ * y también exportado para casos donde el componente cliente necesita
+ * marcar dedup con un targetId DISTINTO al que mandó al server (típico:
+ * componentes que mandan `targetId=profileId` pero deduplican por
+ * `profileId+founderUid` para que distintos founders no se bloqueen).
+ *
+ * `value` es opcional: si no se pasa, guardamos el timestamp del momento.
+ */
+export function markEmitted(
+  touchpoint: FeedbackTouchpoint,
+  targetId: string,
+  value?: string,
+) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(lsKey(touchpoint, targetId), value);
+    window.localStorage.setItem(
+      lsKey(touchpoint, targetId),
+      value ?? String(Date.now()),
+    );
   } catch {
     /* quota — ignoramos */
   }
