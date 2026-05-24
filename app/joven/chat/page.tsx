@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +19,11 @@ import {
   MAX_USER_TURNS,
   MIN_USER_TURNS,
 } from '@/lib/interview-prompt';
+import {
+  fetchJovenBasicsFromProfile,
+  loadSavedJovenBasics,
+  saveJovenBasics,
+} from '@/lib/user-onboarding-storage';
 
 const MIN_TURNS = MIN_USER_TURNS;
 const MAX_TURNS = MAX_USER_TURNS;
@@ -28,6 +34,21 @@ type InterviewMode = 'text' | 'voice';
 
 function firstNameFrom(full: string): string {
   return full.trim().split(/\s+/)[0] || full.trim();
+}
+
+function applyBasicsToForm(
+  basics: JovenBasics,
+  setters: {
+    setFormName: (v: string) => void;
+    setFormAge: (v: string) => void;
+    setFormGender: (v: Gender | '') => void;
+    setBasicsStep: (v: 0 | 1 | 2) => void;
+  }
+) {
+  setters.setFormName(basics.name);
+  setters.setFormAge(String(basics.age));
+  setters.setFormGender(basics.gender);
+  setters.setBasicsStep(2);
 }
 
 interface DetectedSignal {
@@ -125,6 +146,7 @@ function ChatJoven() {
   const finishInterviewRef = useRef<(conversation: ChatMessage[]) => Promise<void>>(async () => {});
   const resumeProfileBuildRef = useRef(false);
   const profileBuildInFlightRef = useRef(false);
+  const skipAutoOpeningRef = useRef(false);
   const {
     isSupported: voiceSupported,
     isRecording,
@@ -167,31 +189,112 @@ function ChatJoven() {
     inputRef.current = input;
   }, [input]);
 
+  const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
+    const res = await fetch('/api/entrevista', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        opening: true,
+        firstName: firstNameFrom(name),
+        age,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.nextQuestion) {
+      throw new Error(data.error || 'No pudimos preparar la entrevista.');
+    }
+    return data.nextQuestion as string;
+  }, []);
+
+  const beginInterview = useCallback(
+    async (b: JovenBasics, opts?: { keepMessages?: boolean }) => {
+      saveJovenBasics(user?.uid, b);
+      setBasics(b);
+      applyBasicsToForm(b, { setFormName, setFormAge, setFormGender, setBasicsStep });
+      setFormError(null);
+      setPhase('interview');
+
+      if (interviewMode === 'text' && !opts?.keepMessages) {
+        setMessages([]);
+        setLoading(true);
+        try {
+          const opening = await fetchOpeningQuestion(b.name, b.age);
+          setMessages([{ role: 'agent', content: opening }]);
+        } catch (err) {
+          setFormError(
+            err instanceof Error ? err.message : 'No pudimos preparar la entrevista. Revisa tu conexión e intenta de nuevo.'
+          );
+        } finally {
+          setLoading(false);
+        }
+      } else if (!opts?.keepMessages) {
+        setMessages([]);
+      }
+    },
+    [fetchOpeningQuestion, interviewMode, user?.uid]
+  );
+
   // Restaurar estado al montar (una vez por uid). Si la sesión cambia de
   // usuario, leemos la persistencia del usuario nuevo y descartamos el
   // estado en memoria.
   useEffect(() => {
-    const saved = loadPersisted(user?.uid);
-    if (saved) {
-      if (saved.phase) setPhase(saved.phase);
-      if (saved.basics) setBasics(saved.basics);
-      if (typeof saved.formName === 'string') setFormName(saved.formName);
-      if (typeof saved.formAge === 'string') setFormAge(saved.formAge);
-      else if (typeof saved.formAge === 'number' && Number.isFinite(saved.formAge)) {
-        setFormAge(String(saved.formAge));
+    let cancelled = false;
+
+    async function restore() {
+      const saved = loadPersisted(user?.uid);
+      if (saved) {
+        if (Array.isArray(saved.messages)) setMessages(saved.messages);
+        if (typeof saved.input === 'string') setInput(saved.input);
+        if (saved.interviewMode === 'voice' || saved.interviewMode === 'text') {
+          setInterviewMode(saved.interviewMode);
+        }
       }
-      if (typeof saved.formGender === 'string') setFormGender(saved.formGender as Gender | '');
-      if (saved.basicsStep === 0 || saved.basicsStep === 1 || saved.basicsStep === 2) {
-        setBasicsStep(saved.basicsStep);
+
+      let resolvedBasics = loadSavedJovenBasics(user?.uid);
+      if (!resolvedBasics && user?.uid) {
+        resolvedBasics = await fetchJovenBasicsFromProfile(user.uid);
+        if (resolvedBasics) saveJovenBasics(user.uid, resolvedBasics);
       }
-      if (Array.isArray(saved.messages)) setMessages(saved.messages);
-      if (typeof saved.input === 'string') setInput(saved.input);
-      if (saved.interviewMode === 'voice' || saved.interviewMode === 'text') {
-        setInterviewMode(saved.interviewMode);
+      if (!resolvedBasics && saved?.basics) {
+        resolvedBasics = saved.basics;
+        saveJovenBasics(user?.uid, resolvedBasics);
       }
+
+      if (cancelled) return;
+
+      const hasInterviewProgress = (saved?.messages?.length ?? 0) > 0;
+
+      if (resolvedBasics) {
+        setBasics(resolvedBasics);
+        applyBasicsToForm(resolvedBasics, { setFormName, setFormAge, setFormGender, setBasicsStep });
+        if (hasInterviewProgress) {
+          setPhase('interview');
+        } else {
+          setPhase('interview');
+          skipAutoOpeningRef.current = false;
+        }
+      } else if (saved) {
+        if (saved.phase) setPhase(saved.phase);
+        if (saved.basics) setBasics(saved.basics);
+        if (typeof saved.formName === 'string') setFormName(saved.formName);
+        if (typeof saved.formAge === 'string') setFormAge(saved.formAge);
+        else if (typeof saved.formAge === 'number' && Number.isFinite(saved.formAge)) {
+          setFormAge(String(saved.formAge));
+        }
+        if (typeof saved.formGender === 'string') setFormGender(saved.formGender as Gender | '');
+        if (saved.basicsStep === 0 || saved.basicsStep === 1 || saved.basicsStep === 2) {
+          setBasicsStep(saved.basicsStep);
+        }
+      }
+
+      setRestored(true);
+      resumeProfileBuildRef.current = false;
     }
-    setRestored(true);
-    resumeProfileBuildRef.current = false;
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -251,43 +354,34 @@ function ChatJoven() {
   const resetInterview = () => {
     const confirmMsg = closing
       ? 'Todavía estamos construyendo tu perfil. ¿Cancelar y empezar la entrevista de cero?'
-      : '¿Reiniciar la entrevista? Se borra todo lo que llevás escrito y volvés al paso 1. Tus datos básicos (nombre, edad) también se vacían.';
+      : '¿Reiniciar la entrevista? Se borra la conversación actual. Tus datos básicos (nombre, edad, género) se mantienen.';
     if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return;
     cancelRecording('reset-interview');
     disconnectLive();
     clearPersisted(user?.uid);
-    setMessages([]);
     setInput('');
+    setFormError(null);
+    setLoading(false);
+    setClosing(false);
+    setInterviewMode('text');
+    resumeProfileBuildRef.current = false;
+    profileBuildInFlightRef.current = false;
+
+    const savedBasics = loadSavedJovenBasics(user?.uid) ?? basics;
+    if (savedBasics) {
+      skipAutoOpeningRef.current = true;
+      void beginInterview(savedBasics);
+      return;
+    }
+
+    setMessages([]);
     setBasics(null);
     setFormName(user?.displayName ?? '');
     setFormAge('');
     setFormGender('');
     setBasicsStep(0);
-    setFormError(null);
-    setLoading(false);
-    setClosing(false);
-    setInterviewMode('text');
     setPhase('basics');
-    resumeProfileBuildRef.current = false;
-    profileBuildInFlightRef.current = false;
   };
-
-  const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
-    const res = await fetch('/api/entrevista', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        opening: true,
-        firstName: firstNameFrom(name),
-        age,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.nextQuestion) {
-      throw new Error(data.error || 'No pudimos preparar la entrevista.');
-    }
-    return data.nextQuestion as string;
-  }, []);
 
   const startInterview = async () => {
     const name = formName.trim();
@@ -304,29 +398,29 @@ function ChatJoven() {
       setFormError('Selecciona cómo te identificas.');
       return;
     }
-    const b: JovenBasics = { name, age, gender: formGender };
-    setBasics(b);
-    setFormError(null);
-    setPhase('interview');
+    skipAutoOpeningRef.current = true;
+    await beginInterview({ name, age, gender: formGender });
+  };
 
-    if (interviewMode === 'text') {
-      setMessages([]);
-      setLoading(true);
-      try {
-        const opening = await fetchOpeningQuestion(name, age);
-        setMessages([{ role: 'agent', content: opening }]);
-      } catch (err) {
+  // Datos básicos ya guardados: abrir entrevista en texto sin repetir el wizard.
+  useEffect(() => {
+    if (!restored || phase !== 'interview' || !basics || messages.length > 0 || loading || closing) return;
+    if (interviewMode !== 'text') return;
+    if (skipAutoOpeningRef.current) {
+      skipAutoOpeningRef.current = false;
+      return;
+    }
+    skipAutoOpeningRef.current = true;
+    setLoading(true);
+    void fetchOpeningQuestion(basics.name, basics.age)
+      .then((opening) => setMessages([{ role: 'agent', content: opening }]))
+      .catch((err) =>
         setFormError(
           err instanceof Error ? err.message : 'No pudimos preparar la entrevista. Revisa tu conexión e intenta de nuevo.'
-        );
-        setPhase('basics');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setMessages([]);
-    }
-  };
+        )
+      )
+      .finally(() => setLoading(false));
+  }, [restored, phase, basics, messages.length, loading, closing, interviewMode, fetchOpeningQuestion]);
 
   const finishInterview = useCallback(
     async (conversation: ChatMessage[]) => {
@@ -351,9 +445,13 @@ function ChatJoven() {
         });
         const closeData = await closeRes.json();
         // #region agent log
+        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil_created',data:{ok:closeRes.ok,profileId:closeData.id??null,hadUid:!!user?.uid,uid:user?.uid??null,idMatchesUid:closeData.id===user?.uid},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        // #region agent log
         fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'C',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil POST result',data:{ok:closeRes.ok,status:closeRes.status,hasId:!!closeData.id,code:closeData.code??null,msgCount:conversation.length,userTurns:conversation.filter(m=>m.role==='user').length},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         if (closeRes.ok && closeData.id) {
+          if (basics) saveJovenBasics(user?.uid, basics);
           try {
             localStorage.setItem('salto_last_profile_id', closeData.id);
           } catch {
@@ -595,7 +693,12 @@ function ChatJoven() {
             )}
             {user?.uid && (
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Ya tienes perfil: puedes repetir la entrevista para actualizarlo, o usa «Reiniciar» para empezar de cero.
+                Tus datos básicos ya están guardados.{' '}
+                <Link href={`/joven/perfil/${user.uid}#datos-personales`} className="text-emerald-700 underline">
+                  Editar en tu perfil
+                </Link>
+                {' · '}
+                «Reiniciar» solo borra la conversación.
               </p>
             )}
           </div>

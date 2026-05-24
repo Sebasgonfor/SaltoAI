@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,18 @@ import {
   Network,
   Layers,
   ChevronRight,
+  ChevronDown,
   Quote,
   AlertCircle,
   CheckCircle2,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
-import type { CompanyNeed, Match, ICSBreakdown } from '@/lib/types';
+import type { CompanyNeed, Match, ICSBreakdown, MatchDecision } from '@/lib/types';
+import { storeMatchForNavigation } from '@/lib/match-navigation-storage';
 import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
+import { useAuth } from '@/lib/auth-context';
 
 interface MatchResponse {
   need: CompanyNeed;
@@ -52,11 +57,26 @@ function recordImplicitSignal(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ needId, profileId, signal, icsAtTime }),
-      keepalive: true, // sobrevive navegación de página
+      keepalive: true,
     }).catch(() => {});
   } catch {
     /* never throws */
   }
+}
+
+function candidateHref(needId: string, profileId: string) {
+  return `/empresa/candidatos/${profileId}?needId=${encodeURIComponent(needId)}`;
+}
+
+function openCandidate(needId: string, match: Match) {
+  storeMatchForNavigation(needId, match.profileId, match);
+}
+
+function decisionFor(
+  decisions: MatchDecision[],
+  profileId: string
+): MatchDecision['status'] | undefined {
+  return decisions.find((d) => d.profileId === profileId)?.status;
 }
 
 function BreakdownBars({
@@ -133,7 +153,10 @@ function PipelineVisual({ totalProfiles, shortlistSize, returnSize }: { totalPro
 
 export default function MatchesPorNecesidad({ params }: { params: Promise<{ needId: string }> }) {
   const { needId } = use(params);
+  const { user } = useAuth();
   const [data, setData] = useState<MatchResponse | null>(null);
+  const [decisions, setDecisions] = useState<MatchDecision[]>([]);
+  const [showDiscarded, setShowDiscarded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,17 +164,20 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/match', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ needId }),
-        });
-        const json = await res.json();
-        if (!res.ok) {
+        const [matchRes, decisionRes] = await Promise.all([
+          fetch(`/api/match?needId=${encodeURIComponent(needId)}`),
+          fetch(`/api/match/decision?needId=${encodeURIComponent(needId)}`),
+        ]);
+        const json = await matchRes.json();
+        if (!matchRes.ok) {
           if (!cancelled) setError(json.error || 'No pudimos calcular los matches.');
           return;
         }
-        if (!cancelled) setData(json);
+        const decisionJson = decisionRes.ok ? await decisionRes.json() : { decisions: [] };
+        if (!cancelled) {
+          setData(json);
+          setDecisions(decisionJson.decisions ?? []);
+        }
       } catch (e) {
         if (!cancelled) setError('Error de red.');
       } finally {
@@ -163,15 +189,56 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
     };
   }, [needId]);
 
+  const { activeMatches, discardedMatches } = useMemo(() => {
+    if (!data?.matches) return { activeMatches: [], discardedMatches: [] };
+    const active: Match[] = [];
+    const discarded: Match[] = [];
+    for (const m of data.matches) {
+      const st = decisionFor(decisions, m.profileId);
+      if (st === 'discarded') discarded.push(m);
+      else active.push(m);
+    }
+    return { activeMatches: active, discardedMatches: discarded };
+  }, [data?.matches, decisions]);
+
+  async function quickDecision(profileId: string, status: 'interested' | 'discarded', ics?: number) {
+    if (!user?.uid) return;
+    await fetch('/api/match/decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        needId,
+        profileId,
+        companyId: user.uid,
+        status,
+        ...(typeof ics === 'number' && { icsAtTime: ics }),
+      }),
+    });
+    setDecisions((prev) => {
+      const id = `${needId}__${profileId}`;
+      const next = prev.filter((d) => d.profileId !== profileId);
+      next.push({
+        id,
+        needId,
+        profileId,
+        companyId: user.uid,
+        status,
+        updatedAt: Date.now(),
+        ...(typeof ics === 'number' && { icsAtTime: ics }),
+      });
+      return next;
+    });
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-24 text-center">
         <div className="inline-flex items-center gap-3 text-slate-500 mb-4">
           <Network size={18} className="text-emerald-500 animate-pulse" />
-          <span className="text-sm">Calculando Índice de Compatibilidad…</span>
+          <span className="text-sm">Cargando candidatos…</span>
         </div>
         <div className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-          Vectorizando tu necesidad, comparando contra perfiles por similitud semántica, y rankeando el shortlist con LLM. ~10 segundos.
+          Mostrando el ranking calculado al publicar tu necesidad.
         </div>
       </div>
     );
@@ -189,8 +256,8 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
     );
   }
 
-  const { need, matches } = data;
-  const [top, ...rest] = matches;
+  const { need, matches: _allMatches } = data;
+  const [top, ...rest] = activeMatches;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
@@ -260,7 +327,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       )}
 
       {/* Pipeline visual */}
-      {matches.length > 0 && (
+      {activeMatches.length > 0 && (
         <section className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
@@ -269,13 +336,13 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 <strong className="text-slate-900">Embeddings</strong> hacen shortlist semántico → <strong className="text-slate-900">LLM</strong> calcula el desglose ICS.
               </div>
             </div>
-            <PipelineVisual totalProfiles={matches.length + 5} shortlistSize={15} returnSize={matches.length} />
+            <PipelineVisual totalProfiles={activeMatches.length + 5} shortlistSize={15} returnSize={activeMatches.length} />
           </div>
         </section>
       )}
 
       {/* Sin matches */}
-      {matches.length === 0 && (
+      {activeMatches.length === 0 && discardedMatches.length === 0 && (
         <section className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-2xl p-12 text-center">
           <UserCheck size={32} className="text-slate-400 mx-auto mb-4" />
           <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">Aún no hay perfiles en SaltoAI</h3>
@@ -301,6 +368,9 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
                     {top.profileName}
                   </h2>
+                  {decisionFor(decisions, top.profileId) === 'interested' && (
+                    <Badge className="mt-2 bg-emerald-600 text-white border-transparent">Interesado</Badge>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {top.topSkills.map((s) => {
                       const verified = top.verifiedSkills?.find(
@@ -336,16 +406,37 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Link
-                    href={`/joven/perfil/${top.profileId}`}
-                    className="flex-1"
-                    onClick={() => recordImplicitSignal(needId, top.profileId, 'connect', top.ics)}
+                    href={candidateHref(needId, top.profileId)}
+                    className="flex-1 min-w-[140px]"
+                    onClick={() => {
+                      openCandidate(needId, top);
+                      recordImplicitSignal(needId, top.profileId, 'connect', top.ics);
+                    }}
                   >
                     <Button className="w-full gap-2">
                       Ver perfil completo <ArrowRight size={14} />
                     </Button>
                   </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Me interesa"
+                    onClick={() => void quickDecision(top.profileId, 'interested', top.ics)}
+                  >
+                    <ThumbsUp size={16} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Descartar"
+                    onClick={() => void quickDecision(top.profileId, 'discarded', top.ics)}
+                  >
+                    <ThumbsDown size={16} />
+                  </Button>
                   <Link
                     href={`/empresa/probar/${top.profileId}?needId=${needId}`}
                     onClick={() => recordImplicitSignal(needId, top.profileId, 'microtask_proposed', top.ics)}
@@ -407,6 +498,11 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                       #{idx + 2}
                     </div>
                     <h3 className="font-display font-semibold text-2xl text-slate-900 tracking-tight">{m.profileName}</h3>
+                    {decisionFor(decisions, m.profileId) === 'interested' && (
+                      <Badge className="mt-1 bg-emerald-600 text-white border-transparent text-[10px]">
+                        Interesado
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="font-display font-bold text-4xl text-slate-700 tabular-nums leading-none">{m.ics}</div>
@@ -440,19 +536,42 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                   <p className="text-sm text-slate-700 leading-relaxed italic">"{m.reason}"</p>
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-slate-100 flex items-start justify-between gap-3">
-                  <div className="text-xs text-slate-500 flex gap-1.5 items-start flex-1">
+                <div className="mt-auto pt-4 border-t border-slate-100 flex items-start justify-between gap-3 flex-wrap">
+                  <div className="text-xs text-slate-500 flex gap-1.5 items-start flex-1 min-w-[180px]">
                     <Info size={12} className="mt-0.5 flex-shrink-0" />
                     <span><strong className="text-slate-700">Red flag:</strong> {m.redFlag}</span>
                   </div>
-                  <Link
-                    href={`/joven/perfil/${m.profileId}`}
-                    onClick={() => recordImplicitSignal(needId, m.profileId, 'connect', m.ics)}
-                  >
-                    <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0">
-                      Ver perfil <ArrowRight size={12} />
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Me interesa"
+                      onClick={() => void quickDecision(m.profileId, 'interested', m.ics)}
+                    >
+                      <ThumbsUp size={14} />
                     </Button>
-                  </Link>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Descartar"
+                      onClick={() => void quickDecision(m.profileId, 'discarded', m.ics)}
+                    >
+                      <ThumbsDown size={14} />
+                    </Button>
+                    <Link
+                      href={candidateHref(needId, m.profileId)}
+                      onClick={() => {
+                        openCandidate(needId, m);
+                        recordImplicitSignal(needId, m.profileId, 'connect', m.ics);
+                      }}
+                    >
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        Ver perfil <ArrowRight size={12} />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="pt-3 mt-3 border-t border-slate-100">
@@ -464,8 +583,58 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         </section>
       )}
 
+      {discardedMatches.length > 0 && (
+        <section className="border border-slate-200 rounded-2xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowDiscarded((v) => !v)}
+            className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-slate-50 hover:bg-slate-100/80 text-left transition-colors"
+          >
+            <span className="text-sm font-semibold text-slate-700">
+              Descartados ({discardedMatches.length})
+            </span>
+            <ChevronDown
+              size={18}
+              className={`text-slate-500 transition-transform ${showDiscarded ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {showDiscarded && (
+            <div className="p-5 space-y-3 border-t border-slate-200 bg-white">
+              {discardedMatches.map((m) => (
+                <div
+                  key={m.profileId}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0"
+                >
+                  <div>
+                    <div className="font-medium text-slate-800">{m.profileName}</div>
+                    <div className="text-xs text-slate-500">ICS {m.ics}%</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      href={candidateHref(needId, m.profileId)}
+                      onClick={() => openCandidate(needId, m)}
+                    >
+                      <Button size="sm" variant="outline">
+                        Ver perfil
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void quickDecision(m.profileId, 'interested', m.ics)}
+                    >
+                      Recuperar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Filosofía Salto */}
-      {matches.length > 0 && (
+      {data.matches.length > 0 && (
         <section className="bg-slate-950 text-white rounded-2xl p-6 sm:p-8 md:p-10 text-center relative overflow-hidden">
           <UserCheck size={28} className="mx-auto mb-4 text-emerald-400" />
           <h3 className="font-display font-semibold text-2xl md:text-3xl mb-3 tracking-tight">

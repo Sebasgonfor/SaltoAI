@@ -28,9 +28,9 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
             hint="Conversa con la IA para describir el rol — extrae skills, contexto y restricciones."
           />
           <NavLink
-            href="/empresa/matches"
+            href="/empresa"
             label="Mis matches"
-            hint="Shortlist de candidatos rankeados por ICS para cada necesidad publicada."
+            hint="Tus necesidades publicadas y shortlists de candidatos por ICS."
           />
           <Button variant="outline" size="sm" className="hidden md:inline-flex ml-2">
             Ayuda

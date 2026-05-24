@@ -105,6 +105,19 @@ export interface TaskOutcomeStat {
   averageRating: number;
 }
 
+/** Datos de contacto del joven para CV y vista empresa. Persistidos en `profiles.contact`. */
+export interface ProfileContact {
+  email?: string;
+  phone?: string;
+  city?: string;
+  linkedin?: string;
+  languages?: string;
+  education?: string;
+  certifications?: string;
+  headline?: string;
+  cvStyle?: string;
+}
+
 export interface Profile {
   id?: string;
   name: string;
@@ -119,6 +132,7 @@ export interface Profile {
   createdAt: number;
   latent?: LatentProfile;
   taskStats?: TaskOutcomeStat;
+  contact?: ProfileContact;
   /**
    * Skills extraídas por IA de los documentos del joven (diplomas,
    * certificados). NO persistido en el documento `profiles`; se enriquece
@@ -186,6 +200,20 @@ export interface OpportunityMatch {
   breakdown?: ICSBreakdown;
   redFlag?: string;
   topSkills?: string[];
+  /** Decisión de la empresa sobre este match (si existe). */
+  companyStatus?: "interested" | "discarded" | null;
+}
+
+export type MatchDecisionStatus = "pending" | "interested" | "discarded";
+
+export interface MatchDecision {
+  id: string;
+  needId: string;
+  profileId: string;
+  companyId: string;
+  status: MatchDecisionStatus;
+  icsAtTime?: number;
+  updatedAt: number;
 }
 
 export interface CompanyLegal {
@@ -245,6 +273,23 @@ export interface Match {
    * entrevista — el founder confía más en estas.
    */
   verifiedSkills?: { skill: string; evidence: string }[];
+}
+
+/** Resultado persistido del ICS para una necesidad (calculado una vez al publicar). */
+export interface NeedMatchSnapshot {
+  needId: string;
+  matches: Match[];
+  rankingMode: "llm" | "degraded";
+  degradedReason?: string;
+  excluded: { profileId: string; reason: string }[];
+  meta: {
+    shortlistSize: number;
+    llmHits: number;
+    heuristicHits: number;
+    profileCount: number;
+  };
+  warning?: string;
+  computedAt: number;
 }
 
 /**

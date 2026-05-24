@@ -3,12 +3,14 @@ import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
 import { createNeed, getNeed } from "@/lib/db";
+import { computeMatchesForNeed } from "@/lib/match-need";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateNeedDescription } from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { CompanyLegal, CompanyNeed } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const STRUCTURE_PROMPT = `Eres el estructurador de necesidades de SaltoAI.
 Un founder de una empresa temprana describió en lenguaje libre qué necesita. Tu trabajo es estructurar eso en señales comparables para el motor de matching.
@@ -138,6 +140,18 @@ export async function POST(req: NextRequest) {
     const embedding = await embed(buildEmbeddingText(base));
     const { id, storage } = await createNeed({ ...base, embedding });
     const saved = await getNeed(id);
+
+  // ICS se calcula una sola vez al publicar; /api/match solo lee el snapshot.
+    let matchCount = 0;
+    if (saved) {
+      try {
+        const snapshot = await computeMatchesForNeed(saved);
+        matchCount = snapshot.matches.length;
+      } catch (matchErr) {
+        log.warn("match.compute_failed", { needId: id, message: (matchErr as Error)?.message });
+      }
+    }
+
     log.end({
       status: 200,
       extra: {
@@ -145,9 +159,10 @@ export async function POST(req: NextRequest) {
         requiredSkills: structured.requiredSkills.length,
         desiredTraits: structured.desiredTraits.length,
         hardConstraints: structured.hardConstraints.length,
+        matchCount,
       },
     });
-    return NextResponse.json({ id, need: saved });
+    return NextResponse.json({ id, need: saved, storage });
   } catch (err) {
     if (isRateLimitError(err)) {
       const shape = classifyProviderError(err);

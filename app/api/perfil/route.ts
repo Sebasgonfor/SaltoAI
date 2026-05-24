@@ -3,6 +3,7 @@ import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
 import { createProfile, getProfile, upsertProfileWithId, storageFromId } from "@/lib/db";
+import { parseProfileContact } from "@/lib/profile-contact";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateForProfileExtraction, parseJovenAge } from "@/lib/input-validation";
 import { sanitizeEvidenceForCv } from "@/lib/cv-evidence";
@@ -278,6 +279,79 @@ export async function POST(req: NextRequest) {
     log.end({ status: 500, extra: { code: "unknown" } });
     return NextResponse.json(
       { error: "No pudimos construir el perfil.", code: "unknown" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const log = startLog(req, "perfil");
+  try {
+    const body = (await req.json()) as {
+      id?: string;
+      uid?: string;
+      basics?: unknown;
+      contact?: unknown;
+    };
+    const id = typeof body.id === "string" ? body.id.trim() : "";
+    const uid = typeof body.uid === "string" ? body.uid.trim() : "";
+    const basics = body.basics != null ? parseBasics(body.basics) : null;
+    const contact =
+      body.contact != null ? parseProfileContact(body.contact) : null;
+
+    if (!id || !uid || id !== uid) {
+      log.end({ status: 403, extra: { reason: "forbidden" } });
+      return NextResponse.json({ error: "No autorizado para editar este perfil." }, { status: 403 });
+    }
+    if (!basics && !contact) {
+      log.end({ status: 400, extra: { reason: "nothing_to_update" } });
+      return NextResponse.json(
+        { error: "Indica datos básicos o contacto para actualizar." },
+        { status: 400 }
+      );
+    }
+    if (body.basics != null && !basics) {
+      log.end({ status: 400, extra: { reason: "invalid_basics" } });
+      return NextResponse.json(
+        { error: "Completa nombre, edad y género válidos." },
+        { status: 400 }
+      );
+    }
+    if (body.contact != null && !contact) {
+      log.end({ status: 400, extra: { reason: "invalid_contact" } });
+      return NextResponse.json(
+        { error: "Datos de contacto inválidos o vacíos." },
+        { status: 400 }
+      );
+    }
+
+    const existing = await getProfile(id);
+    if (!existing) {
+      log.end({ status: 404, extra: { profileId: id } });
+      return NextResponse.json({ error: "Perfil no encontrado" }, { status: 404 });
+    }
+
+    const patch: Profile = { ...existing };
+    if (basics) {
+      patch.name = basics.name;
+      patch.age = basics.age;
+      patch.gender = basics.gender;
+    }
+    if (contact) {
+      patch.contact = { ...existing.contact, ...contact };
+    }
+
+    await upsertProfileWithId(id, patch);
+
+    const saved = await getProfile(id);
+    const mode = basics && contact ? "patch_both" : basics ? "patch_basics" : "patch_contact";
+    log.end({ status: 200, extra: { profileId: id, mode } });
+    return NextResponse.json({ profile: saved, storage: storageFromId(id) });
+  } catch (err) {
+    log.error("perfil.patch.exception", { message: (err as Error)?.message });
+    log.end({ status: 500, extra: { code: "unknown" } });
+    return NextResponse.json(
+      { error: "No pudimos guardar los cambios.", code: "unknown" },
       { status: 500 }
     );
   }

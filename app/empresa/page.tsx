@@ -36,6 +36,7 @@ import {
   Layers,
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask } from '@/lib/types';
+import { LegalEditor } from '@/components/empresa/legal-editor';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -328,6 +329,8 @@ export default function EmpresaDashboardPage() {
           en curso. Calidad sobre volumen — 10 candidatos por necesidad, no 200 CVs.
         </p>
       </header>
+
+      {user?.uid && <LegalEditor uid={user.uid} />}
 
       {/* KPIs */}
       <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">

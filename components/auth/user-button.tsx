@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { LogOut, User as UserIcon, ChevronDown, LayoutDashboard, Building2, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
+import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
 import { cn } from '@/lib/utils';
 
 interface UserButtonProps {
@@ -15,6 +16,7 @@ interface UserButtonProps {
 
 export function UserButton({ variant = 'light', className }: UserButtonProps) {
   const { user, account, loading, signOut } = useAuth();
+  const jovenProfileId = useJovenProfileId();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -97,7 +99,7 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
           </Link>
           {account?.role === 'joven' && (
             <Link
-              href={`/joven/perfil/${user.uid}`}
+              href={`/joven/perfil/${jovenProfileId ?? user.uid}`}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
               role="menuitem"

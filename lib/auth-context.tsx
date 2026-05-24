@@ -71,6 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           pendingRoleRef.current = null;
         }
         setAccount(existing);
+        // #region agent log
+        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'lib/auth-context.tsx',message:'auth_state',data:{uid:u.uid,hasAccount:!!existing,role:existing?.role??null,pendingRole:pendingRoleRef.current},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       } catch (err) {
         console.error('[auth] load account failed', err);
         setAccount(null);

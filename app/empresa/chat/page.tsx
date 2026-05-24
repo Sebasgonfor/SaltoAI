@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { ChatMessage } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
+import { loadSavedEmpresaLegal, saveEmpresaLegal } from '@/lib/user-onboarding-storage';
 
 const MAX_TURNS = 6;
 
@@ -101,6 +102,16 @@ function clearPersisted(uid: string | null | undefined): void {
   }
 }
 
+function legalToForm(legal: CompanyLegal): Omit<CompanyLegal, 'acceptedAt'> {
+  return {
+    companyName: legal.companyName,
+    taxId: legal.taxId,
+    legalRepName: legal.legalRepName,
+    legalRepDocId: legal.legalRepDocId,
+    acceptedTerms: legal.acceptedTerms,
+  };
+}
+
 function buildOpeningMessage(name: string): ChatMessage {
   const short = name.split(/\s+/)[0] || name;
   return {
@@ -113,21 +124,7 @@ function buildOpeningMessage(name: string): ChatMessage {
   };
 }
 
-// Validaciones mínimas, no estrictas por jurisdicción. El backend valida el
-// resto. Apuntamos a frenar envíos vacíos / obviamente falsos, sin bloquear
-// formatos válidos de CO/ES/MX/etc.
-function validateTaxId(v: string): string | null {
-  const trimmed = v.trim();
-  if (trimmed.length < 6) return 'El identificador fiscal parece muy corto.';
-  if (!/[0-9]/.test(trimmed)) return 'El identificador fiscal debe tener al menos un número.';
-  return null;
-}
-
-function validateDocId(v: string): string | null {
-  const trimmed = v.trim();
-  if (trimmed.length < 5) return 'El documento del representante parece muy corto.';
-  return null;
-}
+import { validateDocId, validateTaxId } from '@/lib/empresa-legal-validation';
 
 export default function ChatEmpresa() {
   const router = useRouter();
@@ -153,15 +150,45 @@ export default function ChatEmpresa() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = loadPersisted(user?.uid);
-    if (saved) {
-      if (saved.phase) setPhase(saved.phase);
-      if (saved.legal) setLegal(saved.legal);
-      if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
-      if (Array.isArray(saved.messages)) setMessages(saved.messages);
-      if (typeof saved.input === 'string') setInput(saved.input);
+    let cancelled = false;
+
+    async function restore() {
+      const saved = loadPersisted(user?.uid);
+      if (saved) {
+        if (Array.isArray(saved.messages)) setMessages(saved.messages);
+        if (typeof saved.input === 'string') setInput(saved.input);
+      }
+
+      const savedLegal = loadSavedEmpresaLegal(user?.uid);
+      if (cancelled) return;
+
+      const hasInterviewProgress = (saved?.messages?.length ?? 0) > 0;
+
+      if (savedLegal) {
+        setLegal(savedLegal);
+        setForm(legalToForm(savedLegal));
+        if (hasInterviewProgress) {
+          setPhase('interview');
+        } else {
+          setPhase('interview');
+          setMessages([buildOpeningMessage(savedLegal.legalRepName)]);
+        }
+      } else if (saved) {
+        if (saved.phase) setPhase(saved.phase);
+        if (saved.legal) {
+          setLegal(saved.legal);
+          saveEmpresaLegal(user?.uid, saved.legal);
+        }
+        if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
+      }
+
+      setRestored(true);
     }
-    setRestored(true);
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -200,17 +227,31 @@ export default function ChatEmpresa() {
       .reduce((acc, m) => acc + m.content.trim().split(/\s+/).filter(Boolean).length, 0);
   }, [messages]);
 
-  const resetAll = () => {
+  const resetInterview = () => {
     if (closing) return;
     const ok =
       typeof window === 'undefined' ||
       window.confirm(
-        '¿Reiniciar todo? Se borran los datos legales y la entrevista. Vas a tener que empezar desde el paso 1.'
+        '¿Reiniciar la entrevista? Se borra la conversación actual. Los datos legales de la empresa se mantienen.'
       );
     if (!ok) return;
     clearPersisted(user?.uid);
     setMessages([]);
     setInput('');
+    setFormError(null);
+    setSubmitError(null);
+    setLoading(false);
+    setClosing(false);
+
+    const savedLegal = loadSavedEmpresaLegal(user?.uid) ?? legal;
+    if (savedLegal) {
+      setLegal(savedLegal);
+      setForm(legalToForm(savedLegal));
+      setPhase('interview');
+      setMessages([buildOpeningMessage(savedLegal.legalRepName)]);
+      return;
+    }
+
     setLegal(null);
     setForm({
       companyName: '',
@@ -219,10 +260,6 @@ export default function ChatEmpresa() {
       legalRepDocId: '',
       acceptedTerms: false,
     });
-    setFormError(null);
-    setSubmitError(null);
-    setLoading(false);
-    setClosing(false);
     setPhase('legal');
   };
 
@@ -260,6 +297,7 @@ export default function ChatEmpresa() {
       acceptedAt: new Date().toISOString(),
     };
     setLegal(legalRecord);
+    saveEmpresaLegal(user?.uid, legalRecord);
     setFormError(null);
     setMessages([buildOpeningMessage(repName)]);
     setPhase('interview');
@@ -299,6 +337,7 @@ export default function ChatEmpresa() {
         return;
       }
       clearPersisted(user?.uid);
+      if (legal) saveEmpresaLegal(user?.uid, legal);
       router.push(`/empresa/matches/${data.id}`);
     } catch {
       setSubmitError('Error de red. Prueba enviar de nuevo en un momento.');
@@ -514,6 +553,16 @@ export default function ChatEmpresa() {
                 </Badge>
               </span>
             )}
+            {user?.uid && (
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                Los datos legales ya están guardados.{' '}
+                <Link href="/empresa#datos-empresa" className="text-emerald-700 underline">
+                  Editar en tu perfil
+                </Link>
+                {' · '}
+                «Reiniciar» solo borra esta conversación.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -537,10 +586,10 @@ export default function ChatEmpresa() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={resetAll}
+            onClick={resetInterview}
             disabled={loading || closing}
             className="text-slate-500 hover:text-rose-600 hover:bg-rose-50 gap-1.5 -ml-1"
-            title="Reiniciar todo desde el paso 1"
+            title="Reiniciar la entrevista (los datos legales se mantienen)"
           >
             <RotateCcw size={14} />
             Reiniciar

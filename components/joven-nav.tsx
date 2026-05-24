@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/auth-context';
 import { UserButton } from '@/components/auth/user-button';
 import { NavLink } from '@/components/nav-link';
+import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
 
 /**
  * Nav del joven. Cuatro items, cada uno con propósito claro:
@@ -25,9 +26,12 @@ import { NavLink } from '@/components/nav-link';
  */
 export function JovenNav() {
   const { user } = useAuth();
-  // Si hay sesión, "Mi Perfil" va directo al perfil de este usuario.
-  // Sin sesión, /joven/perfil hace fallback a localStorage o muestra empty state.
-  const perfilHref = user?.uid ? `/joven/perfil/${user.uid}` : '/joven/perfil';
+  const jovenProfileId = useJovenProfileId();
+  const perfilHref = jovenProfileId
+    ? `/joven/perfil/${jovenProfileId}`
+    : user?.uid
+      ? `/joven/perfil/${user.uid}`
+      : '/joven/perfil';
 
   return (
     <nav className="flex gap-1 items-center text-sm font-medium">

@@ -295,7 +295,13 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
             <p className="text-xs text-emerald-900 leading-relaxed">
               ¿{task.profileName.split(' ')[0]} funcionó? El próximo paso natural es una conversación de contratación formal.
             </p>
-            <Link href={`/joven/perfil/${task.profileId}`}>
+            <Link
+              href={
+                task.needId
+                  ? `/empresa/candidatos/${task.profileId}?needId=${encodeURIComponent(task.needId)}`
+                  : `/empresa/candidatos/${task.profileId}`
+              }
+            >
               <Button variant="outline" size="sm" className="bg-white">
                 Ver perfil completo
               </Button>

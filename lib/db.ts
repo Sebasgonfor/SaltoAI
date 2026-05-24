@@ -22,6 +22,9 @@ import type {
   LatentProfile,
   ProfileDocument,
   TaskOutcomeStat,
+  MatchDecision,
+  MatchDecisionStatus,
+  NeedMatchSnapshot,
 } from "./types";
 
 const PROFILES = "profiles";
@@ -29,6 +32,8 @@ const NEEDS = "needs";
 const FEEDBACK = "feedback";
 const MICROTASKS = "microtasks";
 const DOCUMENTS = "documents";
+const MATCH_DECISIONS = "match_decisions";
+const NEED_MATCHES = "need_matches";
 
 export type StorageMode = "firestore" | "memory";
 
@@ -55,6 +60,8 @@ type DbGlobals = {
   memFeedback: FeedbackEntry[];
   memMicroTasks: Map<string, MicroTask>;
   memDocuments: Map<string, ProfileDocument>;
+  memMatchDecisions: Map<string, MatchDecision>;
+  memNeedMatches: Map<string, NeedMatchSnapshot>;
 };
 const g = globalThis as unknown as { __saltoDb?: DbGlobals };
 if (!g.__saltoDb) {
@@ -64,16 +71,22 @@ if (!g.__saltoDb) {
     memFeedback: [],
     memMicroTasks: new Map(),
     memDocuments: new Map(),
+    memMatchDecisions: new Map(),
+    memNeedMatches: new Map(),
   };
 }
 // Backfill por si el globalThis fue creado por una versión anterior sin
 // memDocuments. Sin esto, HMR en dev deja la prop como undefined → crash.
 if (!g.__saltoDb.memDocuments) g.__saltoDb.memDocuments = new Map();
+if (!g.__saltoDb.memMatchDecisions) g.__saltoDb.memMatchDecisions = new Map();
+if (!g.__saltoDb.memNeedMatches) g.__saltoDb.memNeedMatches = new Map();
 const memProfiles = g.__saltoDb.memProfiles;
 const memNeeds = g.__saltoDb.memNeeds;
 const memFeedback = g.__saltoDb.memFeedback;
 const memMicroTasks = g.__saltoDb.memMicroTasks;
 const memDocuments = g.__saltoDb.memDocuments;
+const memMatchDecisions = g.__saltoDb.memMatchDecisions;
+const memNeedMatches = g.__saltoDb.memNeedMatches;
 
 // Antes había un único flag global `firestoreDisabled` que se prendía con
 // el PRIMER error y dejaba el proceso entero en modo memoria — un permiso
@@ -531,6 +544,145 @@ export async function deleteDocument(id: string): Promise<boolean> {
   }
   if (memDocuments.delete(id)) deleted = true;
   return deleted;
+}
+
+export function matchDecisionId(needId: string, profileId: string): string {
+  return `${needId}__${profileId}`;
+}
+
+export async function upsertMatchDecision(
+  input: Omit<MatchDecision, "id" | "updatedAt"> & { status: Exclude<MatchDecisionStatus, "pending"> }
+): Promise<MatchDecision> {
+  const id = matchDecisionId(input.needId, input.profileId);
+  const data: MatchDecision = {
+    ...input,
+    id,
+    updatedAt: Date.now(),
+  };
+  if (useFirestore(MATCH_DECISIONS)) {
+    try {
+      await setDoc(
+        doc(db, MATCH_DECISIONS, id),
+        stripUndefined(data as unknown as Record<string, unknown>)
+      );
+      memMatchDecisions.set(id, data);
+      return data;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "upsertMatchDecision", MATCH_DECISIONS);
+    }
+  }
+  memMatchDecisions.set(id, data);
+  return data;
+}
+
+export async function getMatchDecision(
+  needId: string,
+  profileId: string
+): Promise<MatchDecision | null> {
+  const id = matchDecisionId(needId, profileId);
+  if (useFirestore(MATCH_DECISIONS)) {
+    try {
+      const snap = await getDoc(doc(db, MATCH_DECISIONS, id));
+      if (!snap.exists()) return memMatchDecisions.get(id) ?? null;
+      const row = { id: snap.id, ...(snap.data() as Omit<MatchDecision, "id">) };
+      memMatchDecisions.set(id, row);
+      return row;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getMatchDecision", MATCH_DECISIONS);
+    }
+  }
+  return memMatchDecisions.get(id) ?? null;
+}
+
+export async function listDecisionsByNeed(needId: string): Promise<MatchDecision[]> {
+  if (useFirestore(MATCH_DECISIONS)) {
+    try {
+      const q = query(collection(db, MATCH_DECISIONS), where("needId", "==", needId));
+      const snap = await getDocs(q);
+      const remote = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<MatchDecision, "id">),
+      }));
+      for (const row of remote) memMatchDecisions.set(row.id, row);
+      return remote.length > 0
+        ? remote
+        : Array.from(memMatchDecisions.values()).filter((d) => d.needId === needId);
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listDecisionsByNeed", MATCH_DECISIONS);
+    }
+  }
+  return Array.from(memMatchDecisions.values()).filter((d) => d.needId === needId);
+}
+
+export async function listDecisionsForProfile(profileId: string): Promise<MatchDecision[]> {
+  if (useFirestore(MATCH_DECISIONS)) {
+    try {
+      const q = query(collection(db, MATCH_DECISIONS), where("profileId", "==", profileId));
+      const snap = await getDocs(q);
+      const remote = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<MatchDecision, "id">),
+      }));
+      for (const row of remote) memMatchDecisions.set(row.id, row);
+      return remote.length > 0
+        ? remote
+        : Array.from(memMatchDecisions.values()).filter((d) => d.profileId === profileId);
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listDecisionsForProfile", MATCH_DECISIONS);
+    }
+  }
+  return Array.from(memMatchDecisions.values()).filter((d) => d.profileId === profileId);
+}
+
+export async function saveNeedMatches(snapshot: NeedMatchSnapshot): Promise<void> {
+  const id = snapshot.needId;
+  if (useFirestore(NEED_MATCHES)) {
+    try {
+      await setDoc(
+        doc(db, NEED_MATCHES, id),
+        stripUndefined(snapshot as unknown as Record<string, unknown>)
+      );
+      memNeedMatches.set(id, snapshot);
+      return;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "saveNeedMatches", NEED_MATCHES);
+    }
+  }
+  memNeedMatches.set(id, snapshot);
+}
+
+export async function getNeedMatches(needId: string): Promise<NeedMatchSnapshot | null> {
+  if (useFirestore(NEED_MATCHES)) {
+    try {
+      const snap = await getDoc(doc(db, NEED_MATCHES, needId));
+      if (snap.exists()) {
+        const data = snap.data() as Omit<NeedMatchSnapshot, "needId">;
+        const row: NeedMatchSnapshot = { needId, ...data };
+        memNeedMatches.set(needId, row);
+        return row;
+      }
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getNeedMatches", NEED_MATCHES);
+    }
+  }
+  return memNeedMatches.get(needId) ?? null;
+}
+
+export async function getAllNeedMatches(): Promise<NeedMatchSnapshot[]> {
+  if (useFirestore(NEED_MATCHES)) {
+    try {
+      const snap = await getDocs(collection(db, NEED_MATCHES));
+      const remote = snap.docs.map((d) => ({
+        needId: d.id,
+        ...(d.data() as Omit<NeedMatchSnapshot, "needId">),
+      }));
+      for (const row of remote) memNeedMatches.set(row.needId, row);
+      return remote.length > 0 ? remote : Array.from(memNeedMatches.values());
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getAllNeedMatches", NEED_MATCHES);
+    }
+  }
+  return Array.from(memNeedMatches.values());
 }
 
 export { isFirestoreConfigured };

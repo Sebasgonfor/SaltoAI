@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNeed, getProfile } from "@/lib/db";
+import { mergeCvContact } from "@/lib/profile-contact";
 import { startLog } from "@/lib/logger";
 import {
   CV_STYLES,
@@ -12,6 +13,19 @@ import {
 } from "@/lib/cv-templates";
 
 export const runtime = "nodejs";
+
+function spHasContact(cv: CvOptions): boolean {
+  return !!(
+    cv.email?.trim() ||
+    cv.phone?.trim() ||
+    cv.city?.trim() ||
+    cv.linkedin?.trim() ||
+    cv.languages?.trim() ||
+    cv.education?.trim() ||
+    cv.certifications?.trim() ||
+    cv.headline?.trim()
+  );
+}
 
 /**
  * CV ATS one-click (PRD §6.2.5) — 5 estilos seleccionables.
@@ -108,12 +122,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const mergedContact = mergeCvContact(profile.contact, cv);
+  const profileStyle = profile.contact?.cvStyle;
+  const effectiveStyle: CvStyle =
+    !spHasContact(cv) && profileStyle && isCvStyle(profileStyle)
+      ? profileStyle
+      : style;
+  const cvWithContact: CvOptions = {
+    ...cv,
+    ...mergedContact,
+    autoprint: cv.autoprint,
+  };
+
   if (format === "json") {
-    log.end({ status: 200, extra: { profileId, needId, style, format: "json" } });
+    log.end({ status: 200, extra: { profileId, needId, style: effectiveStyle, format: "json" } });
     return NextResponse.json({
       profile,
-      style,
-      ats: { plainText: renderPlainText(profile, style, cv) },
+      style: effectiveStyle,
+      ats: { plainText: renderPlainText(profile, effectiveStyle, cvWithContact) },
     });
   }
 
@@ -121,8 +147,8 @@ export async function GET(req: NextRequest) {
   // y se mostraba como dump crudo en una pestaña nueva. El usuario pide ver
   // el CV en texto plano, no la estructura interna.
   if (format === "txt" || format === "text") {
-    const text = renderPlainText(profile, style, cv);
-    log.end({ status: 200, extra: { profileId, needId, style, format: "txt" } });
+    const text = renderPlainText(profile, effectiveStyle, cvWithContact);
+    log.end({ status: 200, extra: { profileId, needId, style: effectiveStyle, format: "txt" } });
     const headers: Record<string, string> = {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "private, no-store",
@@ -131,12 +157,12 @@ export async function GET(req: NextRequest) {
       const safeName = (profile.name || "candidato")
         .replace(/[^a-z0-9\-_]+/gi, "_")
         .toLowerCase();
-      headers["Content-Disposition"] = `attachment; filename="cv_${style}_${safeName}.txt"`;
+      headers["Content-Disposition"] = `attachment; filename="cv_${effectiveStyle}_${safeName}.txt"`;
     }
     return new NextResponse(text, { status: 200, headers });
   }
 
-  const html = renderCv(profile, style, cv);
+  const html = renderCv(profile, effectiveStyle, cvWithContact);
   const headers: Record<string, string> = {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "private, no-store",
@@ -145,14 +171,14 @@ export async function GET(req: NextRequest) {
     const safeName = (profile.name || "candidato")
       .replace(/[^a-z0-9\-_]+/gi, "_")
       .toLowerCase();
-    headers["Content-Disposition"] = `attachment; filename="cv_${style}_${safeName}.html"`;
+    headers["Content-Disposition"] = `attachment; filename="cv_${effectiveStyle}_${safeName}.html"`;
   }
   log.end({
     status: 200,
     extra: {
       profileId,
       needId,
-      style,
+      style: effectiveStyle,
       format: "html",
       autoprint: cv.autoprint,
       download,

@@ -12,10 +12,11 @@
  *
  * El "one-click" sigue funcionando aun con todos los campos vacíos.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/lib/auth-context';
 import {
   Download,
   FileText,
@@ -171,10 +172,29 @@ function isPhoneValid(v: string): boolean {
   return digits.length >= 7; // permisivo: cubre formatos LATAM con o sin prefijo
 }
 
+function fieldsFromContact(c: Record<string, string | undefined>): CvFields {
+  return {
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    city: c.city ?? '',
+    linkedin: c.linkedin ?? '',
+    languages: c.languages ?? EMPTY.languages,
+    education: c.education ?? '',
+    certifications: c.certifications ?? '',
+    headline: c.headline ?? '',
+  };
+}
+
+function hasLocalContact(f: CvFields): boolean {
+  return !!(f.email.trim() || f.phone.trim() || f.city.trim());
+}
+
 export default function CvCustomizer({ profileId }: { profileId: string }) {
+  const { user } = useAuth();
   const [fields, setFields] = useState<CvFields>(EMPTY);
   const [style, setStyle] = useState<CvStyle>(DEFAULT_STYLE);
   const [hydrated, setHydrated] = useState(false);
+  const migratedRef = useRef(false);
   // Bandera por campo: solo mostramos el error después de que el usuario lo
   // tocó (UX estándar). Evita un mar rojo al cargar la página.
   const [touched, setTouched] = useState<Record<RequiredField, boolean>>({
@@ -187,7 +207,55 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
     setFields(loadFields(profileId));
     setStyle(loadStyle(profileId));
     setHydrated(true);
+    migratedRef.current = false;
   }, [profileId]);
+
+  const pushContactToServer = useCallback(
+    async (f: CvFields, s: CvStyle) => {
+      if (!user?.uid || user.uid !== profileId) return;
+      try {
+        await fetch('/api/perfil', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: profileId,
+            uid: user.uid,
+            contact: { ...f, cvStyle: s },
+          }),
+        });
+      } catch {
+        /* offline — localStorage sigue siendo cache */
+      }
+    },
+    [user?.uid, profileId]
+  );
+
+  // Hidratar desde servidor y migrar localStorage → Firestore una vez.
+  useEffect(() => {
+    if (!hydrated || !user?.uid || user.uid !== profileId || migratedRef.current) return;
+    migratedRef.current = true;
+
+    void (async () => {
+      const local = loadFields(profileId);
+      const localStyle = loadStyle(profileId);
+      try {
+        const res = await fetch(`/api/perfil?id=${encodeURIComponent(profileId)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { profile?: { contact?: Record<string, string> } };
+        const serverContact = data.profile?.contact;
+        if (serverContact && Object.keys(serverContact).length > 0) {
+          setFields((prev) => ({ ...prev, ...fieldsFromContact(serverContact) }));
+          if (serverContact.cvStyle && STYLES.some((s) => s.id === serverContact.cvStyle)) {
+            setStyle(serverContact.cvStyle as CvStyle);
+          }
+        } else if (hasLocalContact(local)) {
+          await pushContactToServer(local, localStyle);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [hydrated, user?.uid, profileId, pushContactToServer]);
 
   // Persistencia: ambos slots (fields + style) por profileId.
   useEffect(() => {
@@ -206,6 +274,15 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
       /* quota */
     }
   }, [style, profileId, hydrated]);
+
+  // Sync al servidor (debounced) cuando el dueño edita contacto.
+  useEffect(() => {
+    if (!hydrated || !user?.uid || user.uid !== profileId) return;
+    const t = window.setTimeout(() => {
+      void pushContactToServer(fields, style);
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [fields, style, hydrated, user?.uid, profileId, pushContactToServer]);
 
   const buildUrl = useMemo(() => {
     return (extra: Record<string, string>) => {
@@ -327,8 +404,8 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 Completa tus datos de contacto
               </h3>
               <p className="text-xs text-slate-600 mt-1 max-w-md leading-relaxed">
-                Sin email, teléfono y ciudad, las empresas no pueden contactarte. Se guardan
-                solo en tu navegador.
+                Sin email, teléfono y ciudad, las empresas no pueden contactarte. Se guardan en tu
+                perfil y en este navegador.
               </p>
             </div>
             <div className="text-right">

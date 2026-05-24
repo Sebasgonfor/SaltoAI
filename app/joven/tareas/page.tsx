@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Briefcase, Clock, DollarSign, ArrowRight, Star, Trophy, Search } from 'lucide-react';
 import type { MicroTask } from '@/lib/types';
 import { RoleGate } from '@/components/auth/role-gate';
+import { useAuth } from '@/lib/auth-context';
+
+const TASK_POLL_MS = 12_000;
 
 /**
  * Listado de micro-tareas del joven. Privado — solo el dueño debe verlo.
@@ -21,47 +24,64 @@ export default function TareasJovenPage() {
 }
 
 function TareasJoven() {
+  const { user } = useAuth();
   const [profileId, setProfileId] = useState<string>('');
   const [tasks, setTasks] = useState<MicroTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  const buscar = async () => {
-    if (!profileId.trim()) return;
-    setLoading(true);
+  const loadTasks = useCallback(async (pid: string, opts?: { silent?: boolean }) => {
+    if (!pid.trim()) return;
+    if (!opts?.silent) setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(`/api/microtask/list?profileId=${encodeURIComponent(profileId.trim())}`);
+      const res = await fetch(
+        `/api/microtask/list?profileId=${encodeURIComponent(pid.trim())}`,
+        { cache: 'no-store' }
+      );
       if (res.ok) {
         const data = await res.json();
         setTasks(data.tasks || []);
-      } else {
+      } else if (!opts?.silent) {
         setTasks([]);
       }
     } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const last = typeof window !== 'undefined' ? localStorage.getItem('salto_last_profile_id') : null;
-    if (last) {
-      setProfileId(last);
-      (async () => {
-        setLoading(true);
-        try {
-          const res = await fetch(`/api/microtask/list?profileId=${encodeURIComponent(last)}`);
-          if (res.ok) {
-            const data = await res.json();
-            setTasks(data.tasks || []);
-          }
-        } finally {
-          setLoading(false);
-          setSearched(true);
-        }
-      })();
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
+
+  const buscar = () => void loadTasks(profileId);
+
+  useEffect(() => {
+    const fromAuth = user?.uid;
+    const fromStorage =
+      typeof window !== 'undefined' ? localStorage.getItem('salto_last_profile_id') : null;
+    const pid = fromAuth ?? fromStorage ?? '';
+    if (pid) {
+      setProfileId(pid);
+      void loadTasks(pid);
+    }
+  }, [user?.uid, loadTasks]);
+
+  useEffect(() => {
+    if (!profileId) return;
+
+    const timer = window.setInterval(() => {
+      void loadTasks(profileId, { silent: true });
+    }, TASK_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadTasks(profileId, { silent: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [profileId, loadTasks]);
 
   const active = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
   const delivered = tasks.filter((t) => t.status === 'delivered');
@@ -76,6 +96,12 @@ function TareasJoven() {
         </h1>
         <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
           Cada micro-tarea es ingresos reales para ti y evidencia verificada para tu perfil. Mejor que un CV.
+          {active.length > 0 && (
+            <span className="block mt-2 text-emerald-700 font-medium">
+              Tienes {active.length} tarea{active.length === 1 ? '' : 's'} activa
+              {active.length === 1 ? '' : 's'} — se actualiza sola cada pocos segundos.
+            </span>
+          )}
         </p>
       </header>
 
