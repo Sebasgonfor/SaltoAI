@@ -1,0 +1,84 @@
+rules_version = '2';
+
+// Salto — reglas Firestore.
+//
+// IMPORTANTE — modo "demo / hackatón":
+// El backend (Next.js API routes) usa el WEB SDK de Firebase, NO el Admin SDK.
+// El Web SDK del lado server NO manda credenciales de auth a Firestore, así
+// que cualquier regla que requiera `request.auth != null` deniega TODAS las
+// reads y writes del backend → /api/match, /api/perfil, /api/seed, etc.
+// caen al fallback de memoria.
+//
+// Workaround actual:
+//   - accounts → STRICT (datos sensibles del usuario, sin tráfico server).
+//   - profiles, needs, microtasks → read+write abierto.
+//   - feedback → write abierto, read cerrado (flywheel propietario).
+//
+// El ENFORCEMENT REAL (ownership, schema, validación) vive en las API routes
+// de Next: el server setea `doc.id == uid` en upsertProfileWithId, ata
+// `ownerUid` y `companyOwnerUid` desde el sesión activo. Cliente web NUNCA
+// debería escribir directo a Firestore — todo va por API.
+//
+// Roadmap: migrar el backend a `firebase-admin` con service account. Eso
+// permite cerrar todos los reads/writes auth-scoped sin sacrificar UX.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ACCOUNTS — el rol asignado al usuario. Sigue STRICT auth-scoped:
+    // contiene datos sensibles (rol asignado, no debe filtrarse).
+    match /accounts/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.role in ['joven', 'empresa'];
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['interviewCompleted'])
+                    && request.resource.data.interviewCompleted == true;
+      allow delete: if false;
+    }
+
+    // PROFILES — el doc id es el uid del joven (ver app/api/perfil con upsertProfileWithId).
+    //
+    // DEMO MODE: read + write abiertos.
+    // Razón: los writes los hace el server Next.js con el WEB SDK que NO manda
+    // auth, así que cualquier rule auth-scoped deniega → todo cae a memoria.
+    // Hasta migrar a firebase-admin con service account, las rules no pueden
+    // hacer ownership enforcement aquí. El control real vive en las API routes
+    // de Next: /api/perfil POST setea doc.id = uid (ver upsertProfileWithId).
+    match /profiles/{profileId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // NEEDS — necesidades publicadas por empresas.
+    // DEMO MODE — mismo motivo que profiles. El enforcement de ownerUid vive
+    // en /api/necesidad (server-side) hasta migrar a firebase-admin.
+    match /needs/{needId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // MICROTASKS (PRD §6.3) — tareas pagadas joven↔empresa.
+    // DEMO MODE — writes desde el server (proponer/entregar/evaluar). El
+    // enforcement de companyOwnerUid / profileId vive en las API routes.
+    match /microtasks/{taskId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // FEEDBACK (PRD §6.2.6, §8.6) — data flywheel propietario.
+    // DEMO MODE: write abierto para que el server pueda registrar votos.
+    // Read cerrado del lado cliente (solo lectura via Admin SDK / scripts
+    // internos para reentrenar el ICS).
+    match /feedback/{feedbackId} {
+      allow read: if false;
+      allow write: if true;
+    }
+
+    // Cualquier otra colección queda cerrada por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
