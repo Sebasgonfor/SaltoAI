@@ -12,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured } from './firebase';
 import { getUserAccount, setUserRole, type UserAccount, type UserRole } from './accounts';
-import { isAuthCancellation } from './auth-errors';
+import { isAuthCancellation, isExpectedAuthError } from './auth-errors';
 
 interface AuthContextValue {
   user: User | null;
@@ -109,7 +109,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return cred.user;
       } catch (err: unknown) {
         if (isAuthCancellation(err)) return null;
-        console.error('[auth] signInWithGoogle failed', err);
+        // Solo loggeamos errores INESPERADOS. Los "esperables" (user
+        // typeó mal, cuenta no existe, etc.) ya los muestra el form
+        // al usuario; logearlos genera ruido en el dev overlay de Next.
+        if (!isExpectedAuthError(err)) {
+          console.error('[auth] signInWithGoogle failed', err);
+        }
         throw err;
       }
     },
@@ -129,7 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
         return cred.user;
       } catch (err: unknown) {
-        console.error('[auth] signInWithEmail failed', err);
+        // Credenciales inválidas / cuenta no existente NO son bugs.
+        // El form ya muestra el mensaje user-friendly via
+        // getAuthErrorMessage. Solo loggeamos errores inesperados.
+        if (!isExpectedAuthError(err)) {
+          console.error('[auth] signInWithEmail failed', err);
+        }
         throw err;
       }
     },
@@ -167,7 +177,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return cred.user;
       } catch (err: unknown) {
-        console.error('[auth] signUpWithEmail failed', err);
+        // "Email ya registrado" / "weak password" son user mistakes,
+        // no bugs — el form ya muestra el mensaje en español. Solo
+        // loggeamos errores inesperados (network, configuration).
+        if (!isExpectedAuthError(err)) {
+          console.error('[auth] signUpWithEmail failed', err);
+        }
         throw err;
       }
     },

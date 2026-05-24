@@ -14,6 +14,7 @@ import {
   Network,
   ArrowRight,
   Building2,
+  AlertCircle,
 } from 'lucide-react';
 import type { Gender, Profile, JovenBasics } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
@@ -31,6 +32,7 @@ import {
 } from '@/components/feedback/company-to-youth';
 import { YouthFeedbackInbox } from '@/components/feedback/youth-inbox';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
+import { isDemoProfile } from '@/lib/profile-source';
 
 const GENDER_LABEL: Record<Gender, string> = {
   mujer: 'Mujer',
@@ -50,6 +52,11 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
   const viewerIsEmpresa = account?.role === 'empresa';
   const viewerIsOwner = !!user?.uid && user.uid === id;
   const emit = useEmitSignal();
+  // Perfiles demo (seed_xxx, legacy local_xxx) NO tienen user real al
+  // otro lado. El founder no debe poder dejarles feedback ni proponerles
+  // microtask — quedarían colgados sin destinatario. Mostramos banner
+  // y escondemos los CTAs de acción.
+  const isDemo = isDemoProfile(id);
   const [perfil, setPerfil] = useState<Profile | null>(null);
   const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -291,19 +298,42 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               ¿Cómo quieres evaluar a {perfil.name.split(' ')[0]}?
             </h2>
           </div>
+
+          {/* Banner cuando el perfil es DEMO (seed_xxx / legacy local_xxx).
+              No hay user real al otro lado. Esconder CTAs accionables para
+              que el founder no mande feedback al vacío. */}
+          {isDemo && (
+            <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm leading-relaxed">
+                <div className="font-semibold text-amber-900 mb-0.5">
+                  Este perfil es de demostración
+                </div>
+                <p className="text-amber-800 text-xs">
+                  No corresponde a un usuario real autenticado, así que no recibirá
+                  tu feedback ni microtasks. Sirve para que veas cómo se ve un
+                  Perfil de Evidencia completo. Para acciones reales, buscá
+                  candidatos desde tus matches con jóvenes registrados.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-wrap gap-3 items-start">
-            <Link href={`/empresa/probar/${id}`}>
-              <Button className="gap-2">
-                <Sparkles size={14} /> Proponer micro-tarea pagada
-              </Button>
-            </Link>
+            {!isDemo && (
+              <Link href={`/empresa/probar/${id}`}>
+                <Button className="gap-2">
+                  <Sparkles size={14} /> Proponer micro-tarea pagada
+                </Button>
+              </Link>
+            )}
             <a
               href={`/api/cv?profileId=${encodeURIComponent(id)}&style=minimalist&autoprint=1`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => {
-                // Señal implícita: la empresa descargó el CV. Es señal de
-                // interés alto en el candidato (engagement > "ver perfil").
+                // Señal implícita: la empresa descargó el CV. La emitimos
+                // incluso en demo porque mide engagement (alimenta el flywheel).
                 emit({
                   touchpoint: 'cv_generated',
                   targetType: 'profile',
@@ -315,23 +345,23 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 Descargar CV ATS
               </Button>
             </a>
-            {/* "No avanzar" — cierra el loop incluso cuando la respuesta es
-                "no". El joven raramente recibe esto en otras plataformas.
-                Touchpoint company_pass_reason. */}
-            <PassReasonButton profileId={id} profileName={perfil.name} />
+            {/* CTAs de feedback solo si NO es demo. En demo no hay user
+                al otro lado que reciba la razón. */}
+            {!isDemo && (
+              <PassReasonButton profileId={id} profileName={perfil.name} />
+            )}
             <p className="w-full text-xs text-slate-500 mt-2 leading-relaxed">
               <strong className="text-slate-700">Recomendación:</strong> en lugar de mandar el
               CV a tu mail, propón una micro-tarea pagada acotada. Te llega evidencia REAL de
               cómo trabaja antes de comprometerte con un contrato.
             </p>
           </div>
-          {/* Feedback empresa → joven sobre la candidatura. NO es la
-              evaluación de microtask: es comentario+rating sobre el perfil
-              entero. Va aparte del flujo de microtask para que la empresa
-              pueda dejar feedback aunque NO decida proponer tarea (el
-              caso más común al inicio del funnel). Touchpoint
-              company_feedback_to_youth. */}
-          <CompanyFeedbackToYouth profileId={id} profileName={perfil.name} />
+          {/* Feedback empresa → joven sobre la candidatura. Solo si NO es
+              demo — sin user real no hay destinatario y el comentario
+              quedaría colgado. Touchpoint company_feedback_to_youth. */}
+          {!isDemo && (
+            <CompanyFeedbackToYouth profileId={id} profileName={perfil.name} />
+          )}
         </section>
       ) : (
         <section>

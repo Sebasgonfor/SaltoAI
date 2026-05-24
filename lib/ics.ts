@@ -179,26 +179,89 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 
 // --- Heurística determinística (fallback sin LLM) ---
 
+/**
+ * Stopwords en español que filtramos antes de comparar skills por token.
+ * Sin esto, "Gestión de Redes Sociales" vs "Manejo de redes sociales" se
+ * compara como sub-strings completos y NO matchea ("gestion de redes" no
+ * está en "manejo de redes"). Con tokenización + stopword removal nos
+ * quedamos con {redes, sociales} en ambos lados → match 100%.
+ */
+const SPANISH_STOPWORDS = new Set([
+  "de", "del", "la", "las", "el", "los", "en", "para", "por", "y", "e", "o",
+  "u", "con", "sin", "a", "al", "un", "una", "unos", "unas", "se", "su",
+  "sus", "lo", "le", "les", "es", "que",
+]);
+
+function tokenize(s: string): string[] {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !SPANISH_STOPWORDS.has(t));
+}
+
+/**
+ * Match fuzzy de skill por solapamiento de tokens significativos.
+ * Devuelve un puntaje 0-1:
+ *   - 1.0 si todos los tokens del requirement están en la skill del candidato
+ *   - >0  si al menos un token relevante coincide
+ *   - 0   si no hay overlap
+ * Esto reemplaza el viejo `n.includes(r) || r.includes(n)` que era
+ * substring puro y fallaba en sinónimos básicos del español ("gestión"/"manejo",
+ * "marketing"/"mercadeo").
+ */
+function skillOverlap(required: string, candidate: string): number {
+  const reqTokens = tokenize(required);
+  const candTokens = new Set(tokenize(candidate));
+  if (reqTokens.length === 0 || candTokens.size === 0) return 0;
+  let hits = 0;
+  for (const t of reqTokens) if (candTokens.has(t)) hits++;
+  return hits / reqTokens.length;
+}
+
 export function heuristicScore(
   need: CompanyNeed,
   profile: Profile
 ): Omit<Match, "profileId" | "profileName"> {
   const norm = (s: string) => s.toLowerCase().trim();
-  const reqSet = new Set(need.requiredSkills.map(norm));
   const traitSet = new Set(need.desiredTraits.map(norm));
 
-  const skillMatches = profile.skills.filter((s) => {
-    const n = norm(s);
-    for (const r of reqSet) if (n.includes(r) || r.includes(n)) return true;
-    return false;
-  });
+  // Para cada required skill, buscamos la mejor candidate skill del joven.
+  // Si el overlap >= 0.5 (al menos la mitad de tokens significativos coinciden),
+  // contamos como "covered" total. Si está entre 0.25 y 0.5, "parcial" (cuenta como medio).
+  let coveredCount = 0;
+  let partialCount = 0;
+  const skillMatches: string[] = [];
+  for (const req of need.requiredSkills) {
+    let best = 0;
+    let bestCand = "";
+    for (const cand of profile.skills) {
+      const score = skillOverlap(req, cand);
+      if (score > best) {
+        best = score;
+        bestCand = cand;
+      }
+    }
+    if (best >= 0.5) {
+      coveredCount++;
+      if (bestCand) skillMatches.push(bestCand);
+    } else if (best >= 0.25) {
+      partialCount++;
+      if (bestCand) skillMatches.push(bestCand);
+    }
+  }
+
   const traitMatches = profile.traits.filter((t) => {
     const n = norm(t);
     for (const r of traitSet) if (n.includes(r) || r.includes(n)) return true;
     return false;
   });
 
-  const skillsFit = clamp((skillMatches.length / Math.max(reqSet.size, 1)) * 100);
+  // skillsFit = (covered + 0.5 * partial) / total — el match parcial cuenta como medio.
+  const totalReq = Math.max(need.requiredSkills.length, 1);
+  const skillsFit = clamp(((coveredCount + partialCount * 0.5) / totalReq) * 100);
   const behavioralFit = clamp(
     (traitMatches.length / Math.max(traitSet.size, 1)) * 100
   );

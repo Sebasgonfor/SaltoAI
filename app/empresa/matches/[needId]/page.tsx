@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   ThumbsUp,
   ThumbsDown,
+  RefreshCw,
 } from 'lucide-react';
 import type { CompanyNeed, Match, ICSBreakdown, MatchDecision } from '@/lib/types';
 import { storeMatchForNavigation } from '@/lib/match-navigation-storage';
@@ -178,6 +179,59 @@ function PipelineVisual({ totalProfiles, shortlistSize, returnSize }: { totalPro
   );
 }
 
+// Cache cliente de matches por needId (TTL 15 min).
+//
+// Antes cada visita a /empresa/matches/[needId] disparaba un POST a
+// /api/match → 10-15s de espera porque corre LLM batch. Si el founder
+// hace "Atrás" y vuelve, no debería esperar otra vez por el mismo cálculo.
+// localStorage persiste entre visitas; el botón "Recalcular" fuerza refresh.
+const MATCH_CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface CachedMatches {
+  data: MatchResponse;
+  timestamp: number;
+}
+
+function matchCacheKey(needId: string): string {
+  return `salto.matches.${needId}`;
+}
+
+function readMatchCache(needId: string): CachedMatches | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(matchCacheKey(needId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedMatches;
+    if (!parsed?.timestamp || Date.now() - parsed.timestamp > MATCH_CACHE_TTL_MS) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeMatchCache(needId: string, data: MatchResponse) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(
+      matchCacheKey(needId),
+      JSON.stringify({ data, timestamp: Date.now() }),
+    );
+  } catch {
+    /* quota */
+  }
+}
+
+function clearMatchCache(needId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(matchCacheKey(needId));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function MatchesPorNecesidad({ params }: { params: Promise<{ needId: string }> }) {
   const { needId } = use(params);
   const { user } = useAuth();
@@ -185,35 +239,66 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   const [decisions, setDecisions] = useState<MatchDecision[]>([]);
   const [showDiscarded, setShowDiscarded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [matchRes, decisionRes] = await Promise.all([
-          fetch(`/api/match?needId=${encodeURIComponent(needId)}`),
-          fetch(`/api/match/decision?needId=${encodeURIComponent(needId)}`),
-        ]);
-        const json = await matchRes.json();
-        if (!matchRes.ok) {
-          if (!cancelled) setError(json.error || 'No pudimos calcular los matches.');
-          return;
-        }
-        const decisionJson = decisionRes.ok ? await decisionRes.json() : { decisions: [] };
-        if (!cancelled) {
-          setData(json);
-          setDecisions(decisionJson.decisions ?? []);
-        }
-      } catch (e) {
-        if (!cancelled) setError('Error de red.');
-      } finally {
-        if (!cancelled) setLoading(false);
+  const fetchDecisions = async () => {
+    try {
+      const decisionRes = await fetch(
+        `/api/match/decision?needId=${encodeURIComponent(needId)}`,
+      );
+      const decisionJson = decisionRes.ok ? await decisionRes.json() : { decisions: [] };
+      setDecisions(decisionJson.decisions ?? []);
+    } catch {
+      /* decisions are non-blocking */
+    }
+  };
+
+  const fetchMatches = async (opts: { useCache: boolean; force?: boolean }) => {
+    if (opts.useCache && !opts.force) {
+      const cached = readMatchCache(needId);
+      if (cached) {
+        setData(cached.data);
+        setFromCache(true);
+        setLoading(false);
+        void fetchDecisions();
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    }
+    setRefreshing(true);
+    try {
+      const matchRes = opts.force
+        ? await fetch('/api/match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ needId, force: true }),
+          })
+        : await fetch(`/api/match?needId=${encodeURIComponent(needId)}`);
+      const [json, decisionRes] = await Promise.all([
+        matchRes.json(),
+        fetch(`/api/match/decision?needId=${encodeURIComponent(needId)}`),
+      ]);
+      if (!matchRes.ok) {
+        setError(json.error || 'No pudimos calcular los matches.');
+        return;
+      }
+      const decisionJson = decisionRes.ok ? await decisionRes.json() : { decisions: [] };
+      setData(json);
+      setDecisions(decisionJson.decisions ?? []);
+      setFromCache(false);
+      writeMatchCache(needId, json);
+    } catch {
+      setError('Error de red.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchMatches({ useCache: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needId]);
 
   const { activeMatches, discardedMatches } = useMemo(() => {
@@ -256,6 +341,12 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       return next;
     });
   }
+
+  const forceRefresh = () => {
+    if (refreshing) return;
+    clearMatchCache(needId);
+    void fetchMatches({ useCache: false, force: true });
+  };
 
   if (loading) {
     return (
@@ -322,10 +413,30 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
               </div>
             )}
           </div>
-          <Link href="/empresa/chat">
-            <Button variant="outline" size="sm">Editar necesidad</Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={forceRefresh}
+              disabled={refreshing}
+              className="gap-1.5"
+              title="Recalcular el ranking de candidatos contra esta necesidad"
+            >
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Recalculando…' : 'Recalcular'}
+            </Button>
+            <Link href="/empresa/chat">
+              <Button variant="outline" size="sm">Editar necesidad</Button>
+            </Link>
+          </div>
         </div>
+
+        {fromCache && !refreshing && (
+          <p className="text-[11px] text-slate-400 italic flex items-center gap-1">
+            <CheckCircle2 size={11} className="text-emerald-500" />
+            Resultados cacheados (15 min). Si publicaste cambios o subieron nuevos perfiles, dale a "Recalcular".
+          </p>
+        )}
 
         <div className="grid md:grid-cols-3 gap-4">
           <div className="md:col-span-2 bg-amber-50/60 border border-amber-200/60 rounded-2xl p-6">

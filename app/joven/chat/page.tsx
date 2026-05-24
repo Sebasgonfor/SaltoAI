@@ -174,7 +174,23 @@ function ChatJoven() {
     isActive: liveActive,
   } = useLiveInterview({
     firstName: basics ? firstNameFrom(basics.name) : undefined,
+    // Hard floor: el hook IGNORA closing keywords del agente hasta que
+    // el user haya completado MIN_USER_TURNS rondas. Sin esto, Gemini
+    // Live a veces decide cerrar prematuro y el perfil queda con 2 skills.
+    minUserTurnsBeforeClose: MIN_USER_TURNS,
     onInterviewComplete: (conversation) => {
+      // Doble defensa: el hook ya gatea, pero validamos otra vez por si
+      // algún path lateral (race condition, refactor futuro) llamara el
+      // callback con turnos insuficientes. Mejor reabrir la conversación
+      // que generar un perfil pobre.
+      const userTurnsInConv = conversation.filter((m) => m.role === 'user').length;
+      if (userTurnsInConv < MIN_USER_TURNS) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[chat] onInterviewComplete con userTurns=${userTurnsInConv} < MIN=${MIN_USER_TURNS}; ignorando cierre.`,
+        );
+        return;
+      }
       disconnectLiveRef.current();
       setMessages(conversation);
       void finishInterviewRef.current?.(conversation);

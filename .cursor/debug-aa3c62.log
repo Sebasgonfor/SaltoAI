@@ -23,3 +23,4 @@
 {"sessionId":"aa3c62","hypothesisId":"D","location":"lib/auth-context.tsx","message":"auth_state","data":{"uid":"bVIRHyrPjKN08buoV5zpsaSk7w92","hasAccount":true,"role":"empresa","pendingRole":null},"timestamp":1779622604138}
 {"sessionId":"aa3c62","hypothesisId":"D","location":"lib/auth-context.tsx","message":"auth_state","data":{"uid":"bVIRHyrPjKN08buoV5zpsaSk7w92","hasAccount":true,"role":"empresa","pendingRole":null},"timestamp":1779622625323}
 {"sessionId":"aa3c62","hypothesisId":"D","location":"lib/auth-context.tsx","message":"auth_state","data":{"uid":"bVIRHyrPjKN08buoV5zpsaSk7w92","hasAccount":true,"role":"empresa","pendingRole":null},"timestamp":1779622640583}
+{"sessionId":"aa3c62","hypothesisId":"D","location":"lib/auth-context.tsx","message":"auth_state","data":{"uid":"bVIRHyrPjKN08buoV5zpsaSk7w92","hasAccount":true,"role":"empresa","pendingRole":null},"timestamp":1779623514703}
