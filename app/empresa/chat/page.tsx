@@ -413,15 +413,51 @@ export default function ChatEmpresa() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
 
-    try {
+    // 1 reintento silencioso ante red caída / 5xx. El backend ya tiene su
+    // propio banco de respaldo determinístico (fallbackResponse), así que
+    // un fetch que llega devuelve siempre una pregunta; este retry cubre
+    // solo errores DE RED antes de tocar al backend.
+    const fetchOnce = async () => {
       const res = await fetch('/api/entrevista-empresa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history }),
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
       const data = await res.json();
+      return { res, data };
+    };
+
+    try {
+      let res: Response;
+      let data: { nextQuestion?: string; done?: boolean; retryAfterSec?: number; error?: string };
+      try {
+        ({ res, data } = await fetchOnce());
+        if (!res.ok && res.status !== 429) {
+          await new Promise((r) => setTimeout(r, 500));
+          ({ res, data } = await fetchOnce());
+        }
+      } catch (firstErr) {
+        if ((firstErr as Error)?.name === 'AbortError') throw firstErr;
+        await new Promise((r) => setTimeout(r, 500));
+        ({ res, data } = await fetchOnce());
+      }
+      clearTimeout(timeoutId);
+
+      if (res.status === 429) {
+        const wait = data.retryAfterSec ? ` Intenta en ${data.retryAfterSec}s.` : '';
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'agent',
+            content: (data.error || 'Estamos a tope ahora mismo.') + wait,
+          },
+        ]);
+        setSubmitError((data.error || 'Estamos a tope ahora mismo.') + wait);
+        setLoading(false);
+        return;
+      }
+
       const agentMsg: ChatMessage = {
         role: 'agent',
         content: data.nextQuestion || 'Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?',

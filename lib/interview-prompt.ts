@@ -221,3 +221,115 @@ Redacta UNA pregunta de seguimiento empática y original. NO repitas la pregunta
 export function buildSimilarQuestionRetryNote(similarQuestion: string): string {
   return `\n\nREINTENTO OBLIGATORIO: Tu respuesta "${similarQuestion}" es demasiado similar a una pregunta ya hecha. Genera una pregunta TOTALMENTE distinta: otro ángulo, otra señal pendiente, otra redacción. Conecta con lo último que dijo el joven.`;
 }
+
+// =============================================================================
+// BANCO DE RESPALDO (joven) — usado cuando Gemini falla, timeout o devuelve
+// respuesta vacía. La entrevista NUNCA debe morir; siempre tenemos una
+// pregunta determinística que cubre la próxima señal pendiente.
+// =============================================================================
+
+/**
+ * Aperturas de respaldo. Se usa una al azar (semilla = nombre) cuando el
+ * LLM no logra generar la primera pregunta. Cubre iniciativa / resolución
+ * de problemas — las dos señales que el prompt LLM también prioriza al abrir.
+ */
+export const OPENING_FALLBACK_BANK: string[] = [
+  "Hola{NAME}, gracias por venir. Cuéntame de un momento en el último año en el que tuviste que resolver un problema importante — algo que arreglaste sin que nadie te dijera cómo. ¿Qué pasó y qué hiciste?",
+  "Hola{NAME}, qué bueno tenerte. Para empezar, cuéntame de algo que hayas armado o sacado adelante por iniciativa propia — en tu casa, en un negocio familiar, en un estudio o un proyecto. ¿Qué fue y por qué lo hiciste?",
+  "Hola{NAME}. Antes que nada, quiero conocer tu historia. Cuéntame de un desafío real que enfrentaste en estos últimos meses — algo que te tocó resolver tú, no porque te lo pidieran. ¿Qué pasó?",
+];
+
+export function pickFallbackOpening(firstName?: string): string {
+  const name = firstName?.trim();
+  const tag = name ? ` ${name}` : "";
+  // Semilla simple basada en el nombre — misma persona ve la misma apertura
+  // en reintentos, evita inconsistencia visual.
+  const seed = name ? name.charCodeAt(0) % OPENING_FALLBACK_BANK.length : 0;
+  return OPENING_FALLBACK_BANK[seed].replace("{NAME}", tag);
+}
+
+/**
+ * Banco de preguntas por señal — cuando un turno falla, elegimos una pregunta
+ * que ataca la señal pendiente más prioritaria que aún no salió en la
+ * conversación. Cada señal tiene 2 variantes para evitar que al reintentar
+ * salga exactamente la misma frase si el LLM falla 2 veces seguidas.
+ */
+export const SIGNAL_FALLBACK_BANK: Record<string, string[]> = {
+  "iniciativa": [
+    "Cuéntame de algo que hayas empezado tú sin que nadie te lo pidiera. ¿Qué fue y cómo arrancaste?",
+    "Dame un ejemplo de algo que viste que faltaba y decidiste hacerlo tú. ¿Qué pasó?",
+  ],
+  "aprendizaje autónomo": [
+    "Cuéntame de algo que tuviste que aprender sin que te enseñaran formalmente. ¿Cómo lo lograste?",
+    "¿Hay alguna herramienta o habilidad que aprendiste por tu cuenta — YouTube, tutoriales, prueba y error? Cuéntame el proceso.",
+  ],
+  "resolución de problemas": [
+    "Cuéntame de un problema concreto que resolviste improvisando. ¿Qué hiciste paso a paso?",
+    "Dame un ejemplo de algo que se complicó de repente y cómo encontraste la salida.",
+  ],
+  "resultados medibles": [
+    "De lo que has hecho, ¿qué resultado concreto puedes medir? Ventas, clientes, tiempos, cualquier número.",
+    "Cuéntame de un logro que se pueda contar en números — aunque sean pequeños. ¿Qué cambió y cuánto?",
+  ],
+  "atención al cliente": [
+    "Cuéntame de una situación difícil con un cliente o con alguien al que tuviste que atender. ¿Cómo la manejaste?",
+    "Dame un ejemplo de un reclamo o una persona molesta que tuviste que calmar. ¿Qué hiciste?",
+  ],
+  "trabajo en equipo": [
+    "Cuéntame de algo que hiciste coordinando con otras personas. ¿Cómo se repartieron el trabajo?",
+    "Dame un ejemplo de un momento en que tuviste que ponerte de acuerdo con alguien para sacar algo adelante.",
+  ],
+  "adaptación al cambio": [
+    "Cuéntame de un momento en que las cosas cambiaron de repente y tuviste que reaccionar rápido. ¿Qué hiciste?",
+    "Dame un ejemplo de una situación donde el plan original ya no servía y tuviste que cambiarlo en el camino.",
+  ],
+  "persistencia": [
+    "Cuéntame de algo que no te salió la primera vez y volviste a intentar. ¿Qué pasó al final?",
+    "Dame un ejemplo de algo difícil que sostuviste durante meses sin abandonar. ¿Qué te ayudó a no rendirte?",
+  ],
+};
+
+const SIGNAL_PRIORITY_ORDER = [
+  "iniciativa",
+  "resolución de problemas",
+  "resultados medibles",
+  "aprendizaje autónomo",
+  "adaptación al cambio",
+  "atención al cliente",
+  "trabajo en equipo",
+  "persistencia",
+] as const;
+
+/**
+ * Elige una pregunta de respaldo basada en señales ya cubiertas y preguntas
+ * ya hechas. No repite preguntas (compara primeros ~24 chars de cada agente
+ * mensaje). Si todas las señales están cubiertas, devuelve un cierre.
+ */
+export function pickFallbackQuestion(
+  coveredSignals: string[],
+  askedQuestions: string[]
+): { question: string; signal: string; done: boolean } {
+  const covered = new Set(coveredSignals);
+  const askedBlob = askedQuestions.map((q) => q.toLowerCase()).join(" || ");
+
+  for (const signal of SIGNAL_PRIORITY_ORDER) {
+    if (covered.has(signal)) continue;
+    const variants = SIGNAL_FALLBACK_BANK[signal] || [];
+    for (const q of variants) {
+      const head = q.toLowerCase().slice(0, 24);
+      if (!askedBlob.includes(head)) {
+        return { question: q, signal, done: false };
+      }
+    }
+  }
+
+  // Si todas las señales están cubiertas o todas las variantes fueron usadas,
+  // empujamos a una pregunta de profundización genérica antes de cerrar.
+  const generic =
+    "Profundicemos un poco más: dame un ejemplo concreto de lo que acabas de contar — qué hiciste exactamente y qué resultado tuvo.";
+  if (!askedBlob.includes(generic.toLowerCase().slice(0, 24))) {
+    return { question: generic, signal: "resolución de problemas", done: false };
+  }
+
+  return { question: CLOSING_MESSAGE, signal: "cierre", done: true };
+}

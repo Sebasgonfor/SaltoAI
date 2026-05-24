@@ -10,6 +10,8 @@ import {
   CLOSING_MESSAGE,
   MAX_USER_TURNS,
   MIN_USER_TURNS,
+  pickFallbackOpening,
+  pickFallbackQuestion,
 } from "@/lib/interview-prompt";
 import {
   countUserTurns,
@@ -131,7 +133,7 @@ function maxTurnsResponse(signalsCovered: string[]): InterviewTurnResult {
   };
 }
 
-async function generateInterviewTurn(userPrompt: string): Promise<InterviewTurnResult> {
+async function generateInterviewTurnOnce(userPrompt: string): Promise<InterviewTurnResult> {
   const response = await withTimeout(
     gemini().models.generateContent({
       model: GEMINI_LITE_MODEL,
@@ -165,6 +167,30 @@ async function generateInterviewTurn(userPrompt: string): Promise<InterviewTurnR
   };
 }
 
+/**
+ * Wrapper con 1 reintento ante errores transitorios. Si el primer intento
+ * falla por timeout o por respuesta vacía, esperamos 400ms y reintentamos
+ * una sola vez. Los errores de rate limit (429) NO se reintentan — los
+ * propaga el caller, que ya los traduce a 429 con Retry-After.
+ *
+ * Si los 2 intentos fallan, propaga el último error y el caller cae al
+ * banco de respaldo determinístico.
+ */
+async function generateInterviewTurn(userPrompt: string): Promise<InterviewTurnResult> {
+  try {
+    return await generateInterviewTurnOnce(userPrompt);
+  } catch (err) {
+    const msg = (err as Error)?.message ?? "";
+    const isTransient =
+      msg.startsWith("timeout:") || msg === "empty_next_question" || /5\d\d/.test(msg);
+    if (!isTransient || isRateLimitError(err)) {
+      throw err;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    return await generateInterviewTurnOnce(userPrompt);
+  }
+}
+
 async function generateWithRetry(
   basePrompt: string,
   messages: ChatMessage[],
@@ -191,19 +217,6 @@ async function generateWithRetry(
   }
 
   return { ...result, done };
-}
-
-function noKeyResponse() {
-  return NextResponse.json(
-    {
-      error: "La entrevista con IA no está disponible sin clave de Gemini. Configura GEMINI_API_KEY o intenta más tarde.",
-      code: "no_gemini_key",
-      done: false,
-      targetedSignal: null,
-      signalsCovered: [],
-    },
-    { status: 503 }
-  );
 }
 
 export async function POST(req: NextRequest) {
@@ -236,9 +249,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (opening) {
+      // Sin clave de Gemini igualmente abrimos con el banco — el joven
+      // empieza la entrevista; el cliente decide si quiere mostrar un aviso.
       if (!hasGeminiKey()) {
-        log.end({ status: 503, extra: { mode: "opening", reason: "no_gemini_key" } });
-        return noKeyResponse();
+        const nextQuestion = pickFallbackOpening(firstName || undefined);
+        log.end({ status: 200, extra: { mode: "opening_fallback", reason: "no_gemini_key" } });
+        return NextResponse.json({
+          nextQuestion,
+          done: false,
+          opening: true,
+          targetedSignal: null,
+          signalsCovered: [],
+          degraded: true,
+          degradedReason: "no_gemini_key",
+        });
       }
 
       const userPrompt = `${SYSTEM_PROMPT}\n\n${buildOpeningQuestionPrompt(firstName || undefined, age)}`;
@@ -252,19 +276,28 @@ export async function POST(req: NextRequest) {
           signalsCovered: [],
         });
       } catch (err) {
-        if ((err as Error)?.message?.startsWith("timeout:")) {
-          log.warn("gemini.timeout", { mode: "opening" });
-          log.end({ status: 504, extra: { mode: "opening_timeout" } });
-          return NextResponse.json(
-            {
-              error: "Tardamos demasiado en preparar la entrevista. Intenta de nuevo.",
-              code: "opening_timeout",
-              done: false,
-            },
-            { status: 504 }
-          );
-        }
-        throw err;
+        // Rate limit: lo dejamos burbujear para que el catch externo devuelva
+        // un 429 honesto con Retry-After — el opening sí muestra "estamos a
+        // tope, espera X segundos" porque no tiene historial sobre el cual
+        // construir un fallback contextual.
+        if (isRateLimitError(err)) throw err;
+
+        // Cualquier otro fallo (timeout, vacío, 5xx): abrimos con banco.
+        const reason = (err as Error)?.message?.startsWith("timeout:")
+          ? "opening_timeout"
+          : "opening_llm_error";
+        log.warn("opening.fallback", { reason, message: (err as Error)?.message });
+        const nextQuestion = pickFallbackOpening(firstName || undefined);
+        log.end({ status: 200, extra: { mode: "opening_fallback", reason } });
+        return NextResponse.json({
+          nextQuestion,
+          done: false,
+          opening: true,
+          targetedSignal: null,
+          signalsCovered: [],
+          degraded: true,
+          degradedReason: reason,
+        });
       }
     }
 
@@ -282,9 +315,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(resp);
     }
 
+    // Helper: respuesta de banco para mid-conversación. Usa señales detectadas
+    // por heurística + preguntas ya hechas para no repetir.
+    const askedQuestions = messages
+      .filter((m) => m.role === "agent")
+      .map((m) => m.content);
+    const fallbackTurn = (reason: string) => {
+      const { question, signal, done } = pickFallbackQuestion(
+        heuristicCovered,
+        askedQuestions
+      );
+      // Respetar caps de turnos al construir el fallback.
+      const finalDone = userTurns >= MAX_USER_TURNS || done;
+      return NextResponse.json({
+        nextQuestion: finalDone ? CLOSING_MESSAGE : question,
+        done: finalDone,
+        targetedSignal: finalDone ? null : signal,
+        signalsCovered: heuristicCovered,
+        degraded: true,
+        degradedReason: reason,
+      });
+    };
+
     if (!hasGeminiKey()) {
-      log.end({ status: 503, extra: { mode: "no_gemini_key", userTurns } });
-      return noKeyResponse();
+      log.end({ status: 200, extra: { mode: "fallback_no_key", userTurns } });
+      return fallbackTurn("no_gemini_key");
     }
 
     if (userTurns > 0 && isLastAnswerTooShort(messages, 2)) {
@@ -313,21 +368,13 @@ export async function POST(req: NextRequest) {
           edge: wasYesNo ? "yes_no_followup" : "too_short",
         });
       } catch (err) {
-        if ((err as Error)?.message?.startsWith("timeout:")) {
-          log.warn("gemini.timeout", { edge: "too_short", userTurns });
-          log.end({ status: 504, extra: { edge: "too_short_timeout" } });
-          return NextResponse.json(
-            {
-              error: "No pudimos generar el seguimiento. Intenta responder con un poco más de detalle.",
-              code: "gemini_timeout",
-              done: false,
-              targetedSignal: null,
-              signalsCovered: heuristicCovered,
-            },
-            { status: 504 }
-          );
-        }
-        throw err;
+        if (isRateLimitError(err)) throw err;
+        const reason = (err as Error)?.message?.startsWith("timeout:")
+          ? "too_short_timeout"
+          : "too_short_llm_error";
+        log.warn("entrevista.fallback", { edge: "too_short", reason, userTurns });
+        log.end({ status: 200, extra: { edge: "too_short_fallback", reason } });
+        return fallbackTurn(reason);
       }
     }
 
@@ -371,21 +418,13 @@ export async function POST(req: NextRequest) {
           out.signalsCovered.length > 0 ? out.signalsCovered : heuristicCovered,
       });
     } catch (err) {
-      if ((err as Error)?.message?.startsWith("timeout:")) {
-        log.warn("gemini.timeout", { message: (err as Error).message, userTurns });
-        log.end({ status: 504, extra: { mode: "timeout", userTurns } });
-        return NextResponse.json(
-          {
-            error: "Tardamos en pensar la siguiente pregunta. Envía tu mensaje de nuevo.",
-            code: "gemini_timeout",
-            done: false,
-            targetedSignal: null,
-            signalsCovered: heuristicCovered,
-          },
-          { status: 504 }
-        );
-      }
-      throw err;
+      if (isRateLimitError(err)) throw err;
+      const reason = (err as Error)?.message?.startsWith("timeout:")
+        ? "turn_timeout"
+        : "turn_llm_error";
+      log.warn("entrevista.fallback", { reason, message: (err as Error)?.message, userTurns });
+      log.end({ status: 200, extra: { mode: "fallback", reason, userTurns } });
+      return fallbackTurn(reason);
     }
   } catch (err) {
     if (isRateLimitError(err)) {
@@ -400,17 +439,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Catch-all final: cualquier excepción no clasificada cae al banco
+    // determinístico. La entrevista NUNCA debe morir delante del joven —
+    // solo dejamos surgir errores de rate limit (que sí necesitan Retry-After).
     log.error("entrevista.exception", { message: (err as Error)?.message });
-    log.end({ status: 500, extra: { code: "unknown" } });
-    return NextResponse.json(
-      {
-        error: "No pudimos generar la siguiente pregunta. Intenta de nuevo.",
-        code: "unknown",
-        done: false,
-        targetedSignal: null,
-        signalsCovered: detectSignals(messagesSnapshot),
-      },
-      { status: 500 }
-    );
+    const covered = detectSignals(messagesSnapshot);
+    const asked = messagesSnapshot
+      .filter((m) => m.role === "agent")
+      .map((m) => m.content);
+    const userTurns = countUserTurns(messagesSnapshot);
+    const { question, signal, done } = pickFallbackQuestion(covered, asked);
+    const finalDone = userTurns >= MAX_USER_TURNS || done;
+    log.end({ status: 200, extra: { mode: "exception_fallback", userTurns } });
+    return NextResponse.json({
+      nextQuestion: finalDone ? CLOSING_MESSAGE : question,
+      done: finalDone,
+      targetedSignal: finalDone ? null : signal,
+      signalsCovered: covered,
+      degraded: true,
+      degradedReason: "exception",
+    });
   }
 }

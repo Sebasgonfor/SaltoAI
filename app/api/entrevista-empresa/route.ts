@@ -343,9 +343,8 @@ export async function POST(req: NextRequest) {
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devuelve la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marca done=true si ya hay 5+ slots cubiertos con detalle.`;
 
-    let response;
-    try {
-      response = await withTimeout(
+    const callGemini = () =>
+      withTimeout(
         gemini().models.generateContent({
           // Lite es ~3-4x más rápido que flash para Q&A turn-by-turn y la
           // tarea (elegir slot pendiente + redactar una pregunta) no necesita
@@ -362,14 +361,31 @@ export async function POST(req: NextRequest) {
         GEMINI_TIMEOUT_MS,
         "gemini.generateContent"
       );
+
+    let response;
+    try {
+      try {
+        response = await callGemini();
+      } catch (firstErr) {
+        // 1 reintento ante errores transitorios (timeout o 5xx). Los 429
+        // NO se reintentan: los propaga al catch externo que devuelve un
+        // 429 honesto con Retry-After.
+        const msg = (firstErr as Error)?.message ?? "";
+        const transient =
+          msg.startsWith("timeout:") || /5\d\d/.test(msg);
+        if (!transient || isRateLimitError(firstErr)) throw firstErr;
+        log.warn("gemini.retry", { message: msg, userTurns });
+        await new Promise((r) => setTimeout(r, 400));
+        response = await callGemini();
+      }
     } catch (err) {
-      // Si Gemini se cuelga (cold start, sobrecarga), no dejamos colgar al
-      // founder: respondemos con el banco determinístico y seguimos.
+      // Si Gemini sigue colgado tras el reintento, caemos al banco
+      // determinístico — el founder no se entera.
       if ((err as Error)?.message?.startsWith("timeout:")) {
         log.warn("gemini.timeout", { message: (err as Error).message, userTurns });
         const resp = fallbackResponse(messages);
         log.end({ status: 200, extra: { mode: "fallback_timeout", done: resp.done, userTurns } });
-        return NextResponse.json({ ...resp, edge: "gemini_timeout" });
+        return NextResponse.json({ ...resp, edge: "gemini_timeout", degraded: true });
       }
       throw err;
     }

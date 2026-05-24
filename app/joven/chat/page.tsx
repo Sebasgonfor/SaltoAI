@@ -207,20 +207,48 @@ function ChatJoven() {
   }, [input]);
 
   const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
-    const res = await fetch('/api/entrevista', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        opening: true,
-        firstName: firstNameFrom(name),
-        age,
-      }),
+    // Intento principal + 1 reintento silencioso (500ms) ante errores de red
+    // o respuesta sin pregunta. Si el segundo intento también falla,
+    // propagamos el error — el caller decide cómo mostrarlo.
+    const body = JSON.stringify({
+      opening: true,
+      firstName: firstNameFrom(name),
+      age,
     });
-    const data = await res.json();
-    if (!res.ok || !data.nextQuestion) {
-      throw new Error(data.error || 'No pudimos preparar la entrevista.');
+
+    const attempt = async () => {
+      const res = await fetch('/api/entrevista', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      const data = await res.json();
+      // 429 = rate limit honesto — no reintentar acá, dejar que el usuario vea
+      // el mensaje con el countdown del retryAfterSec.
+      if (res.status === 429) {
+        const err = new Error(data.error || 'Estamos a tope ahora mismo.') as Error & {
+          retryAfterSec?: number;
+          isRateLimit?: boolean;
+        };
+        err.retryAfterSec = data.retryAfterSec;
+        err.isRateLimit = true;
+        throw err;
+      }
+      if (!res.ok || !data.nextQuestion) {
+        throw new Error(data.error || 'No pudimos preparar la entrevista.');
+      }
+      return data.nextQuestion as string;
+    };
+
+    try {
+      return await attempt();
+    } catch (err) {
+      if ((err as { isRateLimit?: boolean })?.isRateLimit) throw err;
+      // Reintento silencioso una vez. Si el backend ya devolvió `degraded`,
+      // no llegamos acá (ya hay `nextQuestion`).
+      await new Promise((r) => setTimeout(r, 500));
+      return await attempt();
     }
-    return data.nextQuestion as string;
   }, []);
 
   const beginInterview = useCallback(
@@ -560,16 +588,52 @@ function ChatJoven() {
 
     const turnsAfterSend = history.filter((m) => m.role === 'user').length;
 
-    try {
+    const reqBody = JSON.stringify({
+      messages: history,
+      firstName: firstNameFrom(basics.name),
+    });
+
+    // Pide al backend la siguiente pregunta. 1 reintento silencioso ante
+    // errores de red / 5xx. Los 429 (rate limit) NO se reintentan: se
+    // muestran al usuario con el countdown del retryAfterSec.
+    const fetchTurn = async () => {
       const res = await fetch('/api/entrevista', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: history,
-          firstName: firstNameFrom(basics.name),
-        }),
+        body: reqBody,
       });
       const data = await res.json();
+      return { res, data };
+    };
+
+    try {
+      let res: Response;
+      let data: {
+        nextQuestion?: string;
+        done?: boolean;
+        error?: string;
+        retryAfterSec?: number;
+        degraded?: boolean;
+      };
+      try {
+        ({ res, data } = await fetchTurn());
+        if (!res.ok && res.status !== 429) {
+          // Reintento silencioso una vez ante 5xx / red.
+          await new Promise((r) => setTimeout(r, 500));
+          ({ res, data } = await fetchTurn());
+        }
+      } catch {
+        // Excepción de red — reintento.
+        await new Promise((r) => setTimeout(r, 500));
+        ({ res, data } = await fetchTurn());
+      }
+
+      if (res.status === 429) {
+        setLoading(false);
+        const wait = data.retryAfterSec ? ` Intenta en ${data.retryAfterSec}s.` : '';
+        setFormError((data.error || 'Estamos a tope ahora mismo.') + wait);
+        return;
+      }
 
       if (!res.ok) {
         setLoading(false);
@@ -588,7 +652,7 @@ function ChatJoven() {
         return;
       }
 
-      const updated = [...history, { role: 'agent' as const, content: agentContent }];
+      const updated = [...history, { role: 'agent' as const, content: agentContent as string }];
       setMessages(updated);
       setLoading(false);
 
