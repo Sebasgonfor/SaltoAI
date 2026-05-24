@@ -21,6 +21,7 @@ import { ICS_WEIGHTS } from '@/lib/types';
 import MatchFeedback from '@/components/match-feedback';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { NeedRadiography } from '@/components/empresa/need-radiography';
 import { emitSignal } from '@/lib/feedback';
 
 interface MatchResponse {
@@ -312,6 +313,14 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         targetId={needId}
         dismissible
       />
+
+      {/* Radiografía — dashboard rico antes de los matches.
+          Convierte la página en una vista de inteligencia operativa:
+          KPIs + salud + histograma + dimensiones + skills coverage +
+          perfil de empresa + engagement. Reduce la fricción para que
+          el founder entienda QUÉ es lo que está mirando antes de ir
+          candidato por candidato. */}
+      <NeedRadiography need={need} matches={matches} needId={needId} />
 
       {/* Aviso (rate-limit en ranking, contexto débil, etc.) */}
       {data.warning && (
