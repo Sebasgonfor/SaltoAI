@@ -39,7 +39,7 @@ export const RETURN_SIZE = 10;
 const GEMINI_TIMEOUT_MS = 25_000;
 
 const RANK_BATCH_PROMPT = `Eres el motor de scoring ICS (Índice de Compatibilidad Salto).
-Recibís UNA necesidad de empresa y N candidatos (shortlist). Devuelves un objeto con un array "results" del MISMO largo y MISMO orden que la lista de candidatos.
+Recibes UNA necesidad de empresa y N candidatos (shortlist). Devuelves un objeto con un array "results" del MISMO largo y MISMO orden que la lista de candidatos.
 
 Para cada candidato devuelve:
 - profileId: copia EXACTAMENTE el profileId del candidato en esa posición. NO inventes IDs.
