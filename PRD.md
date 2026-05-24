@@ -397,6 +397,28 @@ Los componentes viven en [`components/feedback/company-to-youth.tsx`](components
 - Correlación entre ICS al momento del match y rating final del founder (`microtask_outcome`) — el indicador defensivo del §8.6.
 - % de acuerdo founder ↔ pre-eval IA (`ai_preeval_agreement`).
 
+**Dashboards enriquecidos (feb 2026):** además de las listas operacionales, [`/empresa`](app/empresa/page.tsx) y [`/dashboard`](app/dashboard/page.tsx) montan un pack de widgets que conectan TODO el flywheel a métricas accionables.
+
+**Empresa — [`<EmpresaWidgets>`](components/dashboard/empresa-widgets.tsx)** consume [`/api/dashboard/empresa`](app/api/dashboard/empresa/route.ts):
+
+| Widget | Qué responde |
+|---|---|
+| **KPI strip** | Candidatos en pipeline · ICS promedio cross-need · COP invertido · hires confirmados |
+| **Pipeline funnel** | 6 stages (shortlist → abrir → microtask → entregar → evaluar → contratar) + 3 conversion rates |
+| **Calibración del motor** | Pares pre-eval IA vs rating final · delta promedio · label (alineado/optimista/conservador) |
+| **Salud de necesidades** | Top 5 needs ordenadas por health score asc (peores primero) con `topIssue` accionable |
+| **Top candidatos cross-need** | Perfiles que aparecen en múltiples shortlists con ICS promedio + actividad |
+
+**Joven — [`<JovenWidgets>`](components/dashboard/joven-widgets.tsx)** consume [`/api/dashboard/joven`](app/api/dashboard/joven/route.ts):
+
+| Widget | Qué responde |
+|---|---|
+| **KPI strip** | COP ganado · rating promedio · skills verificadas/declaradas · inbox unread |
+| **Visibilidad de mercado** | # necesidades activas que piden tus skills · top 5 skills demandadas con ✓/✗ "iHaveIt" |
+| **Top oportunidad** | Mejor match aproximado (jaccard sobre skills, sin invocar LLM) con CTA al desglose ICS real |
+| **Inbox preview** | Positivos · descartes · sin responder, con CTA al inbox completo en el perfil |
+| **Activity timeline** | Feed de eventos: microtask propuesta · entregada · evaluada · feedback recibido · perfil visto (agregado por día) |
+
 **Radiografía de la necesidad (feb 2026):** [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) deja de ser solo "lista de candidatos" y se vuelve una vista de inteligencia operativa. El componente [`<NeedRadiography>`](components/empresa/need-radiography.tsx) muestra:
 
 | Widget | Qué responde |

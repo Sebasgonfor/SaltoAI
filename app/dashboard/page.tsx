@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
+import { JovenWidgets } from '@/components/dashboard/joven-widgets';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -355,7 +356,9 @@ export default function DashboardPage() {
             </div>
           </FadeUp>
 
-          {/* STAT CARDS */}
+          {/* STAT CARDS base — skills + evidencias del perfil mismo. Las
+              métricas enriquecidas (earnings, market visibility, inbox,
+              activity) van en <JovenWidgets> más abajo. */}
           {!dataLoading && (
             <div className="grid grid-cols-2 gap-3">
               <StatCard
@@ -373,6 +376,16 @@ export default function DashboardPage() {
                 delay={0.1}
               />
             </div>
+          )}
+
+          {/* Widgets enriquecidos — solo si ya hay perfil. Sin perfil el
+              joven todavía no tiene microtasks, earnings ni visibilidad
+              de mercado, y el onboarding banner se ocupa de empujar a
+              la entrevista. */}
+          {!dataLoading && profile && (
+            <FadeUp delay={0.12}>
+              <JovenWidgets uid={user.uid} profileId={user.uid} />
+            </FadeUp>
           )}
 
           {/* ONBOARDING — sin perfil */}
