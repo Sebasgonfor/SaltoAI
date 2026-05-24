@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
+import { SALTO_FAVICON } from '@/components/ui/salto-logo';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -17,8 +18,8 @@ export const metadata: Metadata = {
   title: 'Salto - Tu primer empleo por potencial, no por CV',
   description: 'Conecta talento junior sin experiencia formal con startups y mipymes mediante matching de potencial impulsado por IA.',
   icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
+    icon: SALTO_FAVICON,
+    apple: SALTO_FAVICON,
   },
 };
 

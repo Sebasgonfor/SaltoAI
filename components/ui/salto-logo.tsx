@@ -48,8 +48,8 @@ export function SaltoLogo({
   );
 }
 
-/** Ruta del favicon / pestaña del navegador (solo símbolo). */
-export const SALTO_FAVICON = ICON_LOGO_SRC;
+/** Ruta del favicon / pestaña del navegador (símbolo circular). */
+export const SALTO_FAVICON = '/circle-icon.png';
 
 /** Ruta del logo completo para metadata OG, etc. */
 export const SALTO_FULL_LOGO = FULL_LOGO_SRC;

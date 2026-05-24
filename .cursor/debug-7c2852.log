@@ -1,0 +1,3 @@
+{"sessionId":"7c2852","hypothesisId":"A","location":"app/api/perfil/route.ts:POST","message":"perfil extraction after sanitize","data":{"skills":5,"evidence":3,"uid":true},"timestamp":1779601315300}
+{"sessionId":"7c2852","hypothesisId":"C","location":"app/joven/chat/page.tsx:finishInterview","message":"perfil POST result","data":{"ok":true,"status":200,"hasId":true,"code":null,"msgCount":10,"userTurns":5},"timestamp":1779601318905}
+{"sessionId":"7c2852","hypothesisId":"B","location":"app/api/cv/route.ts:GET","message":"cv getProfile","data":{"profileId":"CYtSbqejCAUdMxO1kZxdqLibMrG3","found":true,"evidenceCount":3},"timestamp":1779601367911}

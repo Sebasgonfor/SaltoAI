@@ -21,6 +21,7 @@
  *  - `.screen-only` para hints que no se imprimen.
  */
 import type { CompanyNeed, Profile } from "./types";
+import { formatExperienceEntry } from "./cv-evidence";
 
 // ---------- Tipos públicos ----------
 
@@ -307,7 +308,9 @@ const BASE_CSS = `
     column-gap: 24px;
     padding-left: 16px;
   }
-  .experience-list li { margin-bottom: 4px; }
+  .experience-list li { margin-bottom: 6px; line-height: 1.45; }
+  .experience-list .exp-competency { display: block; font-weight: 600; color: #111; font-size: 0.92em; margin-bottom: 1px; }
+  .experience-list .exp-bullet { display: block; color: #333; }
   .experience-list li strong { color: #111; }
   .entry { margin-bottom: 6px; }
   .entry .meta { font-size: 9pt; color: #555; margin: 0 0 2px; }
@@ -383,14 +386,20 @@ ${items}
 function evidenceListBlock(p: Profile, heading = "Experiencia y logros"): string {
   if (p.evidence.length === 0) return "";
   const items = p.evidence
-    .map(
-      (e) =>
-        `    <li><strong>${escapeHtml(e.skill)}.</strong> ${escapeHtml(e.quote)}</li>`
-    )
+    .map((e) => {
+      const { competency, bullet } = formatExperienceEntry(e.skill, e.quote);
+      if (!bullet) return "";
+      return `    <li>
+      <span class="exp-competency">${escapeHtml(competency)}</span>
+      <span class="exp-bullet">${escapeHtml(bullet)}</span>
+    </li>`;
+    })
+    .filter(Boolean)
     .join("\n");
+  if (!items) return "";
   return `<section>
   <h2>${heading}</h2>
-  <p class="section-note">Trayectoria informal y proyectos personales · evidencia verificada por Salto IA.</p>
+  <p class="section-note">Experiencia práctica y proyectos autónomos · competencias ancladas a resultados verificados por Salto IA.</p>
   <ul class="experience-list">
 ${items}
   </ul>
@@ -417,7 +426,14 @@ function evidenceByCompetencyBlock(p: Profile): string {
   const blocks = order
     .map((skill) => {
       const quotes = grouped.get(skill)!;
-      const items = quotes.map((q) => `    <li>${escapeHtml(q)}</li>`).join("\n");
+      const items = quotes
+        .map((q) => {
+          const { bullet } = formatExperienceEntry(skill, q);
+          return bullet ? `    <li>${escapeHtml(bullet)}</li>` : "";
+        })
+        .filter(Boolean)
+        .join("\n");
+      if (!items) return "";
       return `  <div class="entry">
     <h3>${escapeHtml(skill)}</h3>
     <ul>
@@ -425,11 +441,14 @@ ${items}
     </ul>
   </div>`;
     })
+    .filter(Boolean)
     .join("\n");
+
+  if (!blocks) return "";
 
   return `<section>
   <h2>Logros por competencia</h2>
-  <p class="section-note">Cada competencia anclada a evidencia citada de la entrevista.</p>
+  <p class="section-note">Resultados concretos agrupados por competencia · evidencia verificada por Salto IA.</p>
 ${blocks}
 </section>`;
 }
@@ -539,15 +558,17 @@ function renderChronological(p: Profile, opts: CvOptions): string {
     p.evidence.length > 0
       ? `<section>
   <h2>Experiencia y trayectoria</h2>
-  <p class="section-note">Trayectoria informal y proyectos personales — orden por relevancia. Evidencia verificada por Salto IA.</p>
+  <p class="section-note">Experiencia práctica y proyectos autónomos — orden por relevancia. Evidencia verificada por Salto IA.</p>
 ${p.evidence
-  .map(
-    (e) => `  <div class="entry">
-    <p class="meta">Reciente · trayectoria informal</p>
-    <p class="role">${escapeHtml(e.skill)}</p>
-    <p>${escapeHtml(e.quote)}</p>
-  </div>`
-  )
+  .map((e) => {
+    const { competency, bullet } = formatExperienceEntry(e.skill, e.quote);
+    if (!bullet) return "";
+    return `  <div class="entry">
+    <p class="meta">Proyecto autónomo · ${escapeHtml(competency)}</p>
+    <p>${escapeHtml(bullet)}</p>
+  </div>`;
+  })
+  .filter(Boolean)
   .join("\n")}
 </section>`
       : "";
@@ -835,7 +856,10 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
   const pushEvidenceFlat = () => {
     if (profile.evidence.length > 0) {
       lines.push("EXPERIENCIA Y LOGROS");
-      profile.evidence.forEach((e) => lines.push(`- ${e.skill}. ${e.quote}`));
+      profile.evidence.forEach((e) => {
+        const { competency, bullet } = formatExperienceEntry(e.skill, e.quote);
+        if (bullet) lines.push(`- ${competency}: ${bullet}`);
+      });
       lines.push("");
     }
   };
@@ -849,7 +873,10 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
     }
     for (const [skill, quotes] of grouped) {
       lines.push(`-- ${skill}`);
-      quotes.forEach((q) => lines.push(`   • ${q}`));
+      quotes.forEach((q) => {
+        const { bullet } = formatExperienceEntry(skill, q);
+        if (bullet) lines.push(`   • ${bullet}`);
+      });
     }
     lines.push("");
   };
