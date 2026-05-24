@@ -234,16 +234,15 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
       />
 
       {/* ─── Grid 3-col superior ─────────────────────────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-4">
-
-        {/* ADN de talento */}
+      {/* items-stretch (default en grid) + flex flex-col en cada card hace
+          que las 3 queden a la MISMA altura, sin la card más corta dejando
+          aire muerto al final. */}
+      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
         <RadarCard
           title="ADN de talento"
           subtitle="Tu perfil en 5 ejes"
           axes={radar}
         />
-
-        {/* Inversión / Earnings */}
         <EarningsCard
           totalCOP={data.earnings.totalCOP}
           completedCount={data.earnings.completedCount}
@@ -251,8 +250,6 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
           avgRating={data.earnings.averageRating}
           tasks={tasks}
         />
-
-        {/* Top oportunidades (flag rows) */}
         <OpportunitiesCard
           topOpportunity={data.topOpportunity}
           marketVisibility={data.marketVisibility}
@@ -260,8 +257,8 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
         />
       </div>
 
-      {/* ─── Grid 2x2 estilo de trabajo + Historial ──────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-4">
+      {/* ─── Estilo + Historial ──────────────────────────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
         <StyleGrid
           tiles={inferStyleTiles(profile, data, tasks)}
           className="lg:col-span-2"
@@ -270,7 +267,7 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
       </div>
 
       {/* ─── Inbox preview + Visibilidad de mercado ──────────────────── */}
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-stretch">
         <InboxCard inbox={data.inboxSummary} profileId={profileId} />
         <MarketSkillsCard topSkills={data.marketVisibility.topSkillsInDemand} />
       </div>
@@ -425,41 +422,36 @@ function RadarCard({
       </div>
     );
   }
-  const size = 180;
+
+  // Antes: SVG 180 + bars laterales redundantes con el polígono. Las bars
+  // duplicaban la info y truncaban labels en columnas angostas.
+  // Ahora: radar grande centrado + valor de cada eje en su vértice (chip),
+  // y leyenda compacta debajo con (eje · valor) en chips.
+  const size = 240;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = (size / 2) - 14;
+  // Margen amplio para labels que viven AFUERA del último ring sin chocar.
+  const radius = size / 2 - 32;
   const N = axes.length;
 
-  const points = axes.map((a, i) => {
-    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
-    const v = a.value / 100;
-    return {
-      x: cx + Math.cos(angle) * radius * v,
-      y: cy + Math.sin(angle) * radius * v,
-      labelX: cx + Math.cos(angle) * (radius + 8),
-      labelY: cy + Math.sin(angle) * (radius + 8),
-    };
-  });
-  const polygon = points.map((p) => `${p.x},${p.y}`).join(' ');
+  const polygonPoints = axes
+    .map((a, i) => {
+      const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+      const v = a.value / 100;
+      const x = cx + Math.cos(angle) * radius * v;
+      const y = cy + Math.sin(angle) * radius * v;
+      return `${x},${y}`;
+    })
+    .join(' ');
 
-  // Grid rings
   const rings = [0.25, 0.5, 0.75, 1.0];
-  // Axis lines
-  const axisLines = axes.map((_, i) => {
-    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
-    return {
-      x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * radius,
-    };
-  });
 
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title={title} subtitle={subtitle} />
-      <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-        <svg width={size} height={size} className="flex-shrink-0">
-          {/* Grid rings */}
+      <div className="mt-2 flex-1 flex items-center justify-center">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="max-w-full h-auto">
+          {/* Rings */}
           {rings.map((r, i) => (
             <polygon
               key={i}
@@ -477,69 +469,83 @@ function RadarCard({
             />
           ))}
           {/* Axis lines */}
-          {axisLines.map((p, i) => (
-            <line
-              key={i}
-              x1={cx}
-              y1={cy}
-              x2={p.x}
-              y2={p.y}
-              stroke="#e7e5e4"
-              strokeWidth={1}
-            />
-          ))}
-          {/* Filled polygon */}
+          {axes.map((_, i) => {
+            const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+            return (
+              <line
+                key={i}
+                x1={cx}
+                y1={cy}
+                x2={cx + Math.cos(angle) * radius}
+                y2={cy + Math.sin(angle) * radius}
+                stroke="#e7e5e4"
+                strokeWidth={1}
+              />
+            );
+          })}
+          {/* Polígono filled */}
           <polygon
-            points={polygon}
+            points={polygonPoints}
             fill="rgba(234, 88, 12, 0.18)"
             stroke="#ea580c"
             strokeWidth={2}
+            strokeLinejoin="round"
           />
-          {/* Vertices */}
-          {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={3} fill="#ea580c" />
-          ))}
-          {/* Labels on axes */}
+          {/* Vértices y labels (label + valor juntos) */}
           {axes.map((a, i) => {
             const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
-            const x = cx + Math.cos(angle) * (radius + 6);
-            const y = cy + Math.sin(angle) * (radius + 6);
-            // Anchor based on x position
+            const v = a.value / 100;
+            const vx = cx + Math.cos(angle) * radius * v;
+            const vy = cy + Math.sin(angle) * radius * v;
+            const lx = cx + Math.cos(angle) * (radius + 18);
+            const ly = cy + Math.sin(angle) * (radius + 18);
+            // Anchor con margen amplio para evitar overlap centro
             const anchor: 'start' | 'middle' | 'end' =
-              x < cx - 1 ? 'end' : x > cx + 1 ? 'start' : 'middle';
+              Math.abs(Math.cos(angle)) < 0.3
+                ? 'middle'
+                : Math.cos(angle) < 0
+                  ? 'end'
+                  : 'start';
             return (
-              <text
-                key={i}
-                x={x}
-                y={y}
-                fontSize={9}
-                textAnchor={anchor}
-                dominantBaseline="middle"
-                fill="#78716c"
-                fontWeight="600"
-              >
-                {a.axis}
-              </text>
+              <g key={i}>
+                <circle cx={vx} cy={vy} r={3.5} fill="#ea580c" />
+                <text
+                  x={lx}
+                  y={ly - 4}
+                  fontSize={10}
+                  textAnchor={anchor}
+                  fill="#78716c"
+                  fontWeight="600"
+                >
+                  {a.axis}
+                </text>
+                <text
+                  x={lx}
+                  y={ly + 8}
+                  fontSize={11}
+                  textAnchor={anchor}
+                  fill="#1c1917"
+                  fontWeight="700"
+                  className="tabular-nums"
+                >
+                  {a.value}
+                </text>
+              </g>
             );
           })}
         </svg>
-        {/* Bars list */}
-        <div className="flex-1 w-full space-y-2 min-w-0">
-          {axes.map((a) => (
-            <div key={a.axis} className="flex items-center gap-3 text-sm">
-              <span className="text-stone-700 w-24 truncate text-xs">{a.axis}</span>
-              <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-orange-500 transition-all"
-                  style={{ width: `${a.value}%` }}
-                />
-              </div>
-              <span className="font-mono tabular-nums text-xs font-bold text-stone-900 w-7 text-right">
-                {a.value}
-              </span>
-            </div>
-          ))}
-        </div>
+      </div>
+      {/* Leyenda compacta con valores raw para contexto. Aporta la métrica
+          honesta detrás del número: "Skills 47/100 = 7 declaradas". */}
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[10px] text-stone-500 border-t border-stone-100 pt-3">
+        {axes.map((a) => (
+          <div key={a.axis} className="flex items-center gap-1.5 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+            <span className="truncate">
+              <strong className="text-stone-700 font-semibold">{a.axis}</strong> · {a.raw}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -560,31 +566,52 @@ function EarningsCard({
   avgRating: number;
   tasks: MicroTask[];
 }) {
-  // Desglose por status
-  const paidSum = tasks
-    .filter((t) => t.status === 'paid')
-    .reduce((a, t) => a + (t.amountCOP ?? 0), 0);
-  const evaluatedSum = tasks
-    .filter((t) => t.status === 'evaluated')
-    .reduce((a, t) => a + (t.amountCOP ?? 0), 0);
-  const deliveredSum = tasks
-    .filter((t) => t.status === 'delivered')
-    .reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+  // Empty state honesto: cuando todo está a $0, mostrar barras vacías es
+  // ruido visual. Mejor un mensaje claro + CTA + preview de lo que será
+  // este widget cuando haya data real.
+  if (totalCOP === 0 && tasks.length === 0) {
+    return (
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
+        <SectionTitle title="Ingresos por microtasks" />
+        <div className="mt-4 flex-1 flex flex-col items-center justify-center text-center px-3 py-6">
+          <div className="text-5xl mb-3" aria-hidden>💼</div>
+          <h3 className="font-display font-bold text-base text-stone-900 mb-1">
+            Tu primera microtask te espera
+          </h3>
+          <p className="text-xs text-stone-500 leading-relaxed max-w-xs">
+            Cuando una empresa te proponga una tarea pagada, vas a verla acá
+            con monto y status — y cuando cobres, el contador sube en tiempo real.
+          </p>
+        </div>
+        <div className="border-t border-stone-100 pt-3 mt-2">
+          <Link href="/joven/conectar" className="text-xs text-orange-700 font-semibold hover:underline inline-flex items-center gap-1.5">
+            Ver oportunidades activas <ArrowRight size={11} />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Caso con tareas pero sin cobro todavía: mostrar bars solo de buckets
+  // con valor (no las cuatro siempre).
+  const paidSum = tasks.filter((t) => t.status === 'paid').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+  const evaluatedSum = tasks.filter((t) => t.status === 'evaluated').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+  const deliveredSum = tasks.filter((t) => t.status === 'delivered').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
   const inProgressSum = tasks
     .filter((t) => t.status === 'pending' || t.status === 'in_progress')
     .reduce((a, t) => a + (t.amountCOP ?? 0), 0);
 
-  const max = Math.max(1, paidSum, evaluatedSum, deliveredSum, inProgressSum);
-
   const rows: { label: string; value: number; color: string }[] = [
     { label: 'Pagadas', value: paidSum, color: 'bg-emerald-500' },
     { label: 'Evaluadas', value: evaluatedSum, color: 'bg-emerald-400' },
-    { label: 'Entregadas · pendientes', value: deliveredSum, color: 'bg-amber-400' },
+    { label: 'Por evaluar', value: deliveredSum, color: 'bg-amber-400' },
     { label: 'En progreso', value: inProgressSum, color: 'bg-stone-300' },
-  ];
+  ].filter((r) => r.value > 0); // Solo mostramos rows que tengan valor
+
+  const max = Math.max(1, ...rows.map((r) => r.value));
 
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Ingresos por microtasks" />
       <div className="mt-3">
         <div className="font-display font-bold text-4xl text-stone-900 tabular-nums leading-none">
@@ -595,23 +622,29 @@ function EarningsCard({
           {avgRating > 0 && ` · rating ${avgRating.toFixed(1)}/5`}
         </div>
       </div>
-      <div className="mt-5 space-y-2.5">
-        {rows.map((r) => (
-          <div key={r.label} className="flex items-center gap-3 text-sm">
-            <span className="text-stone-700 flex-1 truncate text-xs">{r.label}</span>
-            <div className="w-24 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${r.color} transition-all`}
-                style={{ width: `${(r.value / max) * 100}%` }}
-              />
-            </div>
-            <span className="font-mono tabular-nums text-xs font-semibold text-stone-900 w-16 text-right">
-              ${r.value.toLocaleString('es-CO')}
-            </span>
+      <div className="mt-5 flex-1 space-y-2.5">
+        {rows.length === 0 ? (
+          <div className="text-xs text-stone-500 italic px-3 py-2 rounded-lg bg-stone-50">
+            Aún no hay desglose por status — recién arrancás.
           </div>
-        ))}
+        ) : (
+          rows.map((r) => (
+            <div key={r.label} className="flex items-center gap-3 text-sm">
+              <span className="text-stone-700 flex-1 truncate text-xs">{r.label}</span>
+              <div className="w-24 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${r.color} transition-all`}
+                  style={{ width: `${(r.value / max) * 100}%` }}
+                />
+              </div>
+              <span className="font-mono tabular-nums text-xs font-semibold text-stone-900 w-16 text-right">
+                ${r.value.toLocaleString('es-CO')}
+              </span>
+            </div>
+          ))
+        )}
       </div>
-      {(pendingCount > 0) && (
+      {pendingCount > 0 && (
         <div className="mt-5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center gap-2 text-xs text-amber-900">
           <span>⏳</span>
           <span><strong>{pendingCount}</strong> tarea{pendingCount === 1 ? '' : 's'} en curso · acelerar la entrega libera más ingresos.</span>
@@ -633,47 +666,47 @@ function OpportunitiesCard({
   profileId: string;
 }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
-      <div className="flex items-center justify-between mb-1">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-1">
         <SectionTitle title="Tus oportunidades" />
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
           {marketVisibility.needsMatchingMySkills} detectadas
         </span>
       </div>
 
-      {topOpportunity ? (
-        <>
-          <FlagBarRow
-            emoji="🏢"
-            label={topOpportunity.companyName}
-            sublabel={topOpportunity.role}
-            value={topOpportunity.approxIcs}
-            badgeText="Top match"
-            badgeTone="orange"
-          />
-          {/* Si hay más necesidades matching, mostramos las skills demandadas
-              como proxy de oportunidades (cada skill demandada ≈ una abertura). */}
-          {marketVisibility.topSkillsInDemand.slice(0, 4).map((s, i) => (
+      <div className="flex-1">
+        {topOpportunity ? (
+          <>
             <FlagBarRow
-              key={s.skill}
-              emoji={s.iHaveIt ? '✅' : '🎯'}
-              label={s.skill}
-              sublabel={`${s.demandedBy} ${s.demandedBy === 1 ? 'empresa' : 'empresas'} la piden`}
-              value={s.iHaveIt ? Math.min(99, 60 + s.demandedBy * 5) : Math.min(70, 20 + s.demandedBy * 5)}
-              badgeText={s.iHaveIt ? 'La tienes' : 'Aprenderla'}
-              badgeTone={s.iHaveIt ? 'emerald' : 'amber'}
+              emoji="🏢"
+              label={topOpportunity.companyName}
+              sublabel={topOpportunity.role}
+              value={topOpportunity.approxIcs}
+              badgeText="Top match"
+              badgeTone="orange"
             />
-          ))}
-        </>
-      ) : (
-        <p className="text-sm text-stone-500 mt-3">
-          Aún no detectamos matches fuertes. Cuando las empresas publiquen
-          necesidades, aparecen acá ranked por compatibilidad.
-        </p>
-      )}
+            {marketVisibility.topSkillsInDemand.slice(0, 4).map((s) => (
+              <FlagBarRow
+                key={s.skill}
+                emoji={s.iHaveIt ? '✅' : '🎯'}
+                label={s.skill}
+                sublabel={`${s.demandedBy} ${s.demandedBy === 1 ? 'empresa' : 'empresas'} la piden`}
+                value={s.iHaveIt ? Math.min(99, 60 + s.demandedBy * 5) : Math.min(70, 20 + s.demandedBy * 5)}
+                badgeText={s.iHaveIt ? 'La tienes' : 'Aprenderla'}
+                badgeTone={s.iHaveIt ? 'emerald' : 'amber'}
+              />
+            ))}
+          </>
+        ) : (
+          <p className="text-sm text-stone-500 mt-3">
+            Aún no detectamos matches fuertes. Cuando las empresas publiquen
+            necesidades, aparecen acá ranked por compatibilidad.
+          </p>
+        )}
+      </div>
 
-      <Link href={`/joven/conectar?profileId=${encodeURIComponent(profileId)}`}>
-        <button className="mt-4 w-full text-xs text-orange-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
+      <Link href={`/joven/conectar?profileId=${encodeURIComponent(profileId)}`} className="mt-4">
+        <button className="w-full text-xs text-orange-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
           Ver desglose ICS completo <ArrowRight size={11} />
         </button>
       </Link>
@@ -706,18 +739,24 @@ function FlagBarRow({
           : 'bg-stone-100 text-stone-600';
   return (
     <div className="mt-3 first:mt-3">
-      <div className="flex items-start justify-between gap-3 mb-1.5">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-lg leading-none flex-shrink-0">{emoji}</span>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-stone-900 truncate">{label}</div>
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <span className="text-lg leading-none flex-shrink-0 mt-0.5">{emoji}</span>
+          <div className="min-w-0 flex-1">
+            {/* line-clamp-1 con title= como tooltip nativo. Mejor que truncate
+                porque permite que el contenedor se ajuste mejor visualmente. */}
+            <div className="text-sm font-semibold text-stone-900 line-clamp-1" title={label}>
+              {label}
+            </div>
             {sublabel && (
-              <div className="text-[11px] text-stone-500 truncate">{sublabel}</div>
+              <div className="text-[11px] text-stone-500 line-clamp-1" title={sublabel}>
+                {sublabel}
+              </div>
             )}
           </div>
         </div>
         {badgeText && (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${badgeColor}`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 whitespace-nowrap ${badgeColor}`}>
             {badgeText}
           </span>
         )}
@@ -793,13 +832,13 @@ function StyleGrid({
   className?: string;
 }) {
   return (
-    <div className={`bg-white border border-stone-200 rounded-3xl p-5 md:p-6 ${className}`}>
+    <div className={`bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col ${className}`}>
       <SectionTitle title="Estilo de talento" />
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 flex-1">
         {tiles.map((t) => (
           <div
             key={t.label}
-            className="rounded-2xl border border-stone-200 bg-stone-50/40 p-4"
+            className="rounded-2xl border border-stone-200 bg-stone-50/40 p-4 flex flex-col"
           >
             <div className="text-3xl leading-none mb-3">{t.emoji}</div>
             <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
@@ -827,68 +866,97 @@ function HistoryCard({
   tasks: MicroTask[];
   timeline: DashboardJovenData['activityTimeline'];
 }) {
-  // Priorizamos microtasks con rating (las que tienen estrellas → más visual).
   const ratedTasks = tasks
     .filter((t) => typeof t.companyRating === 'number' && t.evaluatedAt)
     .sort((a, b) => (b.evaluatedAt ?? 0) - (a.evaluatedAt ?? 0))
-    .slice(0, 5);
+    .slice(0, 6);
 
-  const showTimeline = ratedTasks.length === 0 && timeline.length > 0;
+  // Mostramos primero las microtasks rateadas (más visual con estrellas),
+  // y abajo eventos del timeline para llenar el espacio en lugar de dejar
+  // la card semi-vacía cuando recién arranca.
+  const remainingSlots = Math.max(0, 6 - ratedTasks.length);
+  const timelineEvents = remainingSlots > 0 ? timeline.slice(0, remainingSlots) : [];
+  const hasContent = ratedTasks.length > 0 || timelineEvents.length > 0;
+
+  // Helper para color del badge de tipo de evento
+  const eventColor = (type: DashboardJovenData['activityTimeline'][number]['type']) => {
+    switch (type) {
+      case 'microtask_proposed':
+      case 'microtask_delivered':
+      case 'microtask_evaluated':
+        return 'bg-orange-100 text-orange-700';
+      case 'feedback_received':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'pass_reason':
+        return 'bg-amber-100 text-amber-800';
+      case 'profile_viewed':
+      default:
+        return 'bg-stone-100 text-stone-600';
+    }
+  };
 
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Historial" />
-      <div className="mt-4 space-y-2.5">
-        {ratedTasks.length > 0 ? (
-          ratedTasks.map((t) => (
-            <div key={t.id} className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center flex-shrink-0">
-                <Briefcase size={14} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-stone-900 truncate">
-                  {t.title}
-                </div>
-                <div className="text-[11px] text-stone-500 truncate">
-                  {t.companyName} · {t.evaluatedAt ? shortDate(t.evaluatedAt) : ''}
-                </div>
-              </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    size={11}
-                    className={
-                      i < (t.companyRating ?? 0)
-                        ? 'text-amber-500 fill-amber-500'
-                        : 'text-stone-200 fill-transparent'
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          ))
-        ) : showTimeline ? (
-          timeline.slice(0, 5).map((e, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-stone-100 text-stone-600 flex items-center justify-center flex-shrink-0">
-                <Activity size={14} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-stone-800 leading-snug truncate">
-                  {e.title}
-                </div>
-                <div className="text-[11px] text-stone-500 truncate">
-                  {formatAgo(e.ts)}
-                </div>
-              </div>
-            </div>
-          ))
+      <div className="mt-4 flex-1">
+        {!hasContent ? (
+          <div className="h-full flex flex-col items-center justify-center text-center px-3 py-6">
+            <div className="text-4xl mb-3" aria-hidden>📜</div>
+            <p className="text-sm font-semibold text-stone-900 mb-1">
+              Tu historial arranca acá
+            </p>
+            <p className="text-xs text-stone-500 leading-relaxed max-w-xs">
+              Cada microtask evaluada y cada empresa que abra tu perfil va a
+              quedar registrada en este timeline.
+            </p>
+          </div>
         ) : (
-          <p className="text-sm text-stone-500">
-            Sin actividad evaluada todavía. Cuando una empresa califique tu primera
-            microtask, aparece acá con estrellas.
-          </p>
+          <div className="space-y-3">
+            {ratedTasks.map((t) => (
+              <div key={t.id} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center flex-shrink-0">
+                  <Briefcase size={14} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-stone-900 truncate" title={t.title}>
+                    {t.title}
+                  </div>
+                  <div className="text-[11px] text-stone-500 truncate">
+                    {t.companyName} · {t.evaluatedAt ? shortDate(t.evaluatedAt) : ''}
+                  </div>
+                </div>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      size={11}
+                      className={
+                        i < (t.companyRating ?? 0)
+                          ? 'text-amber-500 fill-amber-500'
+                          : 'text-stone-200 fill-transparent'
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {timelineEvents.map((e, i) => (
+              <div key={`tl-${i}`} className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${eventColor(e.type)}`}>
+                  <Activity size={13} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-stone-800 leading-snug line-clamp-2" title={e.title}>
+                    {e.title}
+                  </div>
+                  <div className="text-[11px] text-stone-500 mt-0.5">
+                    {formatAgo(e.ts)}
+                    {e.hint && <span className="text-stone-400"> · {e.hint}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -906,33 +974,35 @@ function InboxCard({
 }) {
   if (inbox.total === 0) {
     return (
-      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
         <SectionTitle title="Inbox de feedback" />
-        <p className="text-sm text-stone-500 mt-3 leading-relaxed">
-          Cuando una empresa abra tu perfil y deje feedback (positivo o un descarte
-          con razón), te aparece acá. Es feedback honesto que otras plataformas
-          no te dan.
-        </p>
+        <div className="flex-1 flex items-center">
+          <p className="text-sm text-stone-500 leading-relaxed">
+            Cuando una empresa abra tu perfil y deje feedback (positivo o un descarte
+            con razón), te aparece acá. Es feedback honesto que otras plataformas
+            no te dan.
+          </p>
+        </div>
       </div>
     );
   }
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
-      <div className="flex items-center justify-between mb-1">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-1">
         <SectionTitle title="Inbox de feedback" />
         {inbox.unreplied > 0 && (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
             {inbox.unreplied} sin responder
           </span>
         )}
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-2 flex-1">
         <MiniMetric emoji="⭐" label="Positivos" value={inbox.positiveFeedback} tone="emerald" />
         <MiniMetric emoji="🚪" label="Descartes" value={inbox.passReasons} tone="amber" />
         <MiniMetric emoji="✉️" label="Pendientes" value={inbox.unreplied} tone="slate" />
       </div>
-      <Link href={`/joven/perfil/${profileId}`}>
-        <button className="mt-4 w-full text-xs text-orange-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
+      <Link href={`/joven/perfil/${profileId}`} className="mt-4">
+        <button className="w-full text-xs text-orange-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
           Abrir inbox completo <ArrowRight size={11} />
         </button>
       </Link>
@@ -979,26 +1049,28 @@ function MarketSkillsCard({
 }) {
   if (topSkills.length === 0) {
     return (
-      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
         <SectionTitle title="Skills más buscadas" />
-        <p className="text-sm text-stone-500 mt-3">
-          Aún no hay datos suficientes del mercado.
-        </p>
+        <div className="flex-1 flex items-center">
+          <p className="text-sm text-stone-500">
+            Aún no hay datos suficientes del mercado.
+          </p>
+        </div>
       </div>
     );
   }
   const max = Math.max(...topSkills.map((s) => s.demandedBy));
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Skills más buscadas" subtitle="Demanda actual en el mercado" />
-      <div className="mt-4 space-y-2.5">
+      <div className="mt-4 space-y-2.5 flex-1">
         {topSkills.map((s) => (
           <div key={s.skill} className="flex items-center gap-3 text-sm">
             <span className="text-lg leading-none flex-shrink-0">
               {s.iHaveIt ? '✅' : '🎯'}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-stone-900 truncate">{s.skill}</div>
+              <div className="text-sm text-stone-900 line-clamp-1" title={s.skill}>{s.skill}</div>
               <div className="flex items-center gap-2 mt-0.5">
                 <div className="flex-1 h-1 bg-stone-100 rounded-full overflow-hidden">
                   <div
@@ -1006,7 +1078,7 @@ function MarketSkillsCard({
                     style={{ width: `${(s.demandedBy / max) * 100}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-stone-500 tabular-nums">
+                <span className="text-[10px] text-stone-500 tabular-nums whitespace-nowrap">
                   {s.demandedBy} {s.demandedBy === 1 ? 'empresa' : 'empresas'}
                 </span>
               </div>
