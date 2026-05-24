@@ -1,5 +1,61 @@
 export type Role = "agent" | "user";
 
+/**
+ * Documento que el joven subió a su perfil — diploma, certificado, constancia
+ * laboral, CV físico, etc. Persistido en Firestore (colección `documents`).
+ *
+ * Las skills extraídas por Gemini multimodal viven aparte en el campo
+ * `extractedSkills` con `evidence` (cita textual del documento) — sin cita
+ * no se agregan al perfil principal. Anti-alucinación.
+ */
+export type DocumentKind =
+  | "certificado_curso"
+  | "diploma"
+  | "titulo_universitario"
+  | "constancia_laboral"
+  | "cv_fisico"
+  | "otro";
+
+export interface DocumentSkill {
+  /** Habilidad inferida por la IA a partir del documento. */
+  skill: string;
+  /** Cita textual del documento que justifica la habilidad. SIN CITA, NO ENTRA. */
+  evidence: string;
+  /** 0-100: cuán segura está la IA de que la skill aparece. */
+  confidence: number;
+}
+
+export interface ProfileDocument {
+  id?: string;
+  profileId: string;
+  /** UID del usuario que subió el doc (para validar permisos de borrado). */
+  uploaderUid?: string;
+  /** URL pública servida por Cloudinary. */
+  url: string;
+  /** PublicId de Cloudinary, necesario para borrar el asset. */
+  publicId: string;
+  /** Tipo de archivo: pdf | jpg | png | webp */
+  format: string;
+  /** Tamaño en bytes (reportado por Cloudinary post-upload). */
+  bytes: number;
+  /** Nombre original del archivo que subió el joven. */
+  originalName: string;
+  /** Tipo de documento inferido por la IA o declarado por el joven. */
+  kind?: DocumentKind;
+  /** Institución emisora (ej. "SENA", "Platzi"). Inferida por la IA. */
+  institution?: string;
+  /** Título del programa/curso/grado. */
+  programTitle?: string;
+  /** Fecha de emisión (YYYY-MM) si se pudo inferir. */
+  issuedAt?: string;
+  /** Skills extraídas por Gemini multimodal — anti-alucinación con evidence. */
+  extractedSkills?: DocumentSkill[];
+  /** Estado del proceso de extracción. */
+  extractionStatus?: "pending" | "done" | "failed" | "skipped";
+  extractionError?: string;
+  createdAt: number;
+}
+
 /** Género declarado por la persona (no se infiere del nombre). */
 export type Gender = "mujer" | "hombre" | "otro" | "prefiero_no_decir";
 

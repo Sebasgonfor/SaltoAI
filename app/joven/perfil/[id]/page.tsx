@@ -18,6 +18,7 @@ import type { Gender, Profile } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
 import SkillsGap from '@/components/skills-gap';
+import DocumentsManager from '@/components/documents-manager';
 import { useAuth } from '@/lib/auth-context';
 
 const GENDER_LABEL: Record<Gender, string> = {
@@ -286,6 +287,12 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           perfil. Cuando la empresa visita este perfil, no le mostramos sus
           puntos débiles (es información de carrera del joven, no de selección). */}
       {!viewerIsEmpresa && <SkillsGap profileId={id} />}
+
+      {/* Documentos verificables: diplomas, certificados, constancias.
+          La IA lee cada uno y extrae habilidades con cita textual. Solo
+          el dueño puede subir/borrar (la empresa solo ve los docs ya
+          subidos cuando navega al perfil). */}
+      {!viewerIsEmpresa && <DocumentsManager profileId={id} />}
 
       {/* Skills + Traits */}
       <section className="grid md:grid-cols-2 gap-5">
