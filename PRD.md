@@ -302,22 +302,58 @@ Cada contratación genera un dato propietario que nadie más tiene: **¿el match
 
 **Lo que ya está capturando data (MVP, día 1):**
 
-Colección `feedback` en Firestore, schema mínimo:
+Colección `feedback` en Firestore, schema v3 — cada interacción del producto produce señal:
+
 ```ts
 {
-  matchId: string,        // `${needId}__${profileId}` — idempotente, sin secuencias
-  needId?: string,
-  profileId?: string,
-  useful: boolean,        // ¿el founder marcó "útil" o "no útil"?
+  // Identificación de la señal
+  touchpoint: FeedbackTouchpoint,    // 17 puntos del producto (ver lista abajo)
+  kind: "explicit" | "implicit",     // ¿el user dijo algo o solo cliqueó?
+  targetType: "profile" | "need" | "match" | "microtask" | "evidence" | "suggestion",
+  targetId: string,                  // a qué objeto se refiere
+
+  // Quién (opcional — señal anónima sigue siendo útil)
+  userId?: string,
+  userRole?: "joven" | "empresa",
+
+  // Payload (cualquiera puede venir, depende del touchpoint)
+  rating?: 1|2|3|4|5,
+  binary?: boolean,
+  text?: string,
+  icsAtTime?: number,                // snapshot del score al momento del voto
+  modelVersion?: string,             // qué prompt/weights produjo lo que estamos calificando
   timestamp: number,
-  source: "empresa_match" | "joven_perfil" | "other",
-  note?: string
+
+  // Legacy (compat con el botón "útil sí/no" del primer MVP)
+  matchId?, needId?, profileId?, useful?, signalType?, score?, source?, note?,
 }
 ```
 
-Punto de entrada: botón `¿útil? sí/no` en cada card de match ([`components/match-feedback.tsx`](components/match-feedback.tsx)), POST a [`/api/feedback`](app/api/feedback/route.ts). Persistente en localStorage del navegador (sobrevive refresh sin auth). Reentrenamiento de pesos del ICS = roadmap fase 1-2 con piloto real.
+**Los 17 touchpoints donde Salto pregunta o registra señal** (ver [`lib/types.ts`](lib/types.ts) `FeedbackTouchpoint`):
 
-**Próximas etapas a instrumentar (no en MVP):** post-entrevista joven ("¿la conversación se sintió justa?"), post-contratación empresa ("¿el match efectivamente funcionó después de N días?"), dashboard de auditoría para aliados.
+| # | Touchpoint | Kind | Cuándo |
+|---|---|---|---|
+| 1 | `interview_quality` | explicit | Post-entrevista — "¿se sintió justa?" |
+| 2 | `profile_accuracy` | explicit | Post-perfil — "¿esto te representa?" |
+| 3 | `evidence_quote` | explicit | Por cita — "¿está bien atribuida?" |
+| 4 | `cv_generated` | implicit | Descarga de CV — tracking de uso |
+| 5 | `opportunity_click` | implicit | Click en oportunidad — interés revelado |
+| 6 | `microtask_clarity` | explicit | Post-propuesta — "¿estaba clara la consigna?" |
+| 7 | `microtask_evaluation` | explicit | Post-evaluación — "¿fue justa?" |
+| 8 | `latent_suggestion` | explicit | "¿este rol latente te interesa?" |
+| 9 | `course_recommendation` | explicit | "¿el curso recomendado encaja?" |
+| 10 | `need_structuring` | explicit | "¿la IA capturó bien lo que necesitas?" |
+| 11 | `match_useful` | explicit | El sí/no clásico en cada card de match (legacy) |
+| 12 | `profile_click` | implicit | Empresa abrió un perfil — atención revelada |
+| 13 | `microtask_proposed` | implicit | Empresa propuso microtask — conversión del match |
+| 14 | `microtask_outcome` | explicit | Empresa marca entregable como aceptado/rechazado |
+| 15 | `ai_preeval_agreement` | explicit | "¿coincide la pre-eval de la IA con tu juicio?" |
+| 16 | `post_hire_followup` | explicit | "Lo contraté formalmente / no funcionó después de N días" |
+| 17 | `red_flag_accuracy` | explicit | "¿el red flag fue acertado?" |
+
+**Infraestructura (Fase A — feb 2026):** [`lib/feedback.ts`](lib/feedback.ts) (`emitSignal`, `emitSignalBatch`, dedup vía localStorage), primitives [`components/feedback/{thumbs,rating,inline-prompt}.tsx`](components/feedback/), hook [`hooks/use-emit-signal.ts`](hooks/use-emit-signal.ts) para señales implícitas, endpoint [`app/api/feedback/route.ts`](app/api/feedback/route.ts) que acepta legacy + v3 + batch (backward compatible).
+
+**Reentrenamiento** = roadmap fase 1-2 con piloto real. Por ahora el dato queda **propietario** como combustible del flywheel.
 
 ---
 
