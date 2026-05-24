@@ -295,7 +295,16 @@ export type FeedbackTouchpoint =
   | "microtask_outcome"        // rating final de la micro-tarea (ground truth)
   | "ai_preeval_agreement"     // ¿coincides con la pre-eval de la IA?
   | "post_hire_followup"       // ¿la contratación funcionó a 30/60/90 días?
-  | "red_flag_accuracy";       // ¿el red flag mostrado era acertado?
+  | "red_flag_accuracy"        // ¿el red flag mostrado era acertado?
+  // ─── Bidireccional: empresa ↔ joven (no es sobre la IA) ─────
+  // Estos cierran el loop humano que ningún competidor da: el joven
+  // recibe feedback CUALITATIVO de empresas reales, y puede responder.
+  | "company_feedback_to_youth" // empresa deja comentario + rating sobre la
+                                //   candidatura del joven (no microtask outcome).
+  | "company_pass_reason"       // empresa abrió el perfil pero NO avanzó:
+                                //   le deja al joven la razón corta.
+  | "youth_reply_to_company";   // joven responde al feedback recibido
+                                //   (gracias / contraargumento / actualización).
 
 export type SignalKind = "explicit" | "implicit";
 
@@ -356,6 +365,32 @@ export interface FeedbackEntry {
   text?: string;
   /** Versión del prompt/modelo activo cuando se emitió. Para A/B futuro. */
   modelVersion?: string;
+
+  // ── v4: feedback bidireccional empresa ↔ joven ───────────────
+  /**
+   * Para hilos: id del feedback al que esta entry responde. Permite que el
+   * joven responda a un `company_feedback_to_youth` y que el dashboard
+   * arme la conversación. Solo se llena en `youth_reply_to_company`.
+   */
+  parentFeedbackId?: string;
+  /**
+   * Display name del emisor (ej. "Arepas El Primo", "Camila Silva"). El
+   * cliente lo lee directo en lugar de hacer un join contra accounts/needs.
+   * NO es PII oculta: ya es público en el producto (matches, microtasks).
+   */
+  authorDisplayName?: string;
+  /**
+   * Para feedback empresa→joven: razón pre-canónica del descarte cuando
+   * el founder eligió una opción del menú en `company_pass_reason`. Permite
+   * agregaciones limpias en el dashboard (skill_gap, context_mismatch, etc.)
+   * sin parsear el `text` libre.
+   */
+  reasonCode?:
+    | "skill_gap"
+    | "context_mismatch"
+    | "availability"
+    | "salary_range"
+    | "other";
 }
 
 export const ICS_WEIGHTS = {

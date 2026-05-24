@@ -65,6 +65,15 @@ type V3Payload = {
   source?: "empresa_match" | "joven_perfil" | "other";
   note?: string;
   icsAtTime?: number;
+  // v4: bidireccional empresa ↔ joven
+  parentFeedbackId?: string;
+  authorDisplayName?: string;
+  reasonCode?:
+    | "skill_gap"
+    | "context_mismatch"
+    | "availability"
+    | "salary_range"
+    | "other";
 };
 
 type AnyPayload = LegacyPayload | V3Payload;
@@ -116,6 +125,10 @@ function toEntry(p: AnyPayload): Omit<FeedbackEntry, "id" | "timestamp"> | null 
       binary: p.binary,
       text: p.text,
       modelVersion: p.modelVersion,
+      // v4 bidireccional
+      parentFeedbackId: p.parentFeedbackId,
+      authorDisplayName: p.authorDisplayName,
+      reasonCode: p.reasonCode,
       // signalType legacy: derivado del touchpoint cuando aplica
       signalType:
         p.kind === "implicit"

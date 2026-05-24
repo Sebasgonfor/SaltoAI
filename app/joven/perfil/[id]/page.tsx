@@ -22,6 +22,11 @@ import DocumentsManager from '@/components/documents-manager';
 import { useAuth } from '@/lib/auth-context';
 import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import {
+  CompanyFeedbackToYouth,
+  PassReasonButton,
+} from '@/components/feedback/company-to-youth';
+import { YouthFeedbackInbox } from '@/components/feedback/youth-inbox';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 const GENDER_LABEL: Record<Gender, string> = {
@@ -227,8 +232,8 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             Antes ambos roles veían el CvCustomizer y el founder podía
             sobrescribir los datos guardados en su browser. */}
       {viewerIsEmpresa ? (
-        <section>
-          <div className="mb-5">
+        <section className="space-y-5">
+          <div className="mb-1">
             <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">
               Próximo paso
             </div>
@@ -260,12 +265,23 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 Descargar CV ATS
               </Button>
             </a>
+            {/* "No avanzar" — cierra el loop incluso cuando la respuesta es
+                "no". El joven raramente recibe esto en otras plataformas.
+                Touchpoint company_pass_reason. */}
+            <PassReasonButton profileId={id} profileName={perfil.name} />
             <p className="w-full text-xs text-slate-500 mt-2 leading-relaxed">
               <strong className="text-slate-700">Recomendación:</strong> en lugar de mandar el
               CV a tu mail, propón una micro-tarea pagada acotada. Te llega evidencia REAL de
               cómo trabaja antes de comprometerte con un contrato.
             </p>
           </div>
+          {/* Feedback empresa → joven sobre la candidatura. NO es la
+              evaluación de microtask: es comentario+rating sobre el perfil
+              entero. Va aparte del flujo de microtask para que la empresa
+              pueda dejar feedback aunque NO decida proponer tarea (el
+              caso más común al inicio del funnel). Touchpoint
+              company_feedback_to_youth. */}
+          <CompanyFeedbackToYouth profileId={id} profileName={perfil.name} />
         </section>
       ) : (
         <section>
@@ -280,6 +296,12 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           <CvCustomizer profileId={id} />
         </section>
       )}
+
+      {/* Inbox de feedback recibido — el cierre del loop bidireccional
+          (PRD §8.6 v4). El joven ve los comentarios+ratings que empresas
+          le dejaron sobre su candidatura, las razones de descarte, y
+          puede responder. Solo visible al dueño del perfil. */}
+      {!viewerIsEmpresa && <YouthFeedbackInbox profileId={id} />}
 
       {/* Tu historia → Evidencia (pipeline pedagógico) */}
       <section className="bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-slate-200 rounded-3xl p-8 md:p-10">
