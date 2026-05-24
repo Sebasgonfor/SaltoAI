@@ -219,6 +219,12 @@ export interface CompanyNeed {
   ownerUid?: string;
   ownerEmail?: string | null;
   ownerName?: string | null;
+  /** Naturaleza inferida del rol — cambia cómo el motor de matching pondera
+   * los sub-scores. Default "mixta" para needs creados antes de esta feature. */
+  jobNature?: JobNature;
+  /** Breve explicación de POR QUÉ se clasificó así. Útil para auditoría
+   * humana cuando el founder dice "no entiendo por qué este candidato sale alto". */
+  jobNatureReason?: string;
 }
 
 export interface ICSBreakdown {
@@ -393,9 +399,74 @@ export interface FeedbackEntry {
     | "other";
 }
 
-export const ICS_WEIGHTS = {
-  skillsFit: 0.35,
-  behavioralFit: 0.3,
-  learningSignal: 0.2,
-  contextFit: 0.15,
+/**
+ * Naturaleza del rol — clasificación que cambia QUÉ se valora más en el ICS.
+ *
+ *  - cuantitativa: roles donde el VALOR se mide en números (ventas, crecimiento,
+ *    leads, conversión). Ejemplos: vendedor, growth, marketing, community manager,
+ *    SDR. El motor valora "Resultados medibles" y "Aprendizaje autónomo" alto.
+ *
+ *  - cualitativa: roles donde el VALOR se mide en consistencia, rigor y cuidado.
+ *    Ejemplos: contador de MIPYME, cajero, diseñador gráfico, archivista, asistente
+ *    administrativo, operario, conserje, cocinero. Acá pedir "triplé las ventas"
+ *    es absurdo — lo que importa es "cuadré caja todos los días sin un faltante".
+ *    El motor valora "Confiabilidad", "Sentido del detalle" y "Estabilidad".
+ *
+ *  - mixta: roles que pueden ir hacia cualquier lado según el contexto.
+ *    Ejemplo: atención al cliente (a veces métrica de NPS, a veces solo trato),
+ *    asistente de marketing (a veces métricas, a veces solo ejecución pulcra).
+ *    Default seguro cuando no se puede clasificar con certeza.
+ *
+ * El motor de matching adapta los pesos del ICS según esta clasificación —
+ * un contador con perfil "callado, detallista, responsable" en una MIPYME
+ * NO debería puntuar bajo solo porque no triplicó nada.
+ */
+export type JobNature = "cuantitativa" | "cualitativa" | "mixta";
+
+/**
+ * Pesos del ICS calibrados POR naturaleza del rol.
+ *
+ *  Cuantitativa: learningSignal y resultsmetric pesan más — un vendedor sin
+ *  evidencia de iniciativa autodidacta es señal de alarma.
+ *
+ *  Cualitativa: behavioralFit pesa MUCHO más — el rasgo "detallista responsable"
+ *  vale para un contador más que "aprendí solo a usar X tutorial". learningSignal
+ *  baja porque el valor del rol NO está en la iniciativa scrappy sino en
+ *  ejecutar con cuidado lo establecido.
+ *
+ *  Mixta: balance histórico de Salto. Default cuando no hay clasificación.
+ */
+export const ICS_WEIGHTS_BY_NATURE: Record<JobNature, {
+  skillsFit: number;
+  behavioralFit: number;
+  learningSignal: number;
+  contextFit: number;
+}> = {
+  cuantitativa: {
+    skillsFit: 0.30,
+    behavioralFit: 0.25,
+    learningSignal: 0.25, // peso fuerte: autodidactismo + resultados medibles
+    contextFit: 0.20,
+  },
+  cualitativa: {
+    skillsFit: 0.35,
+    behavioralFit: 0.40, // peso fuerte: detalle, confiabilidad, consistencia
+    learningSignal: 0.10, // peso bajo: no penalizar al callado y rigoroso
+    contextFit: 0.15,
+  },
+  mixta: {
+    skillsFit: 0.35,
+    behavioralFit: 0.30,
+    learningSignal: 0.20,
+    contextFit: 0.15,
+  },
 } as const;
+
+/** Pesos canónicos retro-compatibles. Apuntan a `mixta` — comportamiento de Salto pre-jobNature. */
+export const ICS_WEIGHTS = ICS_WEIGHTS_BY_NATURE.mixta;
+
+/** Helper: pesos del ICS para un need dado, con fallback a mixta. */
+export function weightsForNeed(need: { jobNature?: JobNature }): typeof ICS_WEIGHTS_BY_NATURE.mixta {
+  const nature = need.jobNature ?? "mixta";
+  return ICS_WEIGHTS_BY_NATURE[nature];
+}

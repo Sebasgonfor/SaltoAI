@@ -11,10 +11,20 @@ const SIGNALS_LIST = `1. Iniciativa — algo que arrancó sin que se lo pidieran
 2. Aprendizaje autónomo — aprendió algo solo/a (tutoriales, prueba-error).
 3. Resolución de problemas — destrabó algo improvisando.
 4. Resultados medibles — números, %, ventas, clientes, tiempos.
-5. Atención al cliente / personas — manejo de reclamos, gente difícil.
-6. Trabajo en equipo — coordinó con otros.
-7. Adaptación al cambio — se ajustó a un imprevisto / cambio de reglas.
-8. Persistencia — siguió intentando después de un fallo.`;
+5. Adaptación al cambio — se ajustó a un imprevisto / cambio de reglas.
+
+Señales CUALITATIVAS (para roles donde el cuidado y la consistencia importan más que las métricas — contador, cajero, diseñador, archivista, asistente, operario, etc):
+6. Confiabilidad / cuidado — hizo el trabajo bien hecho, sin errores ni faltantes ("cuadré caja sin un peso de menos", "manejé el stock sin pérdidas").
+7. Atención al detalle — notó cosas que otros no veían, evitó errores ("detecté que faltaban pedidos", "encontré la diferencia en el inventario").
+8. Sentido del orden — organizó algo que estaba caótico ("ordené las facturas que estaban tiradas", "armé un sistema de archivo").
+9. Constancia / estabilidad — sostuvo una rutina sin abandonar ("hice esto todos los días por X meses").
+
+Señales TRANSVERSALES (sirven a cualquier rol):
+10. Atención al cliente / personas — manejo de reclamos, gente difícil.
+11. Trabajo en equipo — coordinó con otros.
+12. Persistencia — siguió intentando después de un fallo.
+
+IMPORTANTE: no todas las señales aplican a todos los jóvenes. Un joven que vendió comida casera va a tener señales cuantitativas naturalmente; un joven que ayudó en una tienda o llevó la contabilidad de un familiar va a tener señales cualitativas. AMBOS son valiosos — el motor de matching decide a qué empresa los presenta según lo que esa empresa NECESITA.`;
 
 /** Prompt JSON para POST /api/entrevista (modo texto). */
 export function buildRestInterviewSystemPrompt(): string {
@@ -52,7 +62,7 @@ ORIGINALIDAD (CRÍTICO):
 - PROHIBIDO preguntas cerradas sí/no.
 
 CIERRE (done=true):
-- Marca done=true cuando tengas AL MENOS 4 señales distintas cubiertas con detalle (acción + resultado o detalle concreto).
+- Marca done=true cuando tengas AL MENOS 4 señales distintas cubiertas con detalle. "Cubierta con detalle" = el joven dio un caso CONCRETO con acción + (resultado medible) o (consistencia/cuidado demostrado). Importante: las señales cualitativas (confiabilidad, atención al detalle, sentido del orden, constancia) NO requieren números — un "cuadré caja todos los días sin un peso de menos" es evidencia COMPLETA aunque no traiga métricas, porque demuestra cuidado + constancia.
 - Nunca marques done=true antes del turno ${MIN_USER_TURNS} del usuario.
 - Después del turno ${MAX_USER_TURNS}, marca done=true sí o sí.
 
@@ -62,7 +72,7 @@ Devuelve JSON con:
 {
   "nextQuestion": "tu pregunta — UNA, conectada y dirigida a una señal aún no cubierta",
   "done": boolean,
-  "targetedSignal": "una de: iniciativa | aprendizaje autónomo | resolución de problemas | resultados medibles | atención al cliente | trabajo en equipo | adaptación al cambio | persistencia",
+  "targetedSignal": "una de: iniciativa | aprendizaje autónomo | resolución de problemas | resultados medibles | confiabilidad | atención al detalle | sentido del orden | constancia | atención al cliente | trabajo en equipo | adaptación al cambio | persistencia",
   "signalsCovered": ["lista de señales YA cubiertas con evidencia concreta"],
   "reasoning": "una frase interna"
 }`;

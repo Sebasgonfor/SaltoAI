@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
+import { JovenWidgets } from '@/components/dashboard/joven-widgets';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -286,9 +287,11 @@ export default function DashboardPage() {
           >
             <Menu size={18} />
           </button>
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center">
+            {/* variant=full ya incluye icono + texto "SaltoAI" — antes había
+                un <span>SaltoAI</span> redundante que mostraba el wordmark
+                dos veces en el topbar. */}
             <SaltoLogo variant="full" size={26} />
-            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">SaltoAI</span>
           </Link>
         </div>
         <UserButton />
@@ -321,9 +324,8 @@ export default function DashboardPage() {
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               >
                 <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center">
                     <SaltoLogo variant="full" size={24} />
-                    <span className="font-display font-semibold text-slate-900 text-sm">SaltoAI</span>
                   </div>
                   <button
                     type="button"
@@ -341,38 +343,41 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* ── MAIN CONTENT ── */}
-        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-4xl">
+        {/* max-w-4xl era angosto: con 3 cards por row la radar quedaba
+            apretada. Subo a 6xl para que los widgets respiren. */}
+        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-6xl">
 
-          {/* WELCOME — sin avatar/foto. El producto no maneja foto de perfil. */}
-          <FadeUp>
-            <div>
-              <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
-                {getGreeting(firstName)}
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {profile ? 'Tu perfil está activo y visible para empresas.' : 'Completa tu entrevista para empezar.'}
-              </p>
-            </div>
-          </FadeUp>
+          {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
+              ya muestra greeting (vía nombre + categoría), avatar circular,
+              status text ("Última actividad: …") y los 4 KPIs (skills,
+              evidencias, microtasks, rating). Mantenerlos arriba duplicaba
+              información y rompía la jerarquía visual. Solo dejamos el
+              greeting cuando NO hay perfil — ahí el hero no se renderiza
+              y el onboarding banner toma protagonismo. */}
+          {!dataLoading && !profile && (
+            <FadeUp>
+              <div>
+                <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
+                  {getGreeting(firstName)}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Completa tu entrevista para empezar.
+                </p>
+              </div>
+            </FadeUp>
+          )}
 
-          {/* STAT CARDS */}
-          {!dataLoading && (
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                icon={Layers}
-                value={profile?.skills.length ?? 0}
-                label="Skills"
-                color="text-emerald-600"
-                delay={0.05}
+          {/* Widgets enriquecidos — pasaporte de talento visual. El hero
+              dentro del componente reemplaza el welcome header. */}
+          {!dataLoading && profile && (
+            <FadeUp>
+              <JovenWidgets
+                uid={user.uid}
+                profileId={user.uid}
+                profile={profile}
+                tasks={tasks}
               />
-              <StatCard
-                icon={MessageSquareQuote}
-                value={profile?.evidence.length ?? 0}
-                label="Evidencias"
-                color="text-emerald-600"
-                delay={0.1}
-              />
-            </div>
+            </FadeUp>
           )}
 
           {/* ONBOARDING — sin perfil */}
