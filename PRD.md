@@ -397,6 +397,20 @@ Los componentes viven en [`components/feedback/company-to-youth.tsx`](components
 - Correlación entre ICS al momento del match y rating final del founder (`microtask_outcome`) — el indicador defensivo del §8.6.
 - % de acuerdo founder ↔ pre-eval IA (`ai_preeval_agreement`).
 
+**Radiografía de la necesidad (feb 2026):** [`/empresa/matches/[needId]`](app/empresa/matches/[needId]/page.tsx) deja de ser solo "lista de candidatos" y se vuelve una vista de inteligencia operativa. El componente [`<NeedRadiography>`](components/empresa/need-radiography.tsx) muestra:
+
+| Widget | Qué responde |
+|---|---|
+| **KPIs** | ICS promedio · # candidatos · días desde publicación · % de skills cubiertas |
+| **Salud de la necesidad** | Score 0-100 + issues accionables (contexto corto, pocas skills, restricciones imposibles) |
+| **Histograma de ICS** | Distribución del shortlist por bucket de 20 |
+| **Dimensiones promedio** | Skills · conducta · aprendizaje · contexto (palancas de mejora) |
+| **Cobertura de skills** | Pedidas vs. cubiertas por el shortlist (insight: qué pediste que nadie tiene) |
+| **Perfil de la empresa** | Legal, founder, otras búsquedas activas, badge "primera necesidad" |
+| **Engagement** | Perfiles abiertos, microtasks propuestas, útiles, descartes — todo desde el feedback log |
+
+Data: la mayoría de widgets son derivados client-side desde `need + matches` (cero round-trips extra). El perfil de empresa y el engagement vienen de [`/api/empresa/radiography?needId=X`](app/api/empresa/radiography/route.ts).
+
 ---
 
 ## 9. Arquitectura general
