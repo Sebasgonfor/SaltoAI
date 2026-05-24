@@ -80,6 +80,10 @@ export function loadSavedEmpresaLegal(uid: string | null | undefined): CompanyLe
     taxId,
     legalRepName,
     legalRepDocId,
+    legalRepDocType:
+      typeof parsed.legalRepDocType === "string" && parsed.legalRepDocType
+        ? parsed.legalRepDocType
+        : "CC",
     acceptedTerms: true,
     acceptedAt:
       typeof parsed.acceptedAt === "string" && parsed.acceptedAt

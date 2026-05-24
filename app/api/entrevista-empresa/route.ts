@@ -8,7 +8,9 @@ import {
   isYesNoQuestion,
   lastAgentMessage,
   pickYesNoFollowup,
+  validateChatMessage,
 } from "@/lib/input-validation";
+import { MIN_USER_TURNS, MAX_USER_TURNS } from "@/lib/interview-prompt";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
@@ -40,8 +42,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   });
 }
 
-const MIN_USER_TURNS = 4;
-const MAX_USER_TURNS = 6;
+// MIN_USER_TURNS y MAX_USER_TURNS importados de lib/interview-prompt
 
 /**
  * Slots de cobertura para empresa (v2 — rediseño post-audit).
@@ -288,6 +289,15 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(messages) || messages.length === 0) {
       log.end({ status: 400, extra: { reason: "messages_required" } });
       return NextResponse.json({ error: "messages required" }, { status: 400 });
+    }
+    for (const m of messages) {
+      if (m.role === 'user' && typeof m.content === 'string') {
+        const err = validateChatMessage(m.content);
+        if (err) {
+          log.end({ status: 400, extra: { reason: 'message_too_long' } });
+          return NextResponse.json({ error: err, code: 'message_too_long', done: false }, { status: 400 });
+        }
+      }
     }
 
     const userTurns = countUserTurns(messages);
