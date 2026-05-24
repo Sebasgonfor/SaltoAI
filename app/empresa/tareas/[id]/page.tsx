@@ -19,6 +19,8 @@ import {
   User,
 } from 'lucide-react';
 import type { MicroTask } from '@/lib/types';
+import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { emitSignal } from '@/lib/feedback';
 
 export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -63,6 +65,19 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
         return;
       }
       setTask(data.task);
+      // Señal microtask_outcome — el rating definitivo del founder es el
+      // outcome ground-truth más valioso del flywheel. Comparable contra
+      // aiEvaluation.overallScore para calibrar el pre-eval (ver §8.6).
+      const aiScore = data.task?.aiEvaluation?.overallScore;
+      void emitSignal({
+        kind: 'explicit',
+        touchpoint: 'microtask_outcome',
+        targetType: 'microtask',
+        targetId: id,
+        rating: rating as 1 | 2 | 3 | 4 | 5,
+        text: comment.trim() || undefined,
+        icsAtTime: typeof aiScore === 'number' ? aiScore : undefined,
+      });
     } catch (e) {
       setError('Error de red');
     } finally {
@@ -190,6 +205,25 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
                     </div>
                   ))}
                 </div>
+                {/* Calibración de la pre-eval: ¿el founder concuerda con
+                    la IA ANTES de poner su propia nota? Este es el touchpoint
+                    más alto valor del flywheel — si el founder dice "no",
+                    sabemos que el rating final lo va a contradecir, y eso
+                    es el signal que reentrena los pesos del evaluador IA.
+                    Sólo aparece en isDelivered (antes de que el founder vote)
+                    o si todavía no envió el thumbs en isEvaluated. */}
+                <div className="mt-6 pt-5 border-t border-slate-800">
+                  <FeedbackInlinePrompt
+                    question="¿Coincidís con esta pre-evaluación?"
+                    hint="Tu acuerdo/desacuerdo se compara contra tu rating final para calibrar la IA."
+                    variant="thumbs"
+                    touchpoint="ai_preeval_agreement"
+                    targetType="microtask"
+                    targetId={id}
+                    icsAtTime={task.aiEvaluation.overallScore}
+                    dismissible
+                  />
+                </div>
               </div>
             </section>
           )}
@@ -300,6 +334,22 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
                 Ver perfil completo
               </Button>
             </Link>
+          </div>
+          {/* Cierre del loop: ¿lo contrataste formalmente? Este es el dato
+              propietario del flywheel (§8.6): correlaciona ICS al momento
+              del match contra outcome real de contratación. Es lo que
+              ningún wrapper de LinkedIn tiene. dismissible=false: queremos
+              cerrar el loop aunque la respuesta sea "no". */}
+          <div className="mt-5 pt-5 border-t border-emerald-200">
+            <FeedbackInlinePrompt
+              question="¿Lo contrataste formalmente?"
+              hint={`Esto cierra el loop de validación. Si "no", contanos por qué — esa data nos hace mejores.`}
+              variant="thumbs"
+              touchpoint="post_hire_followup"
+              targetType="microtask"
+              targetId={id}
+              dismissible={false}
+            />
           </div>
         </section>
       )}

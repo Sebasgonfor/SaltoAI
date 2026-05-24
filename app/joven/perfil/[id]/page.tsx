@@ -20,6 +20,9 @@ import CvCustomizer from '@/components/cv-customizer';
 import SkillsGap from '@/components/skills-gap';
 import DocumentsManager from '@/components/documents-manager';
 import { useAuth } from '@/lib/auth-context';
+import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
+import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 const GENDER_LABEL: Record<Gender, string> = {
   mujer: 'Mujer',
@@ -36,6 +39,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const { account } = useAuth();
   const viewerIsEmpresa = account?.role === 'empresa';
+  const emit = useEmitSignal();
   const [perfil, setPerfil] = useState<Profile | null>(null);
   const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -186,6 +190,32 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         </section>
       )}
 
+      {/* FEEDBACK del joven sobre la calidad de la entrevista y la precisión
+          del perfil generado (touchpoints PRD §8.6: interview_quality +
+          profile_accuracy). Se muestra solo al dueño del perfil — el founder
+          que pasa por aquí no debe ver estos prompts. Dedup por localStorage
+          (no aparecen dos veces para el mismo perfil). */}
+      {!viewerIsEmpresa && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <FeedbackInlinePrompt
+            question="¿La entrevista entendió tu potencial?"
+            hint="Tu calificación entrena el motor que extrae evidencia."
+            variant="rating"
+            touchpoint="interview_quality"
+            targetType="profile"
+            targetId={id}
+          />
+          <FeedbackInlinePrompt
+            question="¿Este perfil te representa?"
+            hint="Si algo falta o sobra, marcalo — lo usamos para afinar."
+            variant="thumbs"
+            touchpoint="profile_accuracy"
+            targetType="profile"
+            targetId={id}
+          />
+        </div>
+      )}
+
       {/* Bloque contextual por rol del viewer:
           - Joven dueño del perfil → CvCustomizer (personaliza SU CV con SUS
             datos de contacto, idiomas, educación; persistencia localStorage
@@ -216,6 +246,15 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               href={`/api/cv?profileId=${encodeURIComponent(id)}&style=minimalist&autoprint=1`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => {
+                // Señal implícita: la empresa descargó el CV. Es señal de
+                // interés alto en el candidato (engagement > "ver perfil").
+                emit({
+                  touchpoint: 'cv_generated',
+                  targetType: 'profile',
+                  targetId: id,
+                });
+              }}
             >
               <Button variant="outline" className="gap-2">
                 Descargar CV ATS
@@ -390,6 +429,26 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                     </div>
                   </div>
                 </div>
+                {/* Feedback por cita — solo lo ve el dueño del perfil. La
+                    empresa NO debe poder marcar evidencia ajena como errada
+                    (sería ataque al perfil). Genera señal ground-truth para
+                    detectar alucinaciones del extractor. */}
+                {!viewerIsEmpresa && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-slate-500">
+                      ¿La cita captura bien lo que contaste?
+                    </span>
+                    <FeedbackThumbs
+                      label=""
+                      thanksText="Gracias, lo registramos."
+                      layout="inline"
+                      silent
+                      touchpoint="evidence_quote"
+                      targetType="evidence"
+                      targetId={`${id}__ev_${i}`}
+                    />
+                  </div>
+                )}
               </article>
             ))}
           </div>

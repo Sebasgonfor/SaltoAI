@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { Gender, OpportunityMatch, Profile } from '@/lib/types';
 import { RoleGate } from '@/components/auth/role-gate';
+import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 // --- Cache cliente de oportunidades (5 min) ---
 //
@@ -88,6 +89,7 @@ const GENDER_LABEL: Record<Gender, string> = {
 function ConectarContent() {
   const searchParams = useSearchParams();
   const profileIdFromUrl = searchParams.get('profileId');
+  const emit = useEmitSignal();
   const [profileId, setProfileId] = useState<string | null>(profileIdFromUrl);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [opportunities, setOpportunities] = useState<OpportunityMatch[]>([]);
@@ -399,7 +401,21 @@ function ConectarContent() {
                 )}
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-3">
-                  <Button className="gap-2" disabled title="Próximamente: mensajería directa">
+                  <Button
+                    className="gap-2"
+                    disabled
+                    title="Próximamente: mensajería directa"
+                    onClick={() => {
+                      // Aunque el botón esté disabled hoy, registramos el
+                      // intent: el joven YA expresó interés. Es señal pura.
+                      emit({
+                        touchpoint: 'opportunity_click',
+                        targetType: 'need',
+                        targetId: opp.needId,
+                        icsAtTime: opp.ics,
+                      });
+                    }}
+                  >
                     Quiero conectar
                   </Button>
                   {opp.breakdown ? (
@@ -407,7 +423,22 @@ function ConectarContent() {
                       variant="outline"
                       size="sm"
                       className="gap-1.5"
-                      onClick={() => setExpandedId(isExpanded ? null : opp.needId)}
+                      onClick={() => {
+                        const expanding = !isExpanded;
+                        setExpandedId(isExpanded ? null : opp.needId);
+                        // "Ver desglose" también es señal de interés (curiosidad
+                        // por el rol). La emitimos solo al expandir, no al
+                        // colapsar — evita doble-emit por toggle.
+                        if (expanding) {
+                          emit({
+                            touchpoint: 'opportunity_click',
+                            targetType: 'need',
+                            targetId: opp.needId,
+                            icsAtTime: opp.ics,
+                            text: 'breakdown_expanded',
+                          });
+                        }
+                      }}
                     >
                       {isExpanded ? 'Ocultar desglose' : 'Ver desglose ICS'}
                       {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
