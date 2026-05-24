@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import {
   ArrowRight,
   Briefcase,
@@ -240,6 +241,7 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
           { icon: '💼', label: 'Microtasks', value: `${data.earnings.completedCount}` },
           { icon: '⭐', label: 'Rating', value: data.earnings.averageRating > 0 ? `${data.earnings.averageRating.toFixed(1)}/5` : '—' },
         ]}
+        pendingTasks={data.earnings.pendingCount}
       />
 
       {/* ─── Grid 3-col superior ─────────────────────────────────────── */}
@@ -298,6 +300,7 @@ function HeroDark({
   ringLabel,
   statusText,
   stats,
+  pendingTasks = 0,
 }: {
   avatarText: string;
   name: string;
@@ -306,6 +309,7 @@ function HeroDark({
   ringLabel: string;
   statusText: string;
   stats: { icon: string; label: string; value: string }[];
+  pendingTasks?: number;
 }) {
   // Calculo color del badge match en base al pulse
   const matchPct = ringValue;
@@ -353,6 +357,22 @@ function HeroDark({
             )}
           </div>
           <p className="text-stone-300 text-sm">{statusText}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/joven/tareas">
+              <Button
+                size="sm"
+                className="gap-2 bg-emerald-500 hover:bg-emerald-600 text-white border-0 shadow-sm"
+              >
+                <Briefcase size={15} />
+                Mis tareas
+                {pendingTasks > 0 && (
+                  <span className="ml-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
+                    {pendingTasks}
+                  </span>
+                )}
+              </Button>
+            </Link>
+          </div>
           {/* Stat row */}
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl">
             {stats.map((s) => (

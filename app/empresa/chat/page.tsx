@@ -128,6 +128,7 @@ function legalToForm(legal: CompanyLegal): Omit<CompanyLegal, 'acceptedAt'> {
     taxId: legal.taxId,
     legalRepName: legal.legalRepName,
     legalRepDocId: legal.legalRepDocId,
+    legalRepDocType: legal.legalRepDocType,
     acceptedTerms: legal.acceptedTerms,
   };
 }
@@ -266,6 +267,7 @@ export default function ChatEmpresa() {
       taxId: '',
       legalRepName: user?.displayName ?? '',
       legalRepDocId: '',
+      legalRepDocType: 'CC',
       acceptedTerms: false,
     });
     setPhase('legal');

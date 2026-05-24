@@ -1,18 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { useAuth } from '@/lib/auth-context';
 import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
-import { SaltoLogo } from '@/components/ui/salto-logo';
-import { UserButton } from '@/components/auth/user-button';
+import { JovenHeader } from '@/components/joven/joven-header';
+import { AppFooter } from '@/components/layout/app-footer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Profile, MicroTask } from '@/lib/types';
 import {
-  LayoutDashboard,
   User,
   Network,
   Briefcase,
@@ -23,8 +22,6 @@ import {
   Clock,
   DollarSign,
   Star,
-  Menu,
-  X,
   MessageSquareQuote,
   Layers,
   TrendingUp,
@@ -52,15 +49,6 @@ function FadeUp({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
     </motion.div>
   );
 }
-
-// ─── sidebar nav config ───────────────────────────────────────────────────────
-
-const NAV_JOVEN = [
-  { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-  { icon: User, label: 'Mi perfil', href: '/joven/perfil' },
-  { icon: Network, label: 'Oportunidades', href: '/joven/conectar' },
-  { icon: Briefcase, label: 'Mis tareas', href: '/joven/tareas' },
-];
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -160,31 +148,6 @@ function EmptyState({ icon: Icon, title, body, cta, href }: {
   );
 }
 
-function SidebarNav({
-  uid,
-  onClose,
-}: {
-  uid: string;
-  onClose?: () => void;
-}) {
-  return (
-    <nav className="flex flex-col gap-0.5 p-3">
-      {NAV_JOVEN.map(({ icon: Icon, label, href }) => {
-        const resolvedHref = href === '/joven/perfil' ? `/joven/perfil/${uid}` : href;
-        return (
-          <Link key={label} href={resolvedHref} onClick={onClose}>
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors">
-              <Icon size={16} strokeWidth={1.75} />
-              {label}
-            </div>
-          </Link>
-        );
-      })}
-
-    </nav>
-  );
-}
-
 // ─── AI insight generator ─────────────────────────────────────────────────────
 
 function getInsight(profile: Profile | null, tasks: MicroTask[]): string {
@@ -208,9 +171,6 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tasks, setTasks] = useState<MicroTask[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (loading || roleLoading) return;
     if (!user) {
@@ -258,16 +218,6 @@ export default function DashboardPage() {
     })();
   }, [user, jovenProfileId]);
 
-  // close sidebar on outside click
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (!sidebarRef.current?.contains(e.target as Node)) setSidebarOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [sidebarOpen]);
-
   // Mientras se resuelve auth/rol, mostramos el loader. Si rol resolvió como
   // empresa, el useEffect ya disparó router.replace; igual mantenemos loader
   // para evitar un flash de UI joven antes del redirect.
@@ -282,84 +232,10 @@ export default function DashboardPage() {
   const insight = getInsight(profile, tasks);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
+    <div className="min-h-screen bg-[#FAFAF7] flex flex-col overflow-x-hidden">
+      <JovenHeader />
 
-      {/* ── TOPBAR ── */}
-      {/* backdrop-blur-md en sticky recalculaba el filter en cada frame de
-          scroll → uno de los mayores culpables del scroll lento. Lo cambio
-          por fondo sólido. Se ve igual de premium y el scroll va smooth. */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-14 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-            aria-label="Abrir menú"
-          >
-            <Menu size={18} />
-          </button>
-          <Link href="/" className="flex items-center">
-            {/* variant=full ya incluye icono + texto "SaltoAI" — antes había
-                un <span>SaltoAI</span> redundante que mostraba el wordmark
-                dos veces en el topbar. */}
-            <SaltoLogo variant="full" size={26} />
-          </Link>
-        </div>
-        <UserButton />
-      </header>
-
-      <div className="flex flex-1">
-
-        {/* ── SIDEBAR desktop ── */}
-        <aside className="hidden md:flex flex-col w-52 border-r border-slate-200 bg-white/60 sticky top-14 self-start h-[calc(100vh-3.5rem)] overflow-y-auto flex-shrink-0">
-          <SidebarNav uid={user.uid} />
-        </aside>
-
-        {/* ── SIDEBAR mobile overlay ── */}
-        <AnimatePresence>
-          {sidebarOpen && (
-            <>
-              <motion.div
-                className="fixed inset-0 bg-slate-900/40 z-40 md:hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setSidebarOpen(false)}
-              />
-              <motion.div
-                ref={sidebarRef}
-                className="fixed top-0 left-0 bottom-0 w-64 bg-white z-50 md:hidden shadow-xl overflow-y-auto"
-                initial={{ x: -264 }}
-                animate={{ x: 0 }}
-                exit={{ x: -264 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              >
-                <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <div className="flex items-center">
-                    <SaltoLogo variant="full" size={24} />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(false)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
-                    aria-label="Cerrar menú"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <SidebarNav uid={user.uid} onClose={() => setSidebarOpen(false)} />
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* ── MAIN CONTENT ── */}
-        {/* Sin max-w: el dashboard ocupa TODO el espacio disponible al
-            costado del sidebar. `flex-1 min-w-0` ya garantiza que se
-            adapta al ancho restante después del sidebar de 208px (w-52).
-            El padding lateral aumenta en pantallas grandes para que el
-            contenido no quede pegado al borde derecho. */}
-        <main className="flex-1 min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7">
+      <main className="flex-1 min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7 max-w-7xl mx-auto w-full">
 
           {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
               ya muestra greeting (vía nombre + categoría), avatar circular,
@@ -532,8 +408,12 @@ export default function DashboardPage() {
           )}
 
 
-        </main>
-      </div>
+      </main>
+
+      <AppFooter
+        left="SaltoAI · Tu primer salto al empleo formal"
+        right="Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI"
+      />
     </div>
   );
 }

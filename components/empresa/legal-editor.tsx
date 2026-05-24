@@ -78,6 +78,7 @@ export function LegalEditor({ uid }: LegalEditorProps) {
       taxId: form.taxId.trim(),
       legalRepName: repName,
       legalRepDocId: form.legalRepDocId.trim(),
+      legalRepDocType: legal?.legalRepDocType ?? 'CC',
       acceptedTerms: true,
       acceptedAt: legal?.acceptedAt ?? new Date().toISOString(),
     };

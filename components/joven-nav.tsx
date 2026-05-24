@@ -40,8 +40,18 @@ export function JovenNav({
       }
     >
       <NavLink
+        href="/dashboard"
+        label="Inicio"
+        shortLabel="Inicio"
+        matchPrefix={false}
+        hint="Tu overview: pulso laboral, oportunidades y micro-tareas."
+        onNavigate={onNavigate}
+        className={linkClass}
+      />
+      <NavLink
         href="/joven/chat"
         label="Entrevista"
+        shortLabel="Entrevista"
         hint="Conversa con la IA para construir o actualizar tu Perfil de Evidencia."
         onNavigate={onNavigate}
         className={linkClass}
@@ -49,6 +59,7 @@ export function JovenNav({
       <NavLink
         href={perfilHref}
         label="Mi Perfil"
+        shortLabel="Perfil"
         matchPrefix
         hint="Tu Perfil de Evidencia: habilidades, evidencia citada y CV ATS."
         onNavigate={onNavigate}
@@ -57,6 +68,7 @@ export function JovenNav({
       <NavLink
         href="/joven/conectar"
         label="Oportunidades"
+        shortLabel="Matches"
         emphasis
         hint="Necesidades publicadas por empresas que encajan con tu perfil."
         onNavigate={onNavigate}
@@ -64,7 +76,9 @@ export function JovenNav({
       />
       <NavLink
         href="/joven/tareas"
-        label="Mis Tareas"
+        label="Mis tareas"
+        shortLabel="Tareas"
+        matchPrefix
         hint="Micro-tareas pagadas asignadas por empresas."
         onNavigate={onNavigate}
         className={linkClass}

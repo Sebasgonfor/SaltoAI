@@ -234,7 +234,7 @@ export interface CompanyLegal {
   legalRepName: string;
   legalRepDocId: string;
   /** Tipo de documento del representante legal: CC, CE, PPN, NIT. */
-  legalRepDocType: string;
+  legalRepDocType: import('./input-validation').DocType;
   acceptedTerms: boolean;
   /** ISO timestamp del momento en que el founder aceptó TyC. */
   acceptedAt: string;
