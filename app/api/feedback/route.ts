@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listFeedback, recordFeedback } from "@/lib/db";
 import { startLog } from "@/lib/logger";
+import { isDemoProfile } from "@/lib/profile-source";
 import type {
   FeedbackEntry,
   FeedbackTarget,
   FeedbackTouchpoint,
   SignalKind,
 } from "@/lib/types";
+
+/**
+ * Touchpoints empresa→joven que tienen DESTINATARIO real (el joven los
+ * ve en su inbox). Bloqueamos estos cuando el targetId es un perfil
+ * demo (seed_xxx o legacy local_xxx) porque NO hay usuario real al
+ * otro lado — el feedback quedaría colgado.
+ *
+ * Touchpoints de IA / análisis (interview_quality, need_structuring,
+ * match_useful, etc.) NO se bloquean: sus señales alimentan el
+ * flywheel aunque el target sea demo.
+ */
+const COMPANY_TO_YOUTH_TOUCHPOINTS = new Set<FeedbackTouchpoint>([
+  "company_feedback_to_youth",
+  "company_pass_reason",
+]);
 
 export const runtime = "nodejs";
 
@@ -187,7 +203,27 @@ export async function POST(req: NextRequest) {
     const rejected: { index: number; reason: string }[] = [];
 
     for (let i = 0; i < items.length; i++) {
-      const entry = toEntry(items[i]);
+      const item = items[i];
+
+      // Guard: feedback empresa→joven contra perfiles demo (seed/legacy)
+      // se rechaza ANTES del mapeo. El founder cree mandarlo a "Camila
+      // Silva" pero no hay user real → quedaría colgado en Firestore
+      // sin destinatario. Devolvemos un código específico para que el
+      // cliente muestre un mensaje claro.
+      if (
+        isV3(item) &&
+        COMPANY_TO_YOUTH_TOUCHPOINTS.has(item.touchpoint) &&
+        item.targetType === "profile" &&
+        isDemoProfile(item.targetId)
+      ) {
+        rejected.push({
+          index: i,
+          reason: "demo_profile_no_destinatario",
+        });
+        continue;
+      }
+
+      const entry = toEntry(item);
       if (!entry) {
         rejected.push({
           index: i,
