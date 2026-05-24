@@ -43,12 +43,6 @@ function EmpresaNav({
         onNavigate={onNavigate}
         className={isCol ? 'w-full' : undefined}
       />
-      {!isCol && (
-        <>
-          <div className="h-5 w-px bg-slate-200 mx-1 sm:mx-2 shrink-0" />
-          <UserButton />
-        </>
-      )}
     </nav>
   );
 }
@@ -59,6 +53,7 @@ export function EmpresaHeader() {
       desktopNav={<EmpresaNav layout="row" />}
       drawerNav={(close) => <EmpresaNav layout="column" onNavigate={close} />}
       mobileTrailing={<UserButton />}
+      desktopTrailing={<UserButton />}
     />
   );
 }

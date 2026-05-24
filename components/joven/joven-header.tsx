@@ -11,6 +11,7 @@ export function JovenHeader() {
       desktopNav={<JovenNav layout="row" />}
       drawerNav={(close) => <JovenNav layout="column" onNavigate={close} />}
       mobileTrailing={<UserButton />}
+      desktopTrailing={<UserButton />}
     />
   );
 }
