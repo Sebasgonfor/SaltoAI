@@ -364,7 +364,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 <div className="mt-1.5 flex items-center gap-1.5">
                   <AtsScore value={s.atsScore} />
                   {s.atsScore <= 2 && (
-                    <AlertTriangle size={10} className="text-amber-600" aria-label="Riesgo ATS" />
+                    <AlertTriangle size={10} className="text-slate-600" aria-label="Riesgo ATS" />
                   )}
                 </div>
               </button>
@@ -376,7 +376,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
           <span className="text-slate-500">Ideal para {activeStyle.bestFor}</span>
         </p>
         {isCreative && (
-          <p className="mt-2 text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed flex gap-2 items-start">
+          <p className="mt-2 text-[11.5px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 leading-relaxed flex gap-2 items-start">
             <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
             <span>
               <strong>Aviso de ATS:</strong> el formato creativo es de 2 columnas y algunos parsers
@@ -413,7 +413,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 Progreso
               </div>
               <div className={`text-2xl font-display font-bold tabular-nums ${
-                validation.ok ? 'text-emerald-600' : 'text-amber-600'
+                validation.ok ? 'text-emerald-600' : 'text-slate-600'
               }`}>
                 {validation.filled}/{validation.total}
               </div>
@@ -548,7 +548,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
       */}
       <div>
         {!validation.ok && (
-          <div className="flex items-start gap-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg mb-3">
+          <div className="flex items-start gap-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 p-3 rounded-lg mb-3">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
             <span>
               Completa email, teléfono y ciudad arriba para habilitar la descarga de tu CV.

@@ -216,7 +216,7 @@ function TareasJoven() {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <h2 className="font-display font-bold text-2xl text-slate-900">Activas</h2>
-            <Badge className="bg-amber-100 text-amber-900 border-transparent">
+            <Badge className="bg-emerald-100 text-emerald-900 border-transparent">
               {active.length}
             </Badge>
           </div>
@@ -249,9 +249,9 @@ function TareasJoven() {
       {completed.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
-            <Trophy size={18} className="text-amber-600" />
+            <Trophy size={18} className="text-emerald-600" />
             <h2 className="font-display font-bold text-2xl text-slate-900">Completadas</h2>
-            <Badge className="bg-amber-100 text-amber-900 border-transparent">
+            <Badge className="bg-emerald-100 text-emerald-900 border-transparent">
               {completed.length}
             </Badge>
           </div>
@@ -276,7 +276,7 @@ function TareasJoven() {
 function TaskRow({ task }: { task: MicroTask }) {
   const statusStyle =
     task.status === 'pending' || task.status === 'in_progress'
-      ? 'bg-amber-100 text-amber-800'
+      ? 'bg-emerald-100 text-emerald-800'
       : task.status === 'delivered'
         ? 'bg-slate-200 text-slate-700'
         : 'bg-emerald-100 text-emerald-800';
@@ -313,7 +313,7 @@ function TaskRow({ task }: { task: MicroTask }) {
               {task.deadlineHours}h para entregar
             </span>
             {task.companyRating && (
-              <span className="flex items-center gap-1 text-amber-600">
+              <span className="flex items-center gap-1 text-emerald-600">
                 <Star size={12} fill="currentColor" />
                 <strong>{task.companyRating}/5</strong>
               </span>

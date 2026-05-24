@@ -386,7 +386,7 @@ export function SkillsGap({ profileId }: { profileId: string }) {
                         priority >= 4
                           ? 'bg-rose-100 text-rose-800 border-transparent text-[10px]'
                           : priority >= 3
-                            ? 'bg-amber-100 text-amber-900 border-transparent text-[10px]'
+                            ? 'bg-emerald-100 text-emerald-900 border-transparent text-[10px]'
                             : 'bg-slate-100 text-slate-700 border-transparent text-[10px]'
                       }
                     >
@@ -461,7 +461,7 @@ export function SkillsGap({ profileId }: { profileId: string }) {
                   )}
 
                   {courseData && courseData.courses.length === 0 && (
-                    <div className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <div className="text-sm text-emerald-900 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                       {courseData.warning || 'No encontramos cursos gratuitos verificables. Probá buscar manualmente en Platzi o YouTube.'}
                     </div>
                   )}
@@ -510,7 +510,7 @@ export function SkillsGap({ profileId }: { profileId: string }) {
                                     {c.language === 'en-with-es-subs' && (
                                       <>
                                         <span>·</span>
-                                        <span className="text-amber-700">EN con subs ES</span>
+                                        <span className="text-emerald-700">EN con subs ES</span>
                                       </>
                                     )}
                                   </div>
