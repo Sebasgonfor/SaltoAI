@@ -75,7 +75,7 @@ function TareasJoven() {
           Trabajos reales, pagados, antes del primer contrato.
         </h1>
         <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
-          Cada micro-tarea es ingresos reales para vos y evidencia verificada para tu perfil. Mejor que un CV.
+          Cada micro-tarea es ingresos reales para ti y evidencia verificada para tu perfil. Mejor que un CV.
         </p>
       </header>
 
@@ -93,7 +93,7 @@ function TareasJoven() {
 
       {!searched && (
         <div className="text-center text-slate-500 text-sm py-12">
-          Buscá tus tareas con tu profileId. (En producción, esto sería automático con login).
+          Busca tus tareas con tu profileId. (En producción, esto sería automático con login).
         </div>
       )}
 

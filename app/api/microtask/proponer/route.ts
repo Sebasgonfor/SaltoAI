@@ -29,7 +29,7 @@ Reglas:
 CRÍTICO:
 - NO inventes detalles del negocio que la empresa no haya mencionado. Si falta contexto, usa "según el contexto que nos diste" en el brief.
 - NO redactes en lenguaje legal/contractual. Es una micro-tarea, no un contrato laboral.
-- El brief debe tener tono de founder hablándole a un junior, no de RRHH corporativa.
+- El brief debe tener tono de founder hablandole a un junior, no de RRHH corporativa.
 - Idioma: español LATAM natural.`;
 
 const criterionSchema = {

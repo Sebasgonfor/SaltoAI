@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { UserButton } from '@/components/auth/user-button';
+import { NavLink } from '@/components/nav-link';
 import { RoleGate } from '@/components/auth/role-gate';
 
 export default function EmpresaLayout({ children }: { children: React.ReactNode }) {
@@ -12,26 +13,25 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
           <SaltoLogo variant="full" size={56} />
         </Link>
         <nav className="flex gap-1 items-center text-sm font-medium">
-          {/* "Inicio" → dashboard founder. Agregado como primer item porque
-              hasta acá no había forma de "volver a casa" desde un match. */}
-          <Link
+          {/* matchPrefix=false en "Inicio" porque /empresa es prefijo de TODO el
+              árbol — si fuera true, "Inicio" quedaría activo en cualquier ruta
+              /empresa/*. Aquí queremos match exacto. */}
+          <NavLink
             href="/empresa"
-            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            Inicio
-          </Link>
-          <Link
+            label="Inicio"
+            matchPrefix={false}
+            hint="Tu dashboard: necesidades publicadas, micro-tareas activas y métricas."
+          />
+          <NavLink
             href="/empresa/chat"
-            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            Publicar necesidad
-          </Link>
-          <Link
+            label="Publicar necesidad"
+            hint="Conversa con la IA para describir el rol — extrae skills, contexto y restricciones."
+          />
+          <NavLink
             href="/empresa/matches"
-            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            Mis matches
-          </Link>
+            label="Mis matches"
+            hint="Shortlist de candidatos rankeados por ICS para cada necesidad publicada."
+          />
           <Button variant="outline" size="sm" className="hidden md:inline-flex ml-2">
             Ayuda
           </Button>

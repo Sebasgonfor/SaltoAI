@@ -158,7 +158,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       <div className="max-w-md mx-auto px-6 py-24 text-center">
         <AlertCircle size={32} className="text-rose-500 mx-auto mb-4" />
         <h2 className="text-xl font-display font-medium mb-2">{error || 'No encontramos la necesidad'}</h2>
-        <Link href="/empresa/publicar">
+        <Link href="/empresa/chat">
           <Button className="mt-4">Publicar nueva necesidad</Button>
         </Link>
       </div>
@@ -180,7 +180,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
             </h1>
             <p className="text-lg text-slate-700 max-w-3xl">{need.role}</p>
           </div>
-          <Link href="/empresa/publicar">
+          <Link href="/empresa/chat">
             <Button variant="outline" size="sm">Editar necesidad</Button>
           </Link>
         </div>
@@ -245,7 +245,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 <strong className="text-slate-900">Embeddings</strong> hacen shortlist semántico → <strong className="text-slate-900">LLM</strong> calcula el desglose ICS.
               </div>
             </div>
-            <PipelineVisual totalProfiles={matches.length + 2} shortlistSize={5} returnSize={matches.length} />
+            <PipelineVisual totalProfiles={matches.length + 5} shortlistSize={15} returnSize={matches.length} />
           </div>
         </section>
       )}

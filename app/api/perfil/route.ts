@@ -34,9 +34,9 @@ Reglas estrictas (anti-alucinación):
 Formato de evidencia (CV-ready):
 - Cada quote se redacta en TERCERA PERSONA, tiempo PASADO, empezando con un VERBO DE ACCIÓN fuerte
   ("Triplicó", "Diseñó", "Coordinó", "Aprendió", "Resolvió", "Atendió", "Implementó", "Lideró").
-- Conservá los detalles cuantificables que el joven dio (cifras, %, cantidades, plazos, número de clientes). NO los inventes; si no los dio, omitilos.
+- Conserva los detalles cuantificables que el joven dio (cifras, %, cantidades, plazos, número de clientes). NO los inventes; si no los dio, omitilos.
 - Cada quote es 1 oración, máximo 2. Concisa, en español natural, sin jerga corporativa.
-- Reformulá lo que dijo el joven (paráfrasis cercana), no copies textual la primera persona —
+- Reformula lo que dijo el joven (paráfrasis cercana), no copies textual la primera persona —
   el resultado debe leerse como un bullet de CV listo para imprimir.
 - Ejemplos del formato deseado:
   · "Triplicó las ventas del local de su tía en 6 meses gestionando pedidos por Instagram."
@@ -51,8 +51,8 @@ Otros campos:
 - summary: 2-3 frases en lenguaje natural describiendo a la persona y su trayectoria informal.
 - name: si la persona dijo su nombre, úsalo; si no, "Candidato/a Salto".
 
-Idioma: español natural rioplatense/colombiano.
-Devolvé JSON estricto con el schema indicado.`;
+Idioma: español neutro latinoamericano.
+Devuelve JSON estricto con el schema indicado.`;
 
 const schema = {
   type: Type.OBJECT,
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "No pudimos anclar evidencia concreta en lo que contaste. Volvé al chat y profundizá con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
+              "No pudimos anclar evidencia concreta en lo que contaste. Vuelve al chat y profundiza con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
             code: "no_evidence_extracted",
           },
           { status: 422 }

@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   addDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import {
@@ -225,6 +226,20 @@ export async function getAllNeeds(): Promise<CompanyNeed[]> {
   return Array.from(memNeeds.values());
 }
 
+export async function deleteNeed(id: string): Promise<boolean> {
+  let deleted = false;
+  if (useFirestore(NEEDS)) {
+    try {
+      await deleteDoc(doc(db, NEEDS, id));
+      deleted = true;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "deleteNeed", NEEDS);
+    }
+  }
+  if (memNeeds.delete(id)) deleted = true;
+  return deleted;
+}
+
 export async function getNeed(id: string): Promise<CompanyNeed | null> {
   if (useFirestore(NEEDS)) {
     try {
@@ -244,7 +259,7 @@ export async function recordFeedback(
   const data: FeedbackEntry = { ...entry, timestamp: Date.now() };
   if (useFirestore(FEEDBACK)) {
     try {
-      // stripUndefined es clave acá: `note`, `needId`, `profileId` y
+      // stripUndefined es clave aquí: `note`, `needId`, `profileId` y
       // `source` son opcionales. Sin esto, Firestore rechaza el addDoc
       // con "Unsupported field value: undefined".
       const ref = await addDoc(

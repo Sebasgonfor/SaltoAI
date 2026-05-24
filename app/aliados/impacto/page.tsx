@@ -393,7 +393,7 @@ export default function ImpactoDashboard() {
             <div>
               <div className="font-semibold text-slate-900 mb-2">¿Cómo se mide el time-to-hire?</div>
               <p className="leading-relaxed">
-                Desde la publicación de la necesidad por la empresa hasta que aparece el shortlist de 3 candidatos en la plataforma.
+                Desde la publicación de la necesidad por la empresa hasta que aparece el shortlist de hasta 10 candidatos en la plataforma.
               </p>
             </div>
             <div>
@@ -430,7 +430,7 @@ export default function ImpactoDashboard() {
                   Conocer el producto <ArrowRight size={16} />
                 </Button>
               </Link>
-              <Link href="/empresa/publicar">
+              <Link href="/empresa/chat">
                 <Button
                   variant="outline"
                   className="gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-800 h-12 px-6"

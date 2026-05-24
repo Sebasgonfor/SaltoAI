@@ -114,6 +114,25 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Texto plano servido directo — antes "format=json" devolvía un objeto JSON
+  // y se mostraba como dump crudo en una pestaña nueva. El usuario pide ver
+  // el CV en texto plano, no la estructura interna.
+  if (format === "txt" || format === "text") {
+    const text = renderPlainText(profile, style, cv);
+    log.end({ status: 200, extra: { profileId, needId, style, format: "txt" } });
+    const headers: Record<string, string> = {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "private, no-store",
+    };
+    if (download) {
+      const safeName = (profile.name || "candidato")
+        .replace(/[^a-z0-9\-_]+/gi, "_")
+        .toLowerCase();
+      headers["Content-Disposition"] = `attachment; filename="cv_${style}_${safeName}.txt"`;
+    }
+    return new NextResponse(text, { status: 200, headers });
+  }
+
   const html = renderCv(profile, style, cv);
   const headers: Record<string, string> = {
     "Content-Type": "text/html; charset=utf-8",

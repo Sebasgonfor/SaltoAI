@@ -15,7 +15,7 @@ Un founder de una empresa temprana describió en lenguaje libre qué necesita. T
 
 Reglas:
 - role: 1 línea, claro, sin jerga corporativa. Ej: "Persona para atención al cliente y redes en local de comida."
-- context: condiciones operativas reales (equipo pequeño, sin protocolos, ritmo rápido, multitarea, recursos limitados, etc.). Si el founder no describió contexto, dejá un string vacío — NO inventes ritmo o cultura.
+- context: condiciones operativas reales (equipo pequeño, sin protocolos, ritmo rápido, multitarea, recursos limitados, etc.). Si el founder no describió contexto, deja un string vacío — NO inventes ritmo o cultura.
 - requiredSkills: skills concretas que el rol exige. 3-6.
 - desiredTraits: rasgos conductuales que el contexto exige (ej. tolerancia al caos, autodidactismo, orientación a resultados). 2-5.
 - hardConstraints: restricciones duras y verificables (ubicación, disponibilidad horaria, idioma, edad mínima legal). 0-3. Si no hay, vacío.
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Tu descripción no tiene señales suficientes para construir el match. Contá qué hace la persona, el contexto del equipo y qué rasgos conductuales importan.",
+              "Tu descripción no tiene señales suficientes para construir el match. Cuenta qué hace la persona, el contexto del equipo y qué rasgos conductuales importan.",
             code: "no_signals_extracted",
           },
           { status: 422 }

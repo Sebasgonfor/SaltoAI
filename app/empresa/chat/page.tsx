@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
-  Bot,
-  User,
   Sparkles,
+  User,
   Layers,
   ArrowRight,
   Building2,
@@ -25,7 +24,7 @@ import { useAuth } from '@/lib/auth-context';
 
 const MAX_TURNS = 7;
 
-// Mismos slots que el endpoint /api/entrevista-empresa. Si cambian allá, cambiar acá.
+// Mismos slots que el endpoint /api/entrevista-empresa. Si cambian allá, cambiar aquí.
 const SLOTS: { key: string; label: string; match: RegExp }[] = [
   {
     key: 'equipo',
@@ -106,7 +105,7 @@ function buildOpeningMessage(name: string): ChatMessage {
   const short = name.split(/\s+/)[0] || name;
   return {
     role: 'agent',
-    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, contame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
+    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, cuéntame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
   };
 }
 
@@ -227,7 +226,7 @@ export default function ChatEmpresa() {
     const name = form.companyName.trim();
     const repName = form.legalRepName.trim();
     if (name.length < 2) {
-      setFormError('Escribí la razón social o nombre comercial de la empresa.');
+      setFormError('Escribe la razón social o nombre comercial de la empresa.');
       return;
     }
     const taxErr = validateTaxId(form.taxId);
@@ -236,7 +235,7 @@ export default function ChatEmpresa() {
       return;
     }
     if (repName.length < 2) {
-      setFormError('Escribí el nombre completo del representante legal.');
+      setFormError('Escribe el nombre completo del representante legal.');
       return;
     }
     const docErr = validateDocId(form.legalRepDocId);
@@ -245,7 +244,7 @@ export default function ChatEmpresa() {
       return;
     }
     if (!form.acceptedTerms) {
-      setFormError('Tenés que aceptar los Términos y la Política de Privacidad para continuar.');
+      setFormError('Tienes que aceptar los Términos y la Política de Privacidad para continuar.');
       return;
     }
     const legalRecord: CompanyLegal = {
@@ -289,7 +288,7 @@ export default function ChatEmpresa() {
       if (!res.ok || !data.id) {
         const fallback =
           data?.error ||
-          'No pudimos construir tu necesidad con lo que contaste. Profundizá un poco más con un ejemplo concreto.';
+          'No pudimos construir tu necesidad con lo que contaste. Profundiza un poco más con un ejemplo concreto.';
         setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
         setSubmitError(fallback);
         setClosing(false);
@@ -298,7 +297,7 @@ export default function ChatEmpresa() {
       clearPersisted(user?.uid);
       router.push(`/empresa/matches/${data.id}`);
     } catch {
-      setSubmitError('Error de red. Probá enviar de nuevo en un momento.');
+      setSubmitError('Error de red. Prueba enviar de nuevo en un momento.');
       setClosing(false);
     }
   };
@@ -330,7 +329,7 @@ export default function ChatEmpresa() {
       const data = await res.json();
       const agentMsg: ChatMessage = {
         role: 'agent',
-        content: data.nextQuestion || 'Contame más sobre eso, ¿podés darme un ejemplo concreto?',
+        content: data.nextQuestion || 'Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?',
       };
       const updated = [...history, agentMsg];
       setMessages(updated);
@@ -348,14 +347,14 @@ export default function ChatEmpresa() {
         {
           role: 'agent',
           content: aborted
-            ? 'Estoy demorando más de la cuenta. Probá enviar la respuesta otra vez en un momento.'
-            : 'Tuvimos un problema. ¿Podés contarme otra vez?',
+            ? 'Estoy demorando más de la cuenta. Prueba enviar la respuesta otra vez en un momento.'
+            : 'Tuvimos un problema. ¿Puedes contarme otra vez?',
         },
       ]);
       setSubmitError(
         aborted
-          ? 'El servidor demoró demasiado. Reintentá en unos segundos.'
-          : 'No pudimos contactar al servidor. Revisá tu conexión y reintentá.'
+          ? 'El servidor demoró demasiado. Reinténtalo en unos segundos.'
+          : 'No pudimos contactar al servidor. Revisa tu conexión y reinténtalo.'
       );
       setLoading(false);
     }
@@ -482,26 +481,23 @@ export default function ChatEmpresa() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-500 mt-6 max-w-sm mx-auto leading-relaxed">
-          ¿Preferís escribir tu necesidad en un solo texto largo?{' '}
-          <Link href="/empresa/publicar" className="text-emerald-700 underline">
-            Usar el formato anterior
-          </Link>
-          .
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12 w-full">
-      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    // Full-height layout: ocupa todo el viewport menos los 80px del topbar
+    // sticky del layout (h-20). El header del chat y el grid se reparten ese
+    // espacio sin generar scroll externo en el body. En mobile/pantallas
+    // bajas se relaja a min-h para no aplastar el contenido.
+    <div className="lg:h-[calc(100dvh-80px)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+      <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
             Paso 2 de 2 · Entrevista
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            Contame el contexto real, sin jerga.
+            Cuéntame el contexto real, sin jerga.
           </h1>
           <div className="text-slate-600 mt-2 max-w-xl">
             {legal && (
@@ -555,14 +551,14 @@ export default function ChatEmpresa() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-12 gap-6">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[380px] max-h-[55vh] md:min-h-[520px] md:max-h-[600px] lg:min-h-[600px] lg:max-h-[700px] overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
+        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[480px] overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5 min-h-0">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
                   <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                    <Bot size={16} />
+                    <Sparkles size={16} />
                   </div>
                 )}
                 <div
@@ -577,16 +573,26 @@ export default function ChatEmpresa() {
                   </p>
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600">
-                    <User size={16} />
-                  </div>
+                  user?.photoURL ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || 'Tú'}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-full flex-shrink-0 object-cover ring-2 ring-slate-100"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600">
+                      <User size={16} />
+                    </div>
+                  )
                 )}
               </div>
             ))}
             {(loading || closing) && (
               <div className="flex gap-3 justify-start">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                  <Bot size={16} />
+                  <Sparkles size={16} />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
@@ -605,7 +611,7 @@ export default function ChatEmpresa() {
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex gap-2 items-end">
               <Textarea
-                placeholder="Contame con tus palabras…"
+                placeholder="Cuéntame con tus palabras…"
                 className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -628,7 +634,7 @@ export default function ChatEmpresa() {
           </div>
         </section>
 
-        <aside className="lg:col-span-5 space-y-4">
+        <aside className="lg:col-span-5 space-y-4 lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
           <div className="bg-slate-950 text-white rounded-3xl p-6 relative overflow-hidden">
             <div className="relative">
               <div className="flex items-center gap-2 mb-1">
@@ -642,7 +648,7 @@ export default function ChatEmpresa() {
               </h2>
               {detected.size === 0 ? (
                 <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl p-4 text-center mt-4">
-                  Contame el caos como es, no la versión LinkedIn.
+                  Cuéntame el caos como es, no la versión LinkedIn.
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 mt-4">
@@ -690,14 +696,14 @@ export default function ChatEmpresa() {
             <FileText size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-slate-600 leading-relaxed">
               Al terminar estructuramos rol, contexto, skills y restricciones, y traemos{' '}
-              <strong className="text-slate-900">3 candidatos con score ICS explicable</strong>.
+              <strong className="text-slate-900">hasta 10 candidatos con score ICS explicable</strong>.
             </p>
           </div>
 
           <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex gap-3">
             <Layers size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 leading-relaxed">
-              <strong className="font-semibold">Tip:</strong> describí el día real. "Atiende caja,
+              <strong className="font-semibold">Tip:</strong> describe el día real. "Atiende caja,
               contesta WhatsApp y arma pedidos" es mucho mejor señal que "perfil multifuncional".
             </p>
           </div>

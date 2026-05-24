@@ -129,7 +129,7 @@ function OnboardingRolInner() {
               ¿Cómo vas a usar Salto?
             </h1>
             <p className="text-slate-600 mt-4 max-w-xl mx-auto leading-relaxed">
-              Elegí una vez. Por integridad del matching, no se puede ser candidato y reclutador con
+              Elige una vez. Por integridad del matching, no se puede ser candidato y reclutador con
               la misma cuenta.
             </p>
           </header>

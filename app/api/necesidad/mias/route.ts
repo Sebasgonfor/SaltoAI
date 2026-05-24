@@ -13,7 +13,7 @@ export const runtime = "nodejs";
  * deja de cargar TODAS las necesidades del mundo.
  *
  * Si el uid viene vacío devolvemos array vacío en lugar de error: el
- * dashboard lo muestra como "publicá tu primera necesidad" en lugar de
+ * dashboard lo muestra como "publica tu primera necesidad" en lugar de
  * pantalla rota.
  */
 export async function GET(req: NextRequest) {

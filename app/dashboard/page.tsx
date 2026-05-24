@@ -195,7 +195,7 @@ function getInsight(profile: Profile | null, tasks: MicroTask[]): string {
 
 export default function DashboardPage() {
   // `/dashboard` es la home del JOVEN (sidebar con "Mi perfil", "Oportunidades", etc.).
-  // Sin chequeo de rol, una empresa logueada cae acá y ve una UI que no es suya
+  // Sin chequeo de rol, una empresa logueada cae aquí y ve una UI que no es suya
   // (regresión introducida al lanzar el dashboard sin gating por rol).
   // Solución: si el `account.role` es `empresa`, redirigimos al hub de empresas.
   const { user, account, loading, roleLoading } = useAuth();
@@ -267,12 +267,6 @@ export default function DashboardPage() {
   }
 
   const firstName = user.displayName?.split(' ')[0] || 'tú';
-  const initials = (user.displayName || user.email || '?')
-    .split(' ')
-    .map((s: string) => s[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 
   const activeTasks = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
   const completedTasks = tasks.filter((t) => t.status === 'evaluated' || t.status === 'paid');
@@ -349,30 +343,15 @@ export default function DashboardPage() {
         {/* ── MAIN CONTENT ── */}
         <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-4xl">
 
-          {/* WELCOME */}
+          {/* WELCOME — sin avatar/foto. El producto no maneja foto de perfil. */}
           <FadeUp>
-            <div className="flex items-center gap-3">
-              {user.photoURL ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || 'avatar'}
-                  referrerPolicy="no-referrer"
-                  className="w-12 h-12 rounded-2xl object-cover shadow"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white font-display font-bold text-lg flex items-center justify-center shadow">
-                  {initials}
-                </div>
-              )}
-              <div>
-                <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
-                  {getGreeting(firstName)}
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {profile ? 'Tu perfil está activo y visible para empresas.' : 'Completa tu entrevista para empezar.'}
-                </p>
-              </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
+                {getGreeting(firstName)}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {profile ? 'Tu perfil está activo y visible para empresas.' : 'Completa tu entrevista para empezar.'}
+              </p>
             </div>
           </FadeUp>
 

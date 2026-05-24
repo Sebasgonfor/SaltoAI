@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       log.end({ status: 503, extra: { reason: "no_gemini_key" } });
       return NextResponse.json(
         {
-          error: "El modo voz no está disponible ahora. Usá modo texto o intentá más tarde.",
+          error: "El modo voz no está disponible ahora. Usa modo texto o intenta más tarde.",
           code: "no_gemini_key",
         },
         { status: 503 }
