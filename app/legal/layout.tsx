@@ -1,19 +1,16 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { SaltoLogo } from '@/components/ui/salto-logo';
+import { LegalBackButton } from './back-button';
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition-colors"
-          >
-            <ArrowLeft size={14} strokeWidth={2} />
-            <span className="hidden sm:inline font-medium">Volver a Salto</span>
-          </Link>
+          <Suspense fallback={<div className="w-28 h-8" />}>
+            <LegalBackButton />
+          </Suspense>
 
           <Link href="/" className="flex items-center gap-2">
             <SaltoLogo size={26} />
