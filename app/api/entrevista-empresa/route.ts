@@ -68,19 +68,19 @@ const QUESTION_BANK: Record<(typeof TARGET_SLOTS)[number], string[]> = {
   ],
   ritmo_contexto: [
     "Describime el ritmo del día a día: cómo se siente, dónde se trabaja (local, oficina, remoto) y en qué horario.",
-    "Contame el contexto operativo: cuán caótico u ordenado es, qué procesos hay escritos y qué se resuelve sobre la marcha. ¿Dónde y cuándo trabajaría?",
+    "Cuéntame el contexto operativo: cuán caótico u ordenado es, qué procesos hay escritos y qué se resuelve sobre la marcha. ¿Dónde y cuándo trabajaría?",
   ],
   restricciones_duras: [
-    "Decime los requisitos duros y no-negociables: ubicación, idioma, herramienta concreta, jornada, edad mínima legal. Listalos.",
-    "Contame qué no-negociables tiene el rol — ubicación, horario, idioma o herramientas específicas sin las cuales no podría empezar.",
+    "Dime los requisitos duros y no-negociables: ubicación, idioma, herramienta concreta, jornada, edad mínima legal. Listalos.",
+    "Cuéntame qué no-negociables tiene el rol — ubicación, horario, idioma o herramientas específicas sin las cuales no podría empezar.",
   ],
   fallos_previos: [
-    "Contame la última vez que contrataron para algo parecido: qué les costó, qué tipo de persona no funcionó y por qué.",
-    "Si ya intentaron contratar para este rol u otro parecido, contame qué falló. Esa señal nos sirve más que la lista de skills.",
+    "Cuéntame la última vez que contrataron para algo parecido: qué les costó, qué tipo de persona no funcionó y por qué.",
+    "Si ya intentaron contratar para este rol u otro parecido, cuéntame qué falló. Esa señal nos sirve más que la lista de skills.",
   ],
   dealbreakers: [
-    "Decime qué rasgo o actitud sería un deal-breaker para vos, y qué cosas son “nice-to-have” pero no esenciales.",
-    "Si tuvieras que elegir entre dos candidatos parecidos, contame qué rasgo te haría decir “este sí” y cuál “este no”. Diferenciá esencial de deseable.",
+    "Dime qué rasgo o actitud sería un deal-breaker para ti, y qué cosas son “nice-to-have” pero no esenciales.",
+    "Si tuvieras que elegir entre dos candidatos parecidos, cuéntame qué rasgo te haría decir “este sí” y cuál “este no”. Diferencia esencial de deseable.",
   ],
 };
 
@@ -112,26 +112,26 @@ A lo largo de 4-7 turnos, tus preguntas deben cubrir estos 6 slots:
 
 REGLAS DE COBERTURA:
 - NO repitas ángulos. Si un slot ya quedó cubierto, pasá al siguiente — preferí slots aún no cubiertos.
-- Si una respuesta es vaga (sin datos concretos), profundizá UNA VEZ y después saltá al siguiente slot.
-- Hacé puente narrativo con lo que el founder acaba de decir, no salto brusco.
+- Si una respuesta es vaga (sin datos concretos), profundiza UNA VEZ y después salta al siguiente slot.
+- Haz puente narrativo con lo que el founder acaba de decir, no salto brusco.
 - No inventes contexto. No proyectes. Si el founder no menciona algo, no lo agregues a tu siguiente pregunta como si lo hubiera dicho.
 
 ESTILO:
-- Español natural rioplatense/colombiano, cercano, no corporativo.
+- Español natural neutro LATAM, cercano, no corporativo.
 - UNA pregunta a la vez, corta y específica (máx 2 oraciones).
-- Tuteo o "vos", consistente.
+- Tuteo o "tú", consistente.
 
 PROHIBIDO PREGUNTAS SÍ/NO:
-- Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabés…?", "¿Han contratado…?", "¿Hay…?".
+- Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabes…?", "¿Han contratado…?", "¿Hay…?".
 - Esas preguntas se contestan con "sí" o "no" y matan la entrevista.
-- Toda pregunta debe empezar con QUÉ, CÓMO, CUÁNDO, CUÁNTOS, CUÁL o un imperativo tipo "Contame…", "Pensá en…", "Dame un ejemplo de…".
-- Si querés explorar si algo ocurrió, pedí directamente el ejemplo: "Contame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
+- Toda pregunta debe empezar con QUÉ, CÓMO, CUÁNDO, CUÁNTOS, CUÁL o un imperativo tipo "Cuéntame…", "Piensa en…", "Dame un ejemplo de…".
+- Si quieres explorar si algo ocurrió, pide directamente el ejemplo: "Cuéntame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
 
 CIERRE (done=true):
-- Marcá done=true cuando tengas AL MENOS 5 de los 6 slots cubiertos con detalle concreto.
+- Marca done=true cuando tengas AL MENOS 5 de los 6 slots cubiertos con detalle concreto.
 - Nunca marques done=true antes del turno 4 del founder.
-- Después del turno 7, marcá done=true sí o sí (cap).
-- Cuando done=true, en nextQuestion devolvé un cierre breve: "Listo, con esto puedo armar la búsqueda. Voy a estructurar tu necesidad y traer 3 candidatos."
+- Después del turno 7, marca done=true sí o sí (cap).
+- Cuando done=true, en nextQuestion devuelve un cierre breve: "Listo, con esto puedo armar la búsqueda. Voy a estructurar tu necesidad y traer 3 candidatos."
 
 Devuelve JSON con:
 {
@@ -186,7 +186,7 @@ function pickFallbackQuestion(messages: ChatMessage[]): {
   }
   return {
     question:
-      "Profundicemos un poco más: contame con un ejemplo concreto cómo se ve un día típico para esta persona.",
+      "Profundicemos un poco más: cuéntame con un ejemplo concreto cómo se ve un día típico para esta persona.",
     slot: "actividad_semanal",
   };
 }
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         nextQuestion: wasYesNo
           ? pickYesNoFollowup(userTurns)
-          : "Eso es muy poquito para trabajar. Contame con más detalle, dame un ejemplo concreto.",
+          : "Eso es muy poquito para trabajar. Cuéntame con más detalle, dame un ejemplo concreto.",
         done: false,
         targetedSlot: null,
         slotsCovered: detectSlots(messages),
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
       `SLOTS YA DETECTADOS POR HEURÍSTICA (informativo, no vinculante): ${heuristicCovered.join(", ") || "ninguno"}\n` +
       `SLOTS PENDIENTES (priorizá uno de estos): ${remaining.join(", ") || "ninguno — ya están todos"}\n\n` +
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
-      `Devolvé la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marcá done=true si ya hay 5+ slots cubiertos con detalle.`;
+      `Devuelve la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marca done=true si ya hay 5+ slots cubiertos con detalle.`;
 
     let response;
     try {
@@ -302,7 +302,7 @@ export async function POST(req: NextRequest) {
     const out = {
       nextQuestion:
         parsed.nextQuestion ||
-        "Contame un poco más, ¿podés darme un ejemplo concreto?",
+        "Cuéntame un poco más, ¿puedes darme un ejemplo concreto?",
       done,
       targetedSlot: parsed.targetedSlot ?? null,
       slotsCovered: Array.isArray(parsed.slotsCovered)
@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
     log.error("entrevista-empresa.exception", { message: (err as Error)?.message });
     log.end({ status: 200, extra: { mode: "degraded" } });
     return NextResponse.json({
-      nextQuestion: "Cuéntame más sobre eso, ¿podés darme un ejemplo concreto?",
+      nextQuestion: "Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?",
       done: false,
       targetedSlot: null,
       slotsCovered: [],

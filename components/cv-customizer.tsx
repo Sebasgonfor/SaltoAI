@@ -255,7 +255,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
         </div>
         <div
           role="radiogroup"
-          aria-label="Elegí el estilo de CV"
+          aria-label="Elige el estilo de CV"
           className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
         >
           {STYLES.map((s) => {
@@ -303,7 +303,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
             <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
             <span>
               <strong>Aviso de ATS:</strong> el formato creativo es de 2 columnas y algunos parsers
-              corporativos lo rompen. Para portales como Workday/Greenhouse, elegí <em>ATS
+              corporativos lo rompen. Para portales como Workday/Greenhouse, elige <em>ATS
               minimalista</em> o <em>Híbrido</em>.
             </span>
           </p>

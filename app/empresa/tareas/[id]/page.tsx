@@ -200,7 +200,7 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
         <section className="bg-amber-50/60 border border-amber-200 rounded-2xl p-6 md:p-8">
           <h2 className="font-display font-bold text-xl text-slate-900 mb-1">Tu calificación final</h2>
           <p className="text-sm text-slate-600 mb-5">
-            La IA hizo la pre-evaluación. Vos das el rating definitivo. Esta calificación queda pública en el perfil del joven como outcome verificado.
+            La IA hizo la pre-evaluación. Tú das el rating definitivo. Esta calificación queda pública en el perfil del joven como outcome verificado.
           </p>
 
           <div className="bg-white rounded-xl p-4 mb-4 border border-amber-200">

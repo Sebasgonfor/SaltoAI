@@ -335,7 +335,7 @@ export default function EmpresaDashboardPage() {
           icon={Layers}
           value={kpis.needsCount}
           label="Necesidades"
-          hint="Publicadas por vos"
+          hint="Publicadas por ti"
           tone="emerald"
         />
         <KpiCard
@@ -377,10 +377,10 @@ export default function EmpresaDashboardPage() {
               <Sparkles size={22} strokeWidth={1.75} />
             </div>
             <h3 className="font-display font-bold text-xl text-slate-900 mb-2 tracking-tight">
-              Contanos tu primera necesidad.
+              Cuéntanos tu primera necesidad.
             </h3>
             <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed mb-6">
-              No tenés que escribir un job description perfecto. Contás en lenguaje natural qué te
+              No tienes que escribir un job description perfecto. Cuentas en lenguaje natural qué te
               hace falta y la IA estructura el rol, el contexto y los rasgos que exige.
             </p>
             <div className="flex justify-center">

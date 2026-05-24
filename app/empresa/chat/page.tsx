@@ -105,7 +105,7 @@ function buildOpeningMessage(name: string): ChatMessage {
   const short = name.split(/\s+/)[0] || name;
   return {
     role: 'agent',
-    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, contame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
+    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, cuéntame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
   };
 }
 
@@ -226,7 +226,7 @@ export default function ChatEmpresa() {
     const name = form.companyName.trim();
     const repName = form.legalRepName.trim();
     if (name.length < 2) {
-      setFormError('Escribí la razón social o nombre comercial de la empresa.');
+      setFormError('Escribe la razón social o nombre comercial de la empresa.');
       return;
     }
     const taxErr = validateTaxId(form.taxId);
@@ -235,7 +235,7 @@ export default function ChatEmpresa() {
       return;
     }
     if (repName.length < 2) {
-      setFormError('Escribí el nombre completo del representante legal.');
+      setFormError('Escribe el nombre completo del representante legal.');
       return;
     }
     const docErr = validateDocId(form.legalRepDocId);
@@ -244,7 +244,7 @@ export default function ChatEmpresa() {
       return;
     }
     if (!form.acceptedTerms) {
-      setFormError('Tenés que aceptar los Términos y la Política de Privacidad para continuar.');
+      setFormError('Tienes que aceptar los Términos y la Política de Privacidad para continuar.');
       return;
     }
     const legalRecord: CompanyLegal = {
@@ -297,7 +297,7 @@ export default function ChatEmpresa() {
       clearPersisted(user?.uid);
       router.push(`/empresa/matches/${data.id}`);
     } catch {
-      setSubmitError('Error de red. Probá enviar de nuevo en un momento.');
+      setSubmitError('Error de red. Prueba enviar de nuevo en un momento.');
       setClosing(false);
     }
   };
@@ -329,7 +329,7 @@ export default function ChatEmpresa() {
       const data = await res.json();
       const agentMsg: ChatMessage = {
         role: 'agent',
-        content: data.nextQuestion || 'Contame más sobre eso, ¿podés darme un ejemplo concreto?',
+        content: data.nextQuestion || 'Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?',
       };
       const updated = [...history, agentMsg];
       setMessages(updated);
@@ -347,8 +347,8 @@ export default function ChatEmpresa() {
         {
           role: 'agent',
           content: aborted
-            ? 'Estoy demorando más de la cuenta. Probá enviar la respuesta otra vez en un momento.'
-            : 'Tuvimos un problema. ¿Podés contarme otra vez?',
+            ? 'Estoy demorando más de la cuenta. Prueba enviar la respuesta otra vez en un momento.'
+            : 'Tuvimos un problema. ¿Puedes contarme otra vez?',
         },
       ]);
       setSubmitError(
@@ -497,7 +497,7 @@ export default function ChatEmpresa() {
             Paso 2 de 2 · Entrevista
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-            Contame el contexto real, sin jerga.
+            Cuéntame el contexto real, sin jerga.
           </h1>
           <div className="text-slate-600 mt-2 max-w-xl">
             {legal && (
@@ -611,7 +611,7 @@ export default function ChatEmpresa() {
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex gap-2 items-end">
               <Textarea
-                placeholder="Contame con tus palabras…"
+                placeholder="Cuéntame con tus palabras…"
                 className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -648,7 +648,7 @@ export default function ChatEmpresa() {
               </h2>
               {detected.size === 0 ? (
                 <div className="text-sm text-slate-400 italic border border-dashed border-slate-700 rounded-xl p-4 text-center mt-4">
-                  Contame el caos como es, no la versión LinkedIn.
+                  Cuéntame el caos como es, no la versión LinkedIn.
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 mt-4">
