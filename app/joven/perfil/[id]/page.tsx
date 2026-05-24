@@ -173,7 +173,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               Las empresas ya pueden verte.
             </h2>
             <p className="text-slate-300 leading-relaxed mb-6 max-w-2xl">
-              Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, Salto calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás entre sus 3 candidatos.
+              Tu Perfil de Evidencia entró al motor de matching. Cuando una empresa temprana publique su necesidad, Salto calculará tu Índice de Compatibilidad (ICS) en tiempo real y, si encajas, aparecerás en su shortlist (top 10).
             </p>
             <Link href={`/joven/conectar?profileId=${encodeURIComponent(id)}`}>
               <Button className="gap-2 bg-white text-slate-900 hover:bg-slate-100">

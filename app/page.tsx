@@ -74,7 +74,7 @@ export default function LandingPage() {
                   >
                     <div className="text-left">
                       <div className="font-semibold">Necesito talento junior</div>
-                      <div className="text-xs font-normal text-emerald-700/70">3 candidatos · no 200 CVs</div>
+                      <div className="text-xs font-normal text-emerald-700/70">Hasta 10 candidatos · no 200 CVs</div>
                     </div>
                     <ArrowRight size={18} />
                   </RoleCTA>

@@ -325,7 +325,7 @@ export default function EmpresaDashboardPage() {
         </h1>
         <p className="text-slate-600 mt-2 max-w-2xl">
           Acá ves todas tus necesidades publicadas, los candidatos en evaluación y las micro-tareas
-          en curso. Calidad sobre volumen — 3 candidatos por necesidad, no 200 CVs.
+          en curso. Calidad sobre volumen — 10 candidatos por necesidad, no 200 CVs.
         </p>
       </header>
 
@@ -364,7 +364,7 @@ export default function EmpresaDashboardPage() {
         <SectionHeader
           title="Mis necesidades"
           count={needs.length}
-          hint="Cada una con su shortlist de 3 candidatos ranked por ICS."
+          hint="Cada una con su shortlist de hasta 10 candidatos ranked por ICS."
         />
 
         {dataLoading ? (
@@ -456,7 +456,7 @@ export default function EmpresaDashboardPage() {
               </span>
             </div>
             <h3 className="font-display font-bold text-xl md:text-2xl tracking-tight leading-tight max-w-2xl">
-              Calidad, no volumen. 3 candidatos con evidencia, no 200 CVs sin contexto.
+              Calidad, no volumen. 10 candidatos con evidencia, no 200 CVs sin contexto.
             </h3>
           </div>
           <Link href="/empresa/chat">

@@ -245,7 +245,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 <strong className="text-slate-900">Embeddings</strong> hacen shortlist semántico → <strong className="text-slate-900">LLM</strong> calcula el desglose ICS.
               </div>
             </div>
-            <PipelineVisual totalProfiles={matches.length + 2} shortlistSize={5} returnSize={matches.length} />
+            <PipelineVisual totalProfiles={matches.length + 5} shortlistSize={15} returnSize={matches.length} />
           </div>
         </section>
       )}

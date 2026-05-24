@@ -117,4 +117,114 @@ export const SEED_PROFILES: { id: string; data: SeedProfile }[] = [
       ],
     },
   },
+  {
+    id: "seed_diego_castro",
+    data: {
+      name: "Diego Castro",
+      age: 22,
+      gender: "hombre",
+      summary:
+        "Joven 22 de Barranquilla. Se enseñó solo a hacer páginas web simples para tiendas del barrio — landing pages en HTML/CSS, formularios que llegan a WhatsApp.",
+      skills: ["HTML/CSS", "WordPress básico", "Formularios web", "Atención al cliente"],
+      traits: ["Autodidacta", "Curiosidad técnica", "Resolución de problemas"],
+      evidence: [
+        {
+          skill: "HTML/CSS",
+          quote: "Aprendió HTML y CSS por YouTube y le hizo la landing a 4 negocios del barrio sin haber estudiado programación.",
+        },
+        {
+          skill: "Formularios web",
+          quote: "Conectó un formulario de contacto a WhatsApp Business para una panadería; los pedidos pasaron de llamadas a chats.",
+        },
+      ],
+    },
+  },
+  {
+    id: "seed_natalia_meza",
+    data: {
+      name: "Natalia Meza",
+      age: 20,
+      gender: "mujer",
+      summary:
+        "Joven 20, ayudó a la cooperativa de su madre con planillas de pagos y reportes mensuales. Buena con Excel y con explicar números a gente no técnica.",
+      skills: ["Excel intermedio", "Reportes operativos", "Comunicación con stakeholders", "Análisis básico de datos"],
+      traits: ["Detallista", "Paciencia", "Calma bajo presión"],
+      evidence: [
+        {
+          skill: "Excel intermedio",
+          quote: "Armó la planilla de pagos mensuales de 60 asociados de la cooperativa; antes lo llevaban en cuaderno.",
+        },
+        {
+          skill: "Comunicación con stakeholders",
+          quote: "Explicaba a las socias mayores cómo leer el reporte mensual sin hacerlas sentir incómodas.",
+        },
+      ],
+    },
+  },
+  {
+    id: "seed_kevin_ortega",
+    data: {
+      name: "Kevin Ortega",
+      age: 23,
+      gender: "hombre",
+      summary:
+        "Joven 23 de Soledad, trabajó como repartidor un año y montó un grupo de WhatsApp con clientes recurrentes para programar pedidos del barrio.",
+      skills: ["Logística básica", "WhatsApp Business", "Atención al Cliente", "Coordinación operativa"],
+      traits: ["Proactividad", "Tolerancia al caos", "Orientación a resultados"],
+      evidence: [
+        {
+          skill: "WhatsApp Business",
+          quote: "Armó un grupo de 80 clientes recurrentes y agendaba entregas semanales; redujo viajes en vacío a la mitad.",
+        },
+        {
+          skill: "Coordinación operativa",
+          quote: "Organizaba rutas para 3 motorizados sin tener mapa formal, solo conocimiento del barrio.",
+        },
+      ],
+    },
+  },
+  {
+    id: "seed_valentina_acosta",
+    data: {
+      name: "Valentina Acosta",
+      age: 21,
+      gender: "mujer",
+      summary:
+        "Joven 21, manejó el Instagram y TikTok de un salón de belleza durante 8 meses. Sabe armar contenido orgánico, contestar DMs y agendar.",
+      skills: ["Instagram", "TikTok", "Atención por DM", "Agendamiento de citas"],
+      traits: ["Creatividad", "Curiosidad", "Orientación al cliente"],
+      evidence: [
+        {
+          skill: "Instagram",
+          quote: "Subió la cuenta del salón de 400 a 3.500 seguidores en 8 meses sin pauta paga, solo Reels.",
+        },
+        {
+          skill: "Agendamiento de citas",
+          quote: "Reemplazó la libreta de agendamientos por un sistema de DMs ordenado; bajó los plantones.",
+        },
+      ],
+    },
+  },
+  {
+    id: "seed_brayan_mendez",
+    data: {
+      name: "Brayan Méndez",
+      age: 19,
+      gender: "hombre",
+      summary:
+        "Joven 19, le ayudó al hermano mayor con un emprendimiento de comida en casa. Maneja pedidos por WhatsApp, cobros y entregas en el barrio.",
+      skills: ["Atención al cliente", "WhatsApp Business", "Manejo de efectivo", "Logística de barrio"],
+      traits: ["Responsable", "Tolerancia al caos", "Proactividad"],
+      evidence: [
+        {
+          skill: "WhatsApp Business",
+          quote: "Aprendió a usar catálogo y respuestas rápidas; los pedidos se duplicaron en 3 meses.",
+        },
+        {
+          skill: "Manejo de efectivo",
+          quote: "Llevaba la planilla diaria de cobros y nunca le faltó plata al cierre.",
+        },
+      ],
+    },
+  },
 ];

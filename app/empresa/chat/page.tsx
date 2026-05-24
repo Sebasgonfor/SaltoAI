@@ -696,7 +696,7 @@ export default function ChatEmpresa() {
             <FileText size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-slate-600 leading-relaxed">
               Al terminar estructuramos rol, contexto, skills y restricciones, y traemos{' '}
-              <strong className="text-slate-900">3 candidatos con score ICS explicable</strong>.
+              <strong className="text-slate-900">hasta 10 candidatos con score ICS explicable</strong>.
             </p>
           </div>
 
