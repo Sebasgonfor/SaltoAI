@@ -471,11 +471,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
           </p>
         )}
 
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="md:col-span-2 bg-amber-50/60 border border-amber-200/60 rounded-2xl p-6">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-amber-800 font-semibold mb-2">Contexto operativo</div>
-            <p className="text-slate-700 leading-relaxed">{need.context}</p>
-          </div>
+        <div className="grid gap-4">
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-2">Skills requeridos</div>
