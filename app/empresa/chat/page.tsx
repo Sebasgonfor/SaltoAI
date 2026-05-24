@@ -22,39 +22,39 @@ import {
 import type { ChatMessage } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 
-const MAX_TURNS = 7;
+const MAX_TURNS = 6;
 
-// Mismos slots que el endpoint /api/entrevista-empresa. Si cambian allá, cambiar aquí.
-const SLOTS: { key: string; label: string; match: RegExp }[] = [
+/**
+ * 5 slots (4 obligatorios + 1 opcional) — sincronizado con
+ * /api/entrevista-empresa/route.ts. Si cambian las regex allá, espejarlas
+ * aquí para que el panel lateral del chat refleje lo que el backend ve.
+ */
+const SLOTS: { key: string; label: string; match: RegExp; optional?: boolean }[] = [
   {
-    key: 'equipo',
-    label: 'Tamaño del equipo',
-    match: /(\d+\s*persona|somos\s*\d+|equipo (de|chico|peque)|fundador|cofounder|socio)/i,
+    key: 'vacante',
+    label: 'Rol a cubrir',
+    match: /(busc[oa]mos|necesit[oa]mos|queremos contratar|el rol es|el puesto|vacante|abrimos posición|una persona que|alguien que|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b)/i,
   },
   {
-    key: 'actividad_semanal',
-    label: 'Actividad semanal',
-    match: /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin)/i,
+    key: 'tareas_del_rol',
+    label: 'Tareas del rol',
+    match: /(atender|vender|contestar|publicar|editar|cobrar|inventario|caja|reels?|tiktok|instagram|whatsapp|client[ea]s?|pedidos?|entregas?|reuniones?|coordin|escribir|disenar|cocinar|despachar|empacar|hacer rutas|llevar contabilidad|gestion|reportes?|ventas|cierre|prospect)/i,
   },
   {
-    key: 'ritmo_contexto',
-    label: 'Ritmo / contexto',
-    match: /(r[áa]pido|caos|presi[óo]n|estres|multitarea|cambio|picos?|presencial|remoto|h[íi]brido|horario|turnos?|jornada|barrio|local|oficina|ciudad)/i,
+    key: 'contexto_equipo',
+    label: 'Contexto del equipo',
+    match: /(\d+\s*(persona|activ[oa]s?|integrantes?|emplead|colaborad)|somos\s*\d+|equipo|fundador|cofounder|socio|empresa|emprendimiento|startup|r[áa]pido|caos|presi[óo]n|estres|multitarea|presencial|remoto|h[íi]brido|horario|turnos?|jornada|barrio|local|oficina|ciudad|barranquilla|bogot[áa]|medell[ií]n|cali)/i,
   },
   {
-    key: 'restricciones_duras',
-    label: 'Restricciones duras',
-    match: /(requisito|obligatorio|s[íi] o s[íi]|no-?negociable|jornada completa|tiempo completo|ingl[ée]s|espa[ñn]ol|excel|portugu[ée]s|licencia|mayor de|m[íi]nimo \d+)/i,
+    key: 'no_negociables',
+    label: 'No negociables',
+    match: /(requisito|obligatorio|s[íi] o s[íi]|no-?negociable|jornada completa|tiempo completo|ingl[ée]s|espa[ñn]ol|excel|portugu[ée]s|licencia|mayor de|m[íi]nimo \d+|deal-?breaker|esencial|imprescindible|prefer|valoramos|importante que|sin lo cual|descartam|descart[éa]|no aplica|no funcion[óo])/i,
   },
   {
-    key: 'fallos_previos',
-    label: 'Fallos previos',
-    match: /(contratamos|antes|anterior|nos fall[óo]|no funcion[óo]|se fue|renunci[óo]|no aguant[óo]|costo|cost[óo]|intentamos)/i,
-  },
-  {
-    key: 'dealbreakers',
-    label: 'Deal-breakers',
-    match: /(deal-?breaker|no-?negociable|esencial|imprescindible|deseable|nice|prefer|valoramos|importante que)/i,
+    key: 'experiencia_previa',
+    label: 'Experiencia previa',
+    optional: true,
+    match: /(contratamos|antes|anterior|nos fall[óo]|se fue|renunci[óo]|no aguant[óo]|primera vez|nunca (he|hemos) contratado|este es el primer|jam[áa]s contratamos|intentamos antes|el anterior|la anterior|el [úu]ltimo|la [úu]ltima)/i,
   },
 ];
 

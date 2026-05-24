@@ -117,6 +117,11 @@ export interface OpportunityMatch {
   role: string;
   ics: number;
   reason: string;
+  /** Desglose del ICS — para que el joven pueda VER por qué le dieron ese
+   * score sin necesidad de cruzar el muro de la vista de empresa. */
+  breakdown?: ICSBreakdown;
+  redFlag?: string;
+  topSkills?: string[];
 }
 
 export interface CompanyLegal {

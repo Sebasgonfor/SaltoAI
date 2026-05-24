@@ -82,6 +82,9 @@ export async function POST(req: NextRequest) {
         role: need.role,
         ics: match.ics,
         reason: match.reason,
+        breakdown: match.breakdown,
+        redFlag: match.redFlag,
+        topSkills: match.topSkills,
       });
     }
 
