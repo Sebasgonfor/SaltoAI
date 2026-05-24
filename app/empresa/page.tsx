@@ -36,6 +36,7 @@ import {
   Layers,
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask } from '@/lib/types';
+import { EmpresaWidgets } from '@/components/dashboard/empresa-widgets';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -359,7 +360,8 @@ export default function EmpresaDashboardPage() {
         </p>
       </header>
 
-      {/* KPIs */}
+      {/* KPIs base — operacional. Las activas/por-evaluar/cerradas son las que
+          el founder mira primero para saber QUÉ está pendiente HOY. */}
       <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={Layers}
@@ -388,6 +390,12 @@ export default function EmpresaDashboardPage() {
           hint="Evaluadas + pagadas"
         />
       </section>
+
+      {/* Widgets enriquecidos — pipeline funnel + calibración del motor +
+          salud por necesidad + top candidatos cross-need + financials.
+          Todo derivado de /api/dashboard/empresa (un solo request) — el
+          componente maneja su propio loading state. */}
+      <EmpresaWidgets uid={user.uid} />
 
       {/* CTA + lista de necesidades */}
       <section>
