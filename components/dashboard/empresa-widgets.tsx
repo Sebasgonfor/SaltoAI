@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import {
   Activity,
   ArrowRight,
@@ -191,13 +192,8 @@ export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
 
   if (loading || !data) {
     return (
-      <section className="space-y-5" aria-label="Pasaporte del founder">
-        <div className="h-44 rounded-3xl bg-slate-100 animate-pulse" />
-        <div className="grid lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-72 rounded-3xl bg-slate-100 animate-pulse" />
-          ))}
-        </div>
+      <section aria-label="Pasaporte del founder">
+        <LoadingSpinner variant="section" size="lg" />
       </section>
     );
   }
@@ -226,7 +222,7 @@ export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
       />
 
       {/* ─── Grid 3-col superior — items-stretch para misma altura ─── */}
-      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
         <RadarCard
           title="ADN de búsqueda"
           subtitle="Tu motor en 5 ejes"
@@ -240,7 +236,7 @@ export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
       <PipelineCard funnel={data.pipelineFunnel} />
 
       {/* ─── Grid estilo + Necesidades con salud ─────────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
         <StyleGrid tiles={inferStyleTiles(needs, tasks, data)} className="lg:col-span-2" />
         <NeedsHealthCard needs={data.needsWithHealth} />
       </div>
@@ -278,13 +274,13 @@ function HeroDark({
       className="relative overflow-hidden rounded-3xl text-white p-5 md:p-7"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.25) 0%, transparent 55%), linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, rgba(69, 26, 3, 0.4) 100%)',
+          'radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.28) 0%, transparent 55%), linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, rgba(6, 78, 59, 0.45) 100%)',
       }}
     >
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
         <div className="relative flex-shrink-0">
           <div
-            className="rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl"
+            className="rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl"
             style={{ width: 72, height: 72 }}
           >
             {avatarText || '·'}
@@ -299,11 +295,11 @@ function HeroDark({
             <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight">
               {name}
             </h1>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold shadow-sm">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-semibold shadow-sm">
               {category}
             </span>
             {ringValue >= 70 && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-950/40 border border-amber-700/40 text-amber-300 text-xs font-semibold">
+              <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-700/40 text-emerald-300 text-xs font-semibold">
                 Score {ringValue}
               </span>
             )}
@@ -314,7 +310,7 @@ function HeroDark({
               <div key={s.label} className="flex items-center gap-2.5">
                 <span className="text-xl leading-none">{s.icon}</span>
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-amber-200/70 font-semibold">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-200/70 font-semibold">
                     {s.label}
                   </div>
                   <div className="font-display font-bold text-base text-white tabular-nums truncate">
@@ -326,11 +322,14 @@ function HeroDark({
           </div>
         </div>
 
-        <div className="flex-shrink-0 flex flex-col items-center">
-          <RingScore value={ringValue} size={108} />
-          {/* amber-200/80 sobre stone-950 mantiene el aire cálido del hero
-              y resuelve el contraste insuficiente del stone-500 anterior. */}
-          <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80 font-semibold mt-2">
+        <div className="flex-shrink-0 flex flex-col items-center self-center md:self-auto">
+          <div className="md:hidden">
+            <RingScore value={ringValue} size={88} />
+          </div>
+          <div className="hidden md:block">
+            <RingScore value={ringValue} size={108} />
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80 font-semibold mt-2">
             {ringLabel}
           </div>
         </div>
@@ -363,8 +362,8 @@ function RingScore({ value, size = 96 }: { value: number; size?: number }) {
         />
         <defs>
           <linearGradient id="ringGradEmp" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#ea580c" />
+            <stop offset="0%" stopColor="#34d399" />
+            <stop offset="100%" stopColor="#059669" />
           </linearGradient>
         </defs>
       </svg>
@@ -454,8 +453,8 @@ function RadarCard({
           })}
           <polygon
             points={polygonPoints}
-            fill="rgba(234, 88, 12, 0.18)"
-            stroke="#ea580c"
+            fill="rgba(16, 185, 129, 0.18)"
+            stroke="#059669"
             strokeWidth={2}
             strokeLinejoin="round"
           />
@@ -474,7 +473,7 @@ function RadarCard({
                   : 'start';
             return (
               <g key={i}>
-                <circle cx={vx} cy={vy} r={3.5} fill="#ea580c" />
+                <circle cx={vx} cy={vy} r={3.5} fill="#10b981" />
                 <text
                   x={lx}
                   y={ly - 4}
@@ -504,7 +503,7 @@ function RadarCard({
       <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[10px] text-stone-500 border-t border-stone-100 pt-3">
         {axes.map((a) => (
           <div key={a.axis} className="flex items-center gap-1.5 min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
             <span className="truncate">
               <strong className="text-stone-700 font-semibold">{a.axis}</strong> · {a.raw}
             </span>
@@ -542,7 +541,7 @@ function InversionCard({
           </p>
         </div>
         <div className="border-t border-stone-100 pt-3 mt-2">
-          <Link href="/empresa/matches" className="text-xs text-orange-700 font-semibold hover:underline inline-flex items-center gap-1.5">
+          <Link href="/empresa/matches" className="text-xs text-emerald-700 font-semibold hover:underline inline-flex items-center gap-1.5">
             Proponer microtask a un candidato <ArrowRight size={11} />
           </Link>
         </div>
@@ -560,7 +559,7 @@ function InversionCard({
   const rows: { label: string; value: number; color: string }[] = [
     { label: 'Pagadas', value: paidSum, color: 'bg-emerald-500' },
     { label: 'Evaluadas', value: evaluatedSum, color: 'bg-emerald-400' },
-    { label: 'Por evaluar', value: deliveredSum, color: 'bg-amber-400' },
+    { label: 'Por evaluar', value: deliveredSum, color: 'bg-emerald-300' },
     { label: 'En progreso', value: pendingSum, color: 'bg-stone-300' },
   ].filter((r) => r.value > 0);
 
@@ -570,7 +569,7 @@ function InversionCard({
     <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Inversión en talento" />
       <div className="mt-3">
-        <div className="font-display font-bold text-4xl text-stone-900 tabular-nums leading-none">
+        <div className="font-display font-bold text-2xl sm:text-3xl md:text-4xl text-stone-900 tabular-nums leading-none break-all sm:break-normal">
           ${financials.totalInvestedCOP.toLocaleString('es-CO')}
         </div>
         <div className="text-xs text-stone-500 mt-1">
@@ -598,7 +597,7 @@ function InversionCard({
         )}
       </div>
       {financials.pendingCount > 0 && (
-        <div className="mt-5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center gap-2 text-xs text-amber-900">
+        <div className="mt-5 px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200/60 flex items-center gap-2 text-xs text-emerald-900">
           <span>⏳</span>
           <span><strong>{financials.pendingCount}</strong> microtask{financials.pendingCount === 1 ? '' : 's'} en curso esperando entrega.</span>
         </div>
@@ -619,7 +618,7 @@ function CandidatesCard({
       <div className="flex items-center justify-between gap-2 mb-1">
         <SectionTitle title="Top candidatos" />
         {candidates.length > 0 && (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
             {candidates.length} cross-need
           </span>
         )}
@@ -635,11 +634,11 @@ function CandidatesCard({
             <div className="mt-3 group cursor-pointer">
               <div className="flex items-start justify-between gap-3 mb-1.5">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {initials(c.name)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-stone-900 truncate group-hover:text-orange-700 transition-colors">
+                    <div className="text-sm font-semibold text-stone-900 truncate group-hover:text-emerald-700 transition-colors">
                       {c.name}
                     </div>
                     <div className="text-[11px] text-stone-500 truncate">
@@ -648,13 +647,13 @@ function CandidatesCard({
                     </div>
                   </div>
                 </div>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 flex-shrink-0">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 flex-shrink-0">
                   ICS {c.avgIcsAcrossNeeds || '—'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-orange-500 transition-all" style={{ width: `${c.avgIcsAcrossNeeds}%` }} />
+                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${c.avgIcsAcrossNeeds}%` }} />
                 </div>
                 <span className="text-[11px] font-mono tabular-nums font-bold text-stone-900 w-9 text-right">
                   {c.avgIcsAcrossNeeds || 0}%
@@ -696,10 +695,12 @@ function PipelineCard({
           return (
             <div key={s.label} className="flex items-center gap-3 text-sm">
               <span className="text-xl leading-none w-7 text-center flex-shrink-0">{s.emoji}</span>
-              <span className="text-stone-700 w-44 text-xs truncate">{s.label}</span>
+              <span className="text-stone-700 min-w-0 flex-1 sm:flex-none sm:w-32 md:w-40 text-xs truncate">
+                {s.label}
+              </span>
               <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-orange-500 transition-all"
+                  className="h-full bg-emerald-500 transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -710,7 +711,7 @@ function PipelineCard({
           );
         })}
       </div>
-      <div className="mt-5 pt-4 border-t border-stone-100 grid grid-cols-3 gap-3 text-center">
+      <div className="mt-5 pt-4 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
         <ConversionStat label="Shortlist → Abrir" value={funnel.conversionRates.shortlistToOpen} />
         <ConversionStat label="Abrir → Microtask" value={funnel.conversionRates.openToMicrotask} />
         <ConversionStat label="Microtask → Hire" value={funnel.conversionRates.microtaskToHire} highlight />
@@ -728,11 +729,13 @@ function ConversionStat({
   value: number;
   highlight?: boolean;
 }) {
-  const color = highlight ? (value >= 30 ? 'text-emerald-600' : 'text-amber-600') : 'text-stone-900';
+  const color = highlight ? (value >= 30 ? 'text-emerald-600' : 'text-emerald-500') : 'text-stone-900';
   return (
     <div>
-      <div className={`font-display font-bold text-xl tabular-nums ${color}`}>{value}%</div>
-      <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold mt-0.5">{label}</div>
+      <div className={`font-display font-bold text-lg sm:text-xl tabular-nums ${color}`}>{value}%</div>
+      <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold mt-0.5 leading-snug">
+        {label}
+      </div>
     </div>
   );
 }
@@ -848,17 +851,17 @@ function NeedsHealthCard({
             n.healthScore >= 80
               ? 'bg-emerald-500'
               : n.healthScore >= 50
-                ? 'bg-amber-400'
+                ? 'bg-emerald-400'
                 : 'bg-rose-500';
           const text =
             n.healthScore >= 80
               ? 'text-emerald-600'
               : n.healthScore >= 50
-                ? 'text-amber-600'
+                ? 'text-emerald-600'
                 : 'text-rose-600';
           return (
             <Link key={n.id} href={`/empresa/matches/${n.id}`}>
-              <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl border border-stone-200 hover:border-orange-300 hover:bg-orange-50/30 transition-colors group">
+              <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors group">
                 <span className={`w-2 h-2 rounded-full ${dot} flex-shrink-0 mt-1.5`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -869,12 +872,12 @@ function NeedsHealthCard({
                   </div>
                   {n.topIssue && (
                     <p className="text-[11px] text-stone-500 mt-0.5 truncate">
-                      <AlertTriangle size={9} className="inline mr-1 text-amber-500" />
+                      <AlertTriangle size={9} className="inline mr-1 text-emerald-500" />
                       {n.topIssue}
                     </p>
                   )}
                 </div>
-                <ChevronRight size={13} className="text-stone-300 group-hover:text-orange-500 flex-shrink-0 mt-1" />
+                <ChevronRight size={13} className="text-stone-300 group-hover:text-emerald-500 flex-shrink-0 mt-1" />
               </div>
             </Link>
           );
@@ -893,7 +896,7 @@ function CalibrationCard({
 }) {
   if (calibration.alignmentLabel === 'sin_datos' || calibration.totalPaired === 0) {
     return (
-      <div className="bg-gradient-to-br from-stone-50 to-amber-50/30 border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="bg-gradient-to-br from-stone-50 to-emerald-50/30 border border-stone-200 rounded-3xl p-5 md:p-6">
         <SectionTitle title="Calibración del motor IA" />
         <p className="text-sm text-stone-600 mt-3 leading-relaxed">
           Cuando evalúes microtasks, comparamos tu rating con la pre-eval de la IA.
@@ -908,7 +911,7 @@ function CalibrationCard({
     calibration.alignmentLabel === 'alineado'
       ? { emoji: '🎯', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200/60', label: 'Bien alineado' }
       : calibration.alignmentLabel === 'optimista'
-        ? { emoji: '🌤️', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200/60', label: 'IA optimista' }
+        ? { emoji: '🌤️', color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200/60', label: 'IA optimista' }
         : { emoji: '🧊', color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200/60', label: 'IA conservadora' };
 
   return (
@@ -950,11 +953,11 @@ function CalibrationCard({
               </span>
               <ArrowRight size={11} className="text-stone-300" />
               <span className="font-mono tabular-nums text-stone-500">
-                Tu rating: <strong className="text-amber-600">{p.founderRating}/5</strong>
+                Tu rating: <strong className="text-emerald-600">{p.founderRating}/5</strong>
               </span>
             </div>
             <span className={`text-[10px] font-mono tabular-nums font-semibold ${
-              Math.abs(p.delta) <= 10 ? 'text-emerald-600' : p.delta > 0 ? 'text-amber-600' : 'text-rose-600'
+              Math.abs(p.delta) <= 10 ? 'text-emerald-600' : p.delta > 0 ? 'text-teal-600' : 'text-rose-600'
             }`}>
               {p.delta > 0 ? '+' : ''}{p.delta}
             </span>

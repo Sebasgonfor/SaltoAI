@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -85,7 +86,11 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
     }
   };
 
-  if (loading) return <div className="max-w-3xl mx-auto px-6 py-24 text-center text-slate-500">Cargando…</div>;
+  if (loading) {
+    return (
+      <LoadingSpinner variant="section" label="Cargando…" containerClassName="max-w-3xl mx-auto px-6" />
+    );
+  }
   if (!task) {
     return (
       <div className="max-w-md mx-auto px-6 py-24 text-center">

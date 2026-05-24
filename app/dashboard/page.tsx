@@ -31,6 +31,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { JovenWidgets } from '@/components/dashboard/joven-widgets';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -270,15 +271,7 @@ export default function DashboardPage() {
   // empresa, el useEffect ya disparó router.replace; igual mantenemos loader
   // para evitar un flash de UI joven antes del redirect.
   if (loading || roleLoading || !user || account?.role === 'empresa') {
-    return (
-      <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-        </div>
-      </div>
-    );
+    return <LoadingSpinner variant="full" />;
   }
 
   const firstName = user.displayName?.split(' ')[0] || 'tú';

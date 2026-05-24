@@ -1,39 +1,15 @@
-import Link from 'next/link';
-import { SaltoLogo } from '@/components/ui/salto-logo';
+import { AliadosHeader } from '@/components/aliados/aliados-header';
+import { AppFooter } from '@/components/layout/app-footer';
 
 export default function AliadosLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
-      <header className="px-6 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between sticky top-0 z-20">
-        <Link href="/" className="flex items-center gap-2.5">
-          <SaltoLogo variant="icon" size={32} />
-          <div className="flex flex-col leading-tight">
-            <span className="font-display font-semibold text-slate-900 tracking-tight">SaltoAI</span>
-            <span className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-medium">para aliados</span>
-          </div>
-        </Link>
-        <nav className="flex gap-1 text-sm font-medium">
-          <Link
-            href="/aliados/impacto"
-            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/"
-            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            Volver al inicio
-          </Link>
-        </nav>
-      </header>
-      <main className="flex-1 flex flex-col w-full">
-        {children}
-      </main>
-      <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
-        <span>SaltoAI · Impacto medible, no promesas</span>
-        <span>Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI</span>
-      </footer>
+    <div className="min-h-screen bg-[#FAFAF7] flex flex-col overflow-x-hidden">
+      <AliadosHeader />
+      <main className="flex-1 flex flex-col w-full min-w-0 px-4 sm:px-6">{children}</main>
+      <AppFooter
+        left="SaltoAI · Impacto medible, no promesas"
+        right="Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI"
+      />
     </div>
   );
 }

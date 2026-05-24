@@ -5,7 +5,7 @@ import { LegalBackButton } from './back-button';
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden">
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <Suspense fallback={<div className="w-28 h-8" />}>
@@ -17,16 +17,16 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             <span className="font-display font-bold text-slate-900 text-sm tracking-tight">Salto</span>
           </Link>
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <Link
               href="/legal/terminos"
-              className="text-xs px-3 py-1.5 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+              className="text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium whitespace-nowrap"
             >
               Términos
             </Link>
             <Link
               href="/legal/privacidad"
-              className="text-xs px-3 py-1.5 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+              className="text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium whitespace-nowrap"
             >
               Privacidad
             </Link>
@@ -42,7 +42,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             <SaltoLogo size={18} />
             <span>© 2026 Salto. Barranquilla, Colombia.</span>
           </div>
-          <div className="flex items-center gap-5 text-xs text-slate-400">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-5 text-xs text-slate-400 text-center sm:text-left">
             <Link href="/legal/terminos" className="hover:text-slate-700 transition-colors">
               Términos y Condiciones
             </Link>

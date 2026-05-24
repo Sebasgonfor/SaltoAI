@@ -13,6 +13,9 @@ interface Props {
   hint?: string;
   /** Variante visual para CTAs destacados (ej. "Oportunidades" en el joven). */
   emphasis?: boolean;
+  /** Cierra drawer móvil tras navegar. */
+  onNavigate?: () => void;
+  className?: string;
 }
 
 /**
@@ -26,7 +29,15 @@ interface Props {
  * matchPrefix=true es útil para items que cubren un árbol de rutas (ej. "Mis
  * matches" debe seguir activo en /empresa/matches/{needId}).
  */
-export function NavLink({ href, label, matchPrefix = true, hint, emphasis = false }: Props) {
+export function NavLink({
+  href,
+  label,
+  matchPrefix = true,
+  hint,
+  emphasis = false,
+  onNavigate,
+  className,
+}: Props) {
   const pathname = usePathname() || '';
   const isActive = matchPrefix
     ? pathname === href || pathname.startsWith(href + '/')
@@ -37,8 +48,10 @@ export function NavLink({ href, label, matchPrefix = true, hint, emphasis = fals
       href={href}
       title={hint}
       aria-current={isActive ? 'page' : undefined}
+      onClick={onNavigate}
       className={cn(
         'px-3 py-1.5 rounded-md transition-colors',
+        className,
         isActive
           ? emphasis
             ? 'text-emerald-700 bg-emerald-50'

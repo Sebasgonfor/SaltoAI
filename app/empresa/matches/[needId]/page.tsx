@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import {
   Sparkles,
@@ -258,21 +259,17 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-3 text-slate-500 mb-4">
-          <Network size={18} className="text-emerald-500 animate-pulse" />
-          <span className="text-sm">Cargando candidatos…</span>
-        </div>
-        <div className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-          Mostrando el ranking calculado al publicar tu necesidad.
-        </div>
-      </div>
+      <LoadingSpinner
+        variant="section"
+        label="Cargando candidatos…"
+        containerClassName="max-w-4xl mx-auto px-4 sm:px-6"
+      />
     );
   }
 
   if (error || !data) {
     return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-24 text-center">
         <AlertCircle size={32} className="text-rose-500 mx-auto mb-4" />
         <h2 className="text-xl font-display font-medium mb-2">{error || 'No encontramos la necesidad'}</h2>
         <Link href="/empresa/chat">

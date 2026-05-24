@@ -7,6 +7,7 @@ import { GraduationCap, Building2, ArrowRight, Sparkles } from 'lucide-react';
 import { AuthForm } from '@/components/auth/auth-form';
 import { useAuth, type UserRole } from '@/lib/auth-context';
 import { SaltoLogo } from '@/components/ui/salto-logo';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 function isSafeNext(value: string | null): string {
   if (!value) return '/';
@@ -104,11 +105,7 @@ function OnboardingRolInner() {
   // (pendingRole=null), roleLoading termina en false con account=null,
   // y entonces sí mostramos el picker — comportamiento correcto.
   if (loading || roleLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-        Configurando tu cuenta…
-      </div>
-    );
+    return <LoadingSpinner variant="full" label="Configurando tu cuenta…" />;
   }
 
   if (!user) {
@@ -192,11 +189,7 @@ function OnboardingRolInner() {
 export default function OnboardingRolPage() {
   return (
     <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
-          Cargando…
-        </div>
-      }
+      fallback={<LoadingSpinner variant="full" />}
     >
       <OnboardingRolInner />
     </Suspense>

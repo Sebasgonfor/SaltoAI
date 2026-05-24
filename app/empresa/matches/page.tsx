@@ -73,7 +73,7 @@ export default function MatchesIndex() {
 
   if (authLoading || loading) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="h-8 w-1/3 bg-slate-200 rounded animate-pulse mb-3" />
         <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse mb-8" />
         <div className="grid md:grid-cols-2 gap-4">
@@ -87,7 +87,7 @@ export default function MatchesIndex() {
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-24 text-center">
         <AlertCircle className="text-rose-500 mx-auto mb-4" size={32} />
         <p className="text-slate-700 mb-6">{error}</p>
         <Link href="/empresa">
@@ -100,7 +100,7 @@ export default function MatchesIndex() {
   // Empty state
   if (needs.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-24 text-center">
         <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-slate-900 text-emerald-400 flex items-center justify-center">
           <Sparkles size={28} strokeWidth={1.75} />
         </div>

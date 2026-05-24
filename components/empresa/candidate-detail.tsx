@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
@@ -108,15 +109,17 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
               </Badge>
             </div>
             <h1 className="text-2xl font-display font-bold text-slate-900 mt-3">{match.profileName}</h1>
-            <p className="text-sm text-slate-500 mt-2">Cargando CV y evidencia…</p>
+            <LoadingSpinner variant="inline" label="Cargando CV y evidencia…" />
           </div>
         </div>
       );
     }
     return (
-      <div className="max-w-5xl mx-auto px-6 py-24 text-center text-slate-500 text-sm">
-        Cargando candidato…
-      </div>
+      <LoadingSpinner
+        variant="section"
+        label="Cargando candidato…"
+        containerClassName="max-w-5xl mx-auto px-6"
+      />
     );
   }
 

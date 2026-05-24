@@ -1,0 +1,86 @@
+'use client';
+
+import { Button } from '@/components/ui/button';
+import { NavLink } from '@/components/nav-link';
+import { UserButton } from '@/components/auth/user-button';
+import { ResponsiveRoleHeader } from '@/components/layout/responsive-role-header';
+
+function EmpresaNav({
+  layout,
+  onNavigate,
+}: {
+  layout: 'row' | 'column';
+  onNavigate?: () => void;
+}) {
+  const isCol = layout === 'column';
+  return (
+    <nav
+      className={
+        isCol
+          ? 'flex flex-col items-stretch gap-0.5 p-3 text-sm font-medium'
+          : 'flex gap-1 items-center text-sm font-medium'
+      }
+    >
+      <NavLink
+        href="/empresa"
+        label="Inicio"
+        matchPrefix={false}
+        hint="Tu dashboard: necesidades publicadas, micro-tareas activas y métricas."
+        onNavigate={onNavigate}
+        className={isCol ? 'w-full' : undefined}
+      />
+      {isCol ? (
+        <NavLink
+          href="/empresa/chat"
+          label="Publicar necesidad"
+          hint="Conversa con la IA para describir el rol."
+          onNavigate={onNavigate}
+          className="w-full"
+        />
+      ) : (
+        <>
+          <NavLink
+            href="/empresa/chat"
+            label="Publicar necesidad"
+            hint="Conversa con la IA para describir el rol."
+            onNavigate={onNavigate}
+            className="hidden xl:inline-flex"
+          />
+          <NavLink
+            href="/empresa/chat"
+            label="Publicar"
+            hint="Conversa con la IA para describir el rol."
+            onNavigate={onNavigate}
+            className="xl:hidden"
+          />
+        </>
+      )}
+      <NavLink
+        href="/empresa"
+        label="Mis matches"
+        hint="Tus necesidades y shortlists por ICS."
+        onNavigate={onNavigate}
+        className={isCol ? 'w-full' : undefined}
+      />
+      {!isCol && (
+        <>
+          <Button variant="outline" size="sm" className="hidden lg:inline-flex ml-2">
+            Ayuda
+          </Button>
+          <div className="h-5 w-px bg-slate-200 mx-2" />
+          <UserButton />
+        </>
+      )}
+    </nav>
+  );
+}
+
+export function EmpresaHeader() {
+  return (
+    <ResponsiveRoleHeader
+      desktopNav={<EmpresaNav layout="row" />}
+      drawerNav={(close) => <EmpresaNav layout="column" onNavigate={close} />}
+      mobileTrailing={<UserButton />}
+    />
+  );
+}
