@@ -153,7 +153,64 @@ async function searchCoursesWithGrounding(skill: string): Promise<Recommendation
 
   // Filtramos los que vinieron sin URL (Gemini a veces alucina con tools off,
   // con grounding pasa menos pero igual nos cubrimos).
-  const validated = courses.filter((c) => c.url && /^https?:\/\//.test(c.url));
+  const withUrls = courses.filter((c) => c.url && /^https?:\/\//.test(c.url));
+
+  // ── Validación server-side de URLs (anti-404) ──────────────────────────────
+  // Gemini con grounding A VECES devuelve URLs que parecen reales (a un dominio
+  // real conocido) pero apuntan a páginas que YA NO EXISTEN. El user reportó
+  // explícitamente "los links a veces llevan a 404".
+  //
+  // Estrategia: HEAD request en paralelo con timeout corto (3s) por cada URL.
+  // - 200, 2xx, 3xx → válida
+  // - 4xx → muerta, descartar
+  // - 5xx, timeout, network err → ambigua, DEJAMOS pasar (mejor un link
+  //   incierto que rompido). El user puede dar feedback con el botón "No".
+  // - Sitios que rechazan HEAD (405 Method Not Allowed) → reintento con GET
+  //   y Range:bytes=0-0 para pedir solo el primer byte.
+  const validated = await Promise.all(
+    withUrls.map(async (c) => {
+      try {
+        const head = await Promise.race([
+          fetch(c.url, { method: "HEAD", redirect: "follow" }),
+          new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 3000),
+          ),
+        ]);
+        if (head.status >= 400 && head.status < 500) {
+          // 4xx → probablemente muerto. Reintentar con GET por si rechazaron HEAD.
+          if (head.status === 405 || head.status === 403) {
+            try {
+              const get = await Promise.race([
+                fetch(c.url, {
+                  method: "GET",
+                  redirect: "follow",
+                  headers: { Range: "bytes=0-0" },
+                }),
+                new Promise<Response>((_, reject) =>
+                  setTimeout(() => reject(new Error("timeout")), 3000),
+                ),
+              ]);
+              if (get.status >= 400 && get.status < 500) {
+                console.warn(`[cursos] URL muerta tras retry (${get.status}): ${c.url}`);
+                return null;
+              }
+              return c;
+            } catch {
+              return c; // ambigua → la dejamos
+            }
+          }
+          console.warn(`[cursos] URL muerta (${head.status}): ${c.url}`);
+          return null;
+        }
+        return c;
+      } catch {
+        // Timeout o network: ambigua. Mejor un link incierto que descartar
+        // injustamente. El joven puede reportarla con el botón "No".
+        return c;
+      }
+    }),
+  );
+  const filtered = validated.filter((c): c is CourseRecommendation => c !== null);
 
   // Extraemos las URLs del grounding metadata si Gemini las anotó.
   const groundingSources: string[] = [];
@@ -171,7 +228,7 @@ async function searchCoursesWithGrounding(skill: string): Promise<Recommendation
 
   return {
     skill,
-    courses: validated,
+    courses: filtered,
     groundingSources: groundingSources.length > 0 ? groundingSources : undefined,
   };
 }
