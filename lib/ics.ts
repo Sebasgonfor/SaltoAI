@@ -24,6 +24,7 @@
 import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "./gemini";
 import { isQuotaError } from "./gemini";
+import { loadFeedbackIndex } from "./feedback-signal";
 import {
   ICS_WEIGHTS,
   type CompanyNeed,
@@ -370,6 +371,10 @@ async function rankBatchWithLLM(
 export interface ScoreOptions {
   /** Si true, filtra duro candidatos que violan hardConstraints. Default true. */
   applyHardFilter?: boolean;
+  /** Si true, aplica el delta de feedback (señales acumuladas) sobre el ICS
+   * predicho por el LLM. Default true. Apagar para A/B testing del motor sin
+   * señal vs con señal. */
+  useFeedbackSignal?: boolean;
 }
 
 export interface ScoreResult {
@@ -400,6 +405,7 @@ export async function scoreCandidates(
   opts: ScoreOptions = {}
 ): Promise<ScoreResult> {
   const applyHardFilter = opts.applyHardFilter !== false;
+  const useFeedbackSignal = opts.useFeedbackSignal !== false;
 
   // 1. Hard filter
   const excluded: { profileId: string; reason: string }[] = [];
@@ -466,6 +472,37 @@ export async function scoreCandidates(
     heuristicHits++;
     return { profileId: p.id!, profileName: p.name, ...heuristicScore(need, p) };
   });
+
+  // 4. Aplicar delta de feedback acumulado por par (needId, profileId).
+  // Esto es el primer eslabón del data flywheel: cada vez que el founder
+  // marca 👍/👎, clickea conectar, o ratea una microtask, ese signal se
+  // suma como corrección al ICS predicho por el LLM.
+  if (useFeedbackSignal && need.id) {
+    try {
+      const getSignal = await loadFeedbackIndex();
+      for (const m of ranked) {
+        const agg = getSignal(need.id, m.profileId);
+        if (agg.delta !== 0) {
+          const original = m.ics;
+          m.ics = Math.max(0, Math.min(100, m.ics + agg.delta));
+          // Anotamos la razón con la corrección visible. El founder ve POR QUÉ
+          // el score subió/bajó respecto del puro juicio LLM.
+          const sign = agg.delta > 0 ? "+" : "";
+          m.reason = `${m.reason} [Ajustado ${sign}${agg.delta}pts: ${agg.reasons.join(", ")}]`;
+          m.breakdown = {
+            ...m.breakdown,
+            // No tocamos los sub-scores — el delta solo afecta el ICS final.
+            // El breakdown sigue mostrando lo que el LLM realmente percibió.
+          };
+          void original; // referencia inadvertida para debug breakpoint
+        }
+      }
+    } catch (e) {
+      // Si la lectura de feedback falla, NO rompemos el scoring — solo
+      // continuamos sin la corrección. Mejor un score sin ajuste que un 500.
+      console.warn("[ics] feedback signal load failed:", (e as Error).message);
+    }
+  }
 
   ranked.sort((a, b) => b.ics - a.ics);
   const matches = ranked.slice(0, RETURN_SIZE);

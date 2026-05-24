@@ -3,6 +3,7 @@ import {
   getMicroTask,
   getProfile,
   listMicroTasksByProfile,
+  recordFeedback,
   updateMicroTask,
   updateProfileTaskStats,
 } from "@/lib/db";
@@ -55,6 +56,29 @@ export async function POST(req: NextRequest) {
     };
     const profile = await getProfile(task.profileId);
     if (profile) await updateProfileTaskStats(task.profileId, stats);
+
+    // Outcome de una microtask = ground-truth REAL sobre ese (need, profile).
+    // Lo registramos como feedback para que el motor ICS lo absorba en futuros
+    // rankings. Es la señal más fuerte que tenemos hasta que haya contrataciones
+    // formales.
+    if (task.needId) {
+      try {
+        await recordFeedback({
+          matchId: `${task.needId}__${task.profileId}`,
+          needId: task.needId,
+          profileId: task.profileId,
+          useful: rating >= 4,
+          source: "empresa_match",
+          signalType: "microtask_outcome",
+          score: rating,
+          note: `microtask_evaluated:${taskId}`,
+        });
+      } catch (e) {
+        // Si falla el feedback, NO bloqueamos la evaluación de la tarea —
+        // solo perdemos esa señal. El rating sigue guardado en el documento.
+        console.warn("[microtask/evaluar] feedback save failed:", (e as Error).message);
+      }
+    }
 
     const updated = await getMicroTask(taskId);
     return NextResponse.json({ task: updated, profileStats: stats });

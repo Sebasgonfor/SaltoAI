@@ -35,6 +35,29 @@ const DIM_LABELS: { key: keyof ICSBreakdown; label: string; weight: number | nul
   { key: 'penalties', label: 'Penalización', weight: null, help: 'Restricciones duras incumplidas' },
 ];
 
+/**
+ * Fire-and-forget para señales implícitas (click conectar, propose microtask).
+ * No bloqueamos al founder con esto; si falla, simplemente no se registra.
+ * El motor lo va a leer en el próximo recálculo de scoreCandidates().
+ */
+function recordImplicitSignal(
+  needId: string,
+  profileId: string,
+  signal: 'connect' | 'microtask_proposed',
+  icsAtTime?: number,
+) {
+  try {
+    void fetch('/api/feedback/implicit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ needId, profileId, signal, icsAtTime }),
+      keepalive: true, // sobrevive navegación de página
+    }).catch(() => {});
+  } catch {
+    /* never throws */
+  }
+}
+
 function BreakdownBars({
   breakdown,
   size = 'md',
@@ -295,19 +318,28 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Link href={`/joven/perfil/${top.profileId}`} className="flex-1">
+                  <Link
+                    href={`/joven/perfil/${top.profileId}`}
+                    className="flex-1"
+                    onClick={() => recordImplicitSignal(needId, top.profileId, 'connect', top.ics)}
+                  >
                     <Button className="w-full gap-2">
                       Ver perfil completo <ArrowRight size={14} />
                     </Button>
                   </Link>
-                  <Button variant="outline" className="gap-2">
-                    Contactar
-                  </Button>
+                  <Link
+                    href={`/empresa/probar/${top.profileId}?needId=${needId}`}
+                    onClick={() => recordImplicitSignal(needId, top.profileId, 'microtask_proposed', top.ics)}
+                  >
+                    <Button variant="outline" className="gap-2">
+                      Probar candidato
+                    </Button>
+                  </Link>
                 </div>
 
                 {/* Feedback loop — combustible del flywheel (PRD §8.6) */}
                 <div className="pt-3">
-                  <MatchFeedback needId={needId} profileId={top.profileId} variant="hero" />
+                  <MatchFeedback needId={needId} profileId={top.profileId} icsAtTime={top.ics} variant="hero" />
                 </div>
               </div>
 
@@ -380,7 +412,10 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                     <Info size={12} className="mt-0.5 flex-shrink-0" />
                     <span><strong className="text-slate-700">Red flag:</strong> {m.redFlag}</span>
                   </div>
-                  <Link href={`/joven/perfil/${m.profileId}`}>
+                  <Link
+                    href={`/joven/perfil/${m.profileId}`}
+                    onClick={() => recordImplicitSignal(needId, m.profileId, 'connect', m.ics)}
+                  >
                     <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0">
                       Ver perfil <ArrowRight size={12} />
                     </Button>
@@ -388,7 +423,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 </div>
 
                 <div className="pt-3 mt-3 border-t border-slate-100">
-                  <MatchFeedback needId={needId} profileId={m.profileId} />
+                  <MatchFeedback needId={needId} profileId={m.profileId} icsAtTime={m.ics} />
                 </div>
               </article>
             ))}

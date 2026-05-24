@@ -17,6 +17,7 @@ import {
 import type { Gender, Profile } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
+import SkillsGap from '@/components/skills-gap';
 import { useAuth } from '@/lib/auth-context';
 
 const GENDER_LABEL: Record<Gender, string> = {
@@ -280,6 +281,11 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           ))}
         </div>
       </section>
+
+      {/* Plan de crecimiento (brechas + cursos) — solo para el dueño del
+          perfil. Cuando la empresa visita este perfil, no le mostramos sus
+          puntos débiles (es información de carrera del joven, no de selección). */}
+      {!viewerIsEmpresa && <SkillsGap profileId={id} />}
 
       {/* Skills + Traits */}
       <section className="grid md:grid-cols-2 gap-5">

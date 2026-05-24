@@ -177,9 +177,29 @@ export interface Match {
 }
 
 /**
- * Feedback de match: el dato propietario que reentrena el ICS (PRD §8.6).
- * Mínimo viable: ¿este match le pareció útil al founder? sí/no/timestamp.
- * matchId = `${needId}__${profileId}` para que sea idempotente sin secuencias.
+ * Tipo de señal de feedback. El motor ICS usa cada uno con un peso distinto:
+ *   explicit_vote        — el founder marcó 👍/👎 en el match: señal directa.
+ *   implicit_connect     — el founder clickeó "Quiero conectar": interés débil pero real.
+ *   implicit_microtask   — el founder propuso una micro-tarea pagada: interés FUERTE
+ *                          (puso dinero en el juego).
+ *   microtask_outcome    — la micro-tarea fue completada y rateada: ground-truth
+ *                          real sobre si ese match funciona o no.
+ */
+export type FeedbackSignal =
+  | "explicit_vote"
+  | "implicit_connect"
+  | "implicit_microtask"
+  | "microtask_outcome";
+
+/**
+ * Feedback de match: dato propietario que reentrena el ICS (PRD §8.6).
+ * matchId = `${needId}__${profileId}` para idempotencia sin secuencias.
+ *
+ * v2 — agregamos `signalType`, `score` (para outcomes 1-5) y `icsAtTime`
+ * (el score que el motor predijo cuando ocurrió la señal). Esto último es
+ * clave para medir CALIBRACIÓN: si el motor predice 90% y el founder dice
+ * "no útil", aprendemos que estamos inflados; si predice 40% y rate 5/5,
+ * estamos siendo conservadores.
  */
 export interface FeedbackEntry {
   id?: string;
@@ -190,6 +210,12 @@ export interface FeedbackEntry {
   timestamp: number;
   source?: "empresa_match" | "joven_perfil" | "other";
   note?: string;
+  /** Default "explicit_vote" para retrocompatibilidad con entries viejos. */
+  signalType?: FeedbackSignal;
+  /** Solo para microtask_outcome: 1-5 estrellas del founder. */
+  score?: number;
+  /** ICS que el motor predijo en el momento de la señal. Para correlación. */
+  icsAtTime?: number;
 }
 
 export const ICS_WEIGHTS = {
