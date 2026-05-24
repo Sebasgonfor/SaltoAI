@@ -57,10 +57,20 @@ export async function POST(req: NextRequest) {
     const profile = await getProfile(task.profileId);
     if (profile) await updateProfileTaskStats(task.profileId, stats);
 
-    // Outcome de una microtask = ground-truth REAL sobre ese (need, profile).
-    // Lo registramos como feedback para que el motor ICS lo absorba en futuros
-    // rankings. Es la señal más fuerte que tenemos hasta que haya contrataciones
-    // formales.
+    // === Doble persistencia de la evaluación ===
+    //
+    // 1) microtask_outcome (legacy, alimenta el motor ICS):
+    //    - signalType="microtask_outcome", targetType="match"
+    //    - es la señal de calibración del scoring
+    //
+    // 2) company_feedback_to_youth (v3, alimenta el inbox del joven):
+    //    - targetType="profile", targetId=task.profileId
+    //    - aparece en /joven/perfil/[id] dentro de <YouthFeedbackInbox>
+    //
+    // El bug que esto resuelve: antes solo se persistía (1). El joven veía
+    // su rating en /joven/tareas/[id] (porque lee companyComment del doc
+    // directo), pero NO en el inbox del perfil — el founder pensaba "le
+    // dejé feedback" y al joven no se le reflejaba.
     if (task.needId) {
       try {
         await recordFeedback({
@@ -74,10 +84,43 @@ export async function POST(req: NextRequest) {
           note: `microtask_evaluated:${taskId}`,
         });
       } catch (e) {
-        // Si falla el feedback, NO bloqueamos la evaluación de la tarea —
-        // solo perdemos esa señal. El rating sigue guardado en el documento.
-        console.warn("[microtask/evaluar] feedback save failed:", (e as Error).message);
+        console.warn("[microtask/evaluar] outcome feedback save failed:", (e as Error).message);
       }
+    }
+
+    // Inbox feedback: SIEMPRE creamos uno cuando hay rating, con o sin
+    // comment. Sin esto, la opinión del founder sobre la microtask quedaba
+    // huérfana del perfil del joven.
+    try {
+      const cleanComment = (comment ?? "").trim();
+      const inboxText = cleanComment
+        ? cleanComment
+        : `Microtask "${task.title}" evaluada con ${rating}/5.`;
+      await recordFeedback({
+        // matchId legacy compatible — incluye userId del founder para no
+        // colisionar con otros founders que evalúen al mismo joven.
+        matchId: `profile__${task.profileId}__company_feedback_to_youth__by_${task.companyId}__via_${taskId}`,
+        needId: task.needId,
+        profileId: task.profileId,
+        useful: rating >= 3,
+        // v3 fields — esto es lo que el inbox del joven realmente lee:
+        touchpoint: "company_feedback_to_youth",
+        kind: "explicit",
+        targetType: "profile",
+        targetId: task.profileId,
+        userId: task.companyId,
+        userRole: "empresa",
+        rating: rating,
+        text: inboxText,
+        authorDisplayName: task.companyName,
+        score: rating,
+        signalType: "explicit_vote",
+        // Note traza el origen para que el componente pueda diferenciar
+        // (futuro): "viene de la evaluación de tarea X".
+        note: `via_microtask:${taskId}`,
+      });
+    } catch (e) {
+      console.warn("[microtask/evaluar] inbox feedback save failed:", (e as Error).message);
     }
 
     const updated = await getMicroTask(taskId);
