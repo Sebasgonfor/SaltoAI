@@ -193,7 +193,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               Guardado en la nube
             </Badge>
           ) : storage === 'memory' ? (
-            <Badge variant="outline" className="border-amber-200 bg-amber-50/50 text-amber-900">
+            <Badge variant="outline" className="border-emerald-200 bg-emerald-50/50 text-emerald-900">
               Solo en esta sesión · configura Firebase
             </Badge>
           ) : null}
@@ -304,13 +304,13 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
               No hay user real al otro lado. Esconder CTAs accionables para
               que el founder no mande feedback al vacío. */}
           {isDemo && (
-            <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex items-start gap-3">
-              <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm leading-relaxed">
-                <div className="font-semibold text-amber-900 mb-0.5">
+                <div className="font-semibold text-emerald-900 mb-0.5">
                   Este perfil es de demostración
                 </div>
-                <p className="text-amber-800 text-xs">
+                <p className="text-emerald-800 text-xs">
                   No corresponde a un usuario real autenticado, así que no recibirá
                   tu feedback ni microtasks. Sirve para que veas cómo se ve un
                   Perfil de Evidencia completo. Para acciones reales, buscá
@@ -471,7 +471,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         <div className="bg-white border border-slate-200 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-semibold mb-1">Rasgos</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">Rasgos</div>
               <h3 className="font-display font-semibold text-xl text-slate-900">Cómo trabajas</h3>
             </div>
             <span className="text-3xl font-display font-bold text-slate-200 tabular-nums">{perfil.traits.length}</span>
@@ -484,7 +484,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 <Badge
                   key={i}
                   variant="outline"
-                  className="bg-amber-50/40 border-amber-200 text-amber-900 px-3 py-1 text-sm font-medium"
+                  className="bg-emerald-50/40 border-emerald-200 text-emerald-900 px-3 py-1 text-sm font-medium"
                 >
                   {trait}
                 </Badge>

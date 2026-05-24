@@ -72,8 +72,8 @@ export function NavLink({
     >
       {shortLabel ? (
         <>
-          <span className="hidden xl:inline">{label}</span>
-          <span className="xl:hidden">{shortLabel}</span>
+          <span className="hidden lg:inline">{label}</span>
+          <span className="lg:hidden">{shortLabel}</span>
         </>
       ) : (
         label

@@ -8,12 +8,14 @@ import { SaltoLogo } from '@/components/ui/salto-logo';
 
 type Props = {
   logoHref?: string;
-  /** Nav horizontal visible desde `lg` (1024px); tablet usa drawer. */
+  /** Nav horizontal visible desde `md` (768px); móvil usa drawer. */
   desktopNav: React.ReactNode;
   /** Nav vertical del drawer; recibe `close` para cerrar al navegar. */
   drawerNav: (close: () => void) => React.ReactNode;
   /** Acciones a la derecha en móvil (p. ej. UserButton). */
   mobileTrailing?: React.ReactNode;
+  /** Acciones fuera del nav con scroll (p. ej. UserButton en desktop). */
+  desktopTrailing?: React.ReactNode;
 };
 
 export function ResponsiveRoleHeader({
@@ -21,6 +23,7 @@ export function ResponsiveRoleHeader({
   desktopNav,
   drawerNav,
   mobileTrailing,
+  desktopTrailing,
 }: Props) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -40,28 +43,36 @@ export function ResponsiveRoleHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-20 px-4 sm:px-6 h-14 lg:h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-50 px-4 sm:px-6 h-14 md:h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 sm:gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="lg:hidden p-2 -ml-1 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+            className="md:hidden p-2 -ml-1 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
             aria-label="Abrir menú"
           >
             <Menu size={20} />
           </button>
           <Link href={logoHref} className="flex items-center shrink-0 min-w-0">
-            <SaltoLogo variant="full" size={32} className="lg:hidden max-w-[calc(100vw-7rem)]" />
-            <SaltoLogo variant="full" size={56} className="hidden lg:inline-flex" />
+            <SaltoLogo variant="full" size={32} className="md:hidden max-w-[calc(100vw-7rem)]" />
+            <SaltoLogo variant="full" size={48} className="hidden md:inline-flex" />
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-1 text-sm font-medium min-w-0 flex-1 justify-end overflow-x-auto">
-          {desktopNav}
-        </nav>
+        <div className="hidden md:flex items-center gap-2 min-w-0 flex-1 justify-end">
+          <nav className="flex items-center gap-0.5 text-sm font-medium min-w-0 overflow-x-auto scrollbar-thin">
+            {desktopNav}
+          </nav>
+          {desktopTrailing ? (
+            <>
+              <div className="h-5 w-px bg-slate-200 shrink-0" aria-hidden />
+              <div className="flex items-center shrink-0">{desktopTrailing}</div>
+            </>
+          ) : null}
+        </div>
 
         {mobileTrailing ? (
-          <div className="flex items-center gap-1 flex-shrink-0 lg:hidden">{mobileTrailing}</div>
+          <div className="flex items-center gap-1 flex-shrink-0 md:hidden">{mobileTrailing}</div>
         ) : null}
       </header>
 
@@ -70,7 +81,7 @@ export function ResponsiveRoleHeader({
           <>
             <motion.button
               type="button"
-              className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
+              className="fixed inset-0 bg-slate-900/40 z-40 md:hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -78,7 +89,7 @@ export function ResponsiveRoleHeader({
               onClick={close}
             />
             <motion.aside
-              className="fixed top-0 left-0 bottom-0 w-[min(100vw-3rem,18rem)] bg-white z-50 lg:hidden shadow-xl overflow-y-auto flex flex-col"
+              className="fixed top-0 left-0 bottom-0 w-[min(100vw-3rem,18rem)] bg-white z-50 md:hidden shadow-xl overflow-y-auto flex flex-col"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}

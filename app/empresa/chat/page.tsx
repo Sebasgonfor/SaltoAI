@@ -145,7 +145,6 @@ function buildOpeningMessage(name: string): ChatMessage {
   };
 }
 
-
 export default function ChatEmpresa() {
   const router = useRouter();
   const { user } = useAuth();

@@ -986,7 +986,7 @@ function ChatJoven() {
             {interviewMode === 'voice' ? (
               <>
                 {liveError && (
-                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3" role="alert">
+                  <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-3" role="alert">
                     {liveError}
                   </p>
                 )}
@@ -994,7 +994,7 @@ function ChatJoven() {
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     {liveStatus === 'connecting' && (
                       <>
-                        <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
                         Conectando…
                       </>
                     )}
@@ -1106,7 +1106,7 @@ function ChatJoven() {
                         type="button"
                         size="lg"
                         variant="outline"
-                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-amber-300"
+                        className="h-20 w-20 rounded-full p-0 flex-shrink-0 border-2 border-emerald-300"
                         disabled
                         aria-label="Conectando"
                       >
@@ -1123,7 +1123,7 @@ function ChatJoven() {
             ) : (
               <>
                 {voiceError && (
-                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3" role="alert">
+                  <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-3" role="alert">
                     {voiceError}
                   </p>
                 )}
