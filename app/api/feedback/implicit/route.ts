@@ -27,9 +27,12 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       needId?: string;
       profileId?: string;
-      signal: "connect" | "microtask_proposed" | "outcome";
+      signal: "connect" | "microtask_proposed" | "outcome" | "joven_interest";
       score?: number; // solo para outcome
       icsAtTime?: number;
+      /** Solo para joven_interest: el rol que el joven indica querer aplicar.
+       * Mejora la traza cuando una empresa publicó múltiples needs. */
+      jovenSource?: "oportunidades" | "perfil" | "match";
     };
 
     if (!body.needId || !body.profileId || !body.signal) {
@@ -44,6 +47,7 @@ export async function POST(req: NextRequest) {
     let signalType: FeedbackSignal;
     let useful: boolean;
     let score: number | undefined;
+    let source: "empresa_match" | "joven_perfil" | "other" = "empresa_match";
     switch (body.signal) {
       case "connect":
         signalType = "implicit_connect";
@@ -59,10 +63,18 @@ export async function POST(req: NextRequest) {
         // Mapeo de rating a useful: >=4 sí, <=2 no, 3 neutro.
         useful = (score ?? 3) >= 4;
         break;
+      case "joven_interest":
+        // El joven mostró interés en una oportunidad. Bidireccional con
+        // implicit_connect (que es del founder). Cuando hay ambas, es match
+        // mutuo de alta señal — el motor lo trata como evidencia fuerte.
+        signalType = "joven_interest";
+        useful = true;
+        source = "joven_perfil";
+        break;
       default:
         log.end({ status: 400, extra: { reason: "invalid_signal" } });
         return NextResponse.json(
-          { error: "signal debe ser connect | microtask_proposed | outcome" },
+          { error: "signal debe ser connect | microtask_proposed | outcome | joven_interest" },
           { status: 400 }
         );
     }
@@ -73,11 +85,11 @@ export async function POST(req: NextRequest) {
       needId: body.needId,
       profileId: body.profileId,
       useful,
-      source: "empresa_match",
+      source,
       signalType,
       ...(score !== undefined && { score }),
       ...(typeof body.icsAtTime === "number" && { icsAtTime: body.icsAtTime }),
-      note: `implicit:${body.signal}`,
+      note: `implicit:${body.signal}${body.jovenSource ? `:${body.jovenSource}` : ""}`,
     });
 
     log.end({

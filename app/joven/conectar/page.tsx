@@ -14,6 +14,8 @@ import {
   MessageSquareQuote,
   ChevronDown,
   ChevronUp,
+  CheckCircle2,
+  Loader2,
   RefreshCw,
 } from 'lucide-react';
 import type { Gender, OpportunityMatch, Profile } from '@/lib/types';
@@ -100,6 +102,12 @@ function ConectarContent() {
   const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Set de needIds donde el joven ya expresó interés. Persiste en
+  // localStorage por profileId para que el botón siga marcado "Conectaste"
+  // después de un refresh.
+  const [connectedNeeds, setConnectedNeeds] = useState<Set<string>>(new Set());
+  // needId que está en proceso de "conectar" (mientras corre el POST).
+  const [connectingNeedId, setConnectingNeedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profileIdFromUrl) {
@@ -111,6 +119,77 @@ function ConectarContent() {
       }
     }
   }, [profileIdFromUrl]);
+
+  // Restaurar el set de necesidades a las que ya conectó este joven.
+  // Por profileId — no cruzamos sesiones.
+  useEffect(() => {
+    if (!profileId) return;
+    try {
+      const raw = localStorage.getItem(`salto.connected_needs.${profileId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        if (Array.isArray(parsed)) setConnectedNeeds(new Set(parsed));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [profileId]);
+
+  /**
+   * Registra que el joven quiere conectar con una empresa. MVP sin mensajería:
+   *   1. POST /api/feedback/implicit con signalType="joven_interest" — la
+   *      empresa lo verá como señal bidireccional (si ya hubo profile_click
+   *      del founder, es match mutuo de alta señal).
+   *   2. Persiste en localStorage para que el botón quede "Conectaste" tras
+   *      refresh.
+   *   3. UI optimista — marca antes de que vuelva el server. Si falla, rollback.
+   */
+  const handleConnect = async (needId: string, ics: number) => {
+    if (!profileId || connectingNeedId || connectedNeeds.has(needId)) return;
+    setConnectingNeedId(needId);
+    // Optimistic
+    const previous = connectedNeeds;
+    const next = new Set(connectedNeeds);
+    next.add(needId);
+    setConnectedNeeds(next);
+    try {
+      localStorage.setItem(
+        `salto.connected_needs.${profileId}`,
+        JSON.stringify(Array.from(next)),
+      );
+    } catch {
+      /* quota */
+    }
+
+    try {
+      const res = await fetch('/api/feedback/implicit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          needId,
+          profileId,
+          signal: 'joven_interest',
+          icsAtTime: ics,
+          jovenSource: 'oportunidades',
+        }),
+      });
+      if (!res.ok) throw new Error('feedback save failed');
+    } catch {
+      // Rollback
+      setConnectedNeeds(previous);
+      try {
+        localStorage.setItem(
+          `salto.connected_needs.${profileId}`,
+          JSON.stringify(Array.from(previous)),
+        );
+      } catch {
+        /* ignore */
+      }
+      setError('No pudimos registrar tu interés. Inténtalo de nuevo.');
+    } finally {
+      setConnectingNeedId(null);
+    }
+  };
 
   const fetchOpportunities = useMemo(
     () =>
@@ -401,23 +480,41 @@ function ConectarContent() {
                 )}
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-3">
-                  <Button
-                    className="gap-2"
-                    disabled
-                    title="Próximamente: mensajería directa"
-                    onClick={() => {
-                      // Aunque el botón esté disabled hoy, registramos el
-                      // intent: el joven YA expresó interés. Es señal pura.
-                      emit({
-                        touchpoint: 'opportunity_click',
-                        targetType: 'need',
-                        targetId: opp.needId,
-                        icsAtTime: opp.ics,
-                      });
-                    }}
-                  >
-                    Quiero conectar
-                  </Button>
+                  {(() => {
+                    const alreadyConnected = connectedNeeds.has(opp.needId);
+                    const isConnecting = connectingNeedId === opp.needId;
+                    return (
+                      <Button
+                        className="gap-2"
+                        disabled={alreadyConnected || isConnecting || !profileId}
+                        onClick={() => {
+                          // Doble track: el emit v3 sigue alimentando el
+                          // dashboard de flywheel; handleConnect persiste la
+                          // señal bidireccional joven_interest para que el
+                          // founder lo vea como "match mutuo".
+                          emit({
+                            touchpoint: 'opportunity_click',
+                            targetType: 'need',
+                            targetId: opp.needId,
+                            icsAtTime: opp.ics,
+                          });
+                          void handleConnect(opp.needId, opp.ics);
+                        }}
+                      >
+                        {alreadyConnected ? (
+                          <>
+                            <CheckCircle2 size={14} /> Interés registrado
+                          </>
+                        ) : isConnecting ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" /> Registrando…
+                          </>
+                        ) : (
+                          'Quiero conectar'
+                        )}
+                      </Button>
+                    );
+                  })()}
                   {opp.breakdown ? (
                     <Button
                       variant="outline"
