@@ -391,11 +391,20 @@ export default function EmpresaDashboardPage() {
         />
       </section>
 
-      {/* Widgets enriquecidos — pipeline funnel + calibración del motor +
-          salud por necesidad + top candidatos cross-need + financials.
-          Todo derivado de /api/dashboard/empresa (un solo request) — el
-          componente maneja su propio loading state. */}
-      <EmpresaWidgets uid={user.uid} />
+      {/* Widgets enriquecidos — pasaporte visual del founder: hero dark +
+          ADN de búsqueda (radar) + inversión + top candidatos + pipeline
+          funnel + estilo founder + salud por necesidad + calibración. Una
+          sola request al endpoint. */}
+      <EmpresaWidgets
+        uid={user.uid}
+        companyName={
+          needs[0]?.companyName ||
+          user.displayName ||
+          (user.email ? user.email.split('@')[0] : 'Mi empresa')
+        }
+        needs={needs}
+        tasks={tasks}
+      />
 
       {/* CTA + lista de necesidades */}
       <section>
