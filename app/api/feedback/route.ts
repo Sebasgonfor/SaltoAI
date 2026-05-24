@@ -85,12 +85,20 @@ function isV3(p: AnyPayload): p is V3Payload {
 /**
  * Construye el `matchId` legacy a partir del payload (necesario porque el
  * shape de Firestore requiere `matchId` no-vacío). Usa el targetId/touchpoint
- * para que las señales de los 17 touchpoints sean idempotentes sin colisionar.
+ * para que las señales de los 17+ touchpoints sean idempotentes sin colisionar.
+ *
+ * Cuando hay `userId` lo incluimos: dos founders dejándole `company_feedback_to_youth`
+ * al mismo joven deben tener `matchId` distintos (si no, parece que es el
+ * mismo founder votando dos veces, ensucia agregaciones). Para señales sin
+ * userId (anónimas) seguimos la fórmula simple.
  */
 function buildMatchId(p: AnyPayload): string {
   if (p.matchId) return p.matchId;
   if (p.needId && p.profileId) return `${p.needId}__${p.profileId}`;
-  if (isV3(p) && p.targetType && p.targetId) return `${p.targetType}__${p.targetId}__${p.touchpoint}`;
+  if (isV3(p) && p.targetType && p.targetId) {
+    const base = `${p.targetType}__${p.targetId}__${p.touchpoint}`;
+    return p.userId ? `${base}__by_${p.userId}` : base;
+  }
   return `signal__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`;
 }
 
