@@ -220,8 +220,8 @@ export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
         ]}
       />
 
-      {/* ─── Grid 3-col superior ─────────────────────────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-4">
+      {/* ─── Grid 3-col superior — items-stretch para misma altura ─── */}
+      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
         <RadarCard
           title="ADN de búsqueda"
           subtitle="Tu motor en 5 ejes"
@@ -234,8 +234,8 @@ export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
       {/* ─── Pipeline funnel ─────────────────────────────────────────── */}
       <PipelineCard funnel={data.pipelineFunnel} />
 
-      {/* ─── Grid 2x2 estilo + Necesidades con salud ─────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-4">
+      {/* ─── Grid estilo + Necesidades con salud ─────────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
         <StyleGrid tiles={inferStyleTiles(needs, tasks, data)} className="lg:col-span-2" />
         <NeedsHealthCard needs={data.needsWithHealth} />
       </div>
@@ -372,38 +372,37 @@ function RadarCard({
 }) {
   if (axes.length === 0) {
     return (
-      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
         <SectionTitle title={title} />
         <p className="text-sm text-stone-500 mt-3">Sin datos suficientes.</p>
       </div>
     );
   }
-  const size = 180;
+  // Mismo principio que el del joven: radar grande centrado + label/valor
+  // en el vértice (sin bars laterales redundantes).
+  const size = 240;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = size / 2 - 14;
+  const radius = size / 2 - 32;
   const N = axes.length;
 
-  const points = axes.map((a, i) => {
-    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
-    const v = a.value / 100;
-    return {
-      x: cx + Math.cos(angle) * radius * v,
-      y: cy + Math.sin(angle) * radius * v,
-    };
-  });
-  const polygon = points.map((p) => `${p.x},${p.y}`).join(' ');
+  const polygonPoints = axes
+    .map((a, i) => {
+      const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+      const v = a.value / 100;
+      const x = cx + Math.cos(angle) * radius * v;
+      const y = cy + Math.sin(angle) * radius * v;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
   const rings = [0.25, 0.5, 0.75, 1.0];
-  const axisLines = axes.map((_, i) => {
-    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
-    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
-  });
 
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title={title} subtitle={subtitle} />
-      <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-        <svg width={size} height={size} className="flex-shrink-0">
+      <div className="mt-2 flex-1 flex items-center justify-center">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="max-w-full h-auto">
           {rings.map((r, i) => (
             <polygon
               key={i}
@@ -420,48 +419,78 @@ function RadarCard({
               strokeWidth={1}
             />
           ))}
-          {axisLines.map((p, i) => (
-            <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#e7e5e4" strokeWidth={1} />
-          ))}
-          <polygon points={polygon} fill="rgba(234, 88, 12, 0.18)" stroke="#ea580c" strokeWidth={2} />
-          {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={3} fill="#ea580c" />
-          ))}
+          {axes.map((_, i) => {
+            const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+            return (
+              <line
+                key={i}
+                x1={cx}
+                y1={cy}
+                x2={cx + Math.cos(angle) * radius}
+                y2={cy + Math.sin(angle) * radius}
+                stroke="#e7e5e4"
+                strokeWidth={1}
+              />
+            );
+          })}
+          <polygon
+            points={polygonPoints}
+            fill="rgba(234, 88, 12, 0.18)"
+            stroke="#ea580c"
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
           {axes.map((a, i) => {
             const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
-            const x = cx + Math.cos(angle) * (radius + 6);
-            const y = cy + Math.sin(angle) * (radius + 6);
+            const v = a.value / 100;
+            const vx = cx + Math.cos(angle) * radius * v;
+            const vy = cy + Math.sin(angle) * radius * v;
+            const lx = cx + Math.cos(angle) * (radius + 18);
+            const ly = cy + Math.sin(angle) * (radius + 18);
             const anchor: 'start' | 'middle' | 'end' =
-              x < cx - 1 ? 'end' : x > cx + 1 ? 'start' : 'middle';
+              Math.abs(Math.cos(angle)) < 0.3
+                ? 'middle'
+                : Math.cos(angle) < 0
+                  ? 'end'
+                  : 'start';
             return (
-              <text
-                key={i}
-                x={x}
-                y={y}
-                fontSize={9}
-                textAnchor={anchor}
-                dominantBaseline="middle"
-                fill="#78716c"
-                fontWeight="600"
-              >
-                {a.axis}
-              </text>
+              <g key={i}>
+                <circle cx={vx} cy={vy} r={3.5} fill="#ea580c" />
+                <text
+                  x={lx}
+                  y={ly - 4}
+                  fontSize={10}
+                  textAnchor={anchor}
+                  fill="#78716c"
+                  fontWeight="600"
+                >
+                  {a.axis}
+                </text>
+                <text
+                  x={lx}
+                  y={ly + 8}
+                  fontSize={11}
+                  textAnchor={anchor}
+                  fill="#1c1917"
+                  fontWeight="700"
+                  className="tabular-nums"
+                >
+                  {a.value}
+                </text>
+              </g>
             );
           })}
         </svg>
-        <div className="flex-1 w-full space-y-2 min-w-0">
-          {axes.map((a) => (
-            <div key={a.axis} className="flex items-center gap-3 text-sm">
-              <span className="text-stone-700 w-24 truncate text-xs">{a.axis}</span>
-              <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                <div className="h-full bg-orange-500 transition-all" style={{ width: `${a.value}%` }} />
-              </div>
-              <span className="font-mono tabular-nums text-xs font-bold text-stone-900 w-7 text-right">
-                {a.value}
-              </span>
-            </div>
-          ))}
-        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[10px] text-stone-500 border-t border-stone-100 pt-3">
+        {axes.map((a) => (
+          <div key={a.axis} className="flex items-center gap-1.5 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+            <span className="truncate">
+              <strong className="text-stone-700 font-semibold">{a.axis}</strong> · {a.raw}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -476,6 +505,32 @@ function InversionCard({
   financials: DashboardEmpresaData['financials'];
   tasks: MicroTask[];
 }) {
+  // Empty state: si todavía no hay microtasks creadas, no mostramos las
+  // 4 bars a $0 (ruido visual). Sustituimos por CTA accionable.
+  if (financials.totalInvestedCOP === 0 && tasks.length === 0) {
+    return (
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
+        <SectionTitle title="Inversión en talento" />
+        <div className="mt-4 flex-1 flex flex-col items-center justify-center text-center px-3 py-6">
+          <div className="text-5xl mb-3" aria-hidden>🎯</div>
+          <h3 className="font-display font-bold text-base text-stone-900 mb-1">
+            Tu primera audición pagada
+          </h3>
+          <p className="text-xs text-stone-500 leading-relaxed max-w-xs">
+            En lugar de un CV, pagás una microtask acotada que el candidato
+            entrega. Cuando crees la primera, vas a ver acá el desglose
+            por status (pagadas, evaluadas, en progreso).
+          </p>
+        </div>
+        <div className="border-t border-stone-100 pt-3 mt-2">
+          <Link href="/empresa/matches" className="text-xs text-orange-700 font-semibold hover:underline inline-flex items-center gap-1.5">
+            Proponer microtask a un candidato <ArrowRight size={11} />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const paidSum = tasks.filter((t) => t.status === 'paid').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
   const evaluatedSum = tasks.filter((t) => t.status === 'evaluated').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
   const deliveredSum = tasks.filter((t) => t.status === 'delivered').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
@@ -483,16 +538,17 @@ function InversionCard({
     .filter((t) => t.status === 'pending' || t.status === 'in_progress')
     .reduce((a, t) => a + (t.amountCOP ?? 0), 0);
 
-  const max = Math.max(1, paidSum, evaluatedSum, deliveredSum, pendingSum);
   const rows: { label: string; value: number; color: string }[] = [
     { label: 'Pagadas', value: paidSum, color: 'bg-emerald-500' },
     { label: 'Evaluadas', value: evaluatedSum, color: 'bg-emerald-400' },
     { label: 'Por evaluar', value: deliveredSum, color: 'bg-amber-400' },
     { label: 'En progreso', value: pendingSum, color: 'bg-stone-300' },
-  ];
+  ].filter((r) => r.value > 0);
+
+  const max = Math.max(1, ...rows.map((r) => r.value));
 
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Inversión en talento" />
       <div className="mt-3">
         <div className="font-display font-bold text-4xl text-stone-900 tabular-nums leading-none">
@@ -503,18 +559,24 @@ function InversionCard({
           {financials.averageTaskCOP > 0 && ` · prom $${financials.averageTaskCOP.toLocaleString('es-CO')}/u`}
         </div>
       </div>
-      <div className="mt-5 space-y-2.5">
-        {rows.map((r) => (
-          <div key={r.label} className="flex items-center gap-3 text-sm">
-            <span className="text-stone-700 flex-1 truncate text-xs">{r.label}</span>
-            <div className="w-24 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-              <div className={`h-full ${r.color}`} style={{ width: `${(r.value / max) * 100}%` }} />
-            </div>
-            <span className="font-mono tabular-nums text-xs font-semibold text-stone-900 w-16 text-right">
-              ${r.value.toLocaleString('es-CO')}
-            </span>
+      <div className="mt-5 flex-1 space-y-2.5">
+        {rows.length === 0 ? (
+          <div className="text-xs text-stone-500 italic px-3 py-2 rounded-lg bg-stone-50">
+            Aún no hay desglose por status.
           </div>
-        ))}
+        ) : (
+          rows.map((r) => (
+            <div key={r.label} className="flex items-center gap-3 text-sm">
+              <span className="text-stone-700 flex-1 truncate text-xs">{r.label}</span>
+              <div className="w-24 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div className={`h-full ${r.color}`} style={{ width: `${(r.value / max) * 100}%` }} />
+              </div>
+              <span className="font-mono tabular-nums text-xs font-semibold text-stone-900 w-16 text-right">
+                ${r.value.toLocaleString('es-CO')}
+              </span>
+            </div>
+          ))
+        )}
       </div>
       {financials.pendingCount > 0 && (
         <div className="mt-5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center gap-2 text-xs text-amber-900">
@@ -534,11 +596,11 @@ function CandidatesCard({
   candidates: DashboardEmpresaData['topCandidates'];
 }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
-      <div className="flex items-center justify-between mb-1">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-1">
         <SectionTitle title="Top candidatos" />
         {candidates.length > 0 && (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold whitespace-nowrap flex-shrink-0">
             {candidates.length} cross-need
           </span>
         )}
@@ -720,11 +782,11 @@ function StyleGrid({
   className?: string;
 }) {
   return (
-    <div className={`bg-white border border-stone-200 rounded-3xl p-5 md:p-6 ${className}`}>
+    <div className={`bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col ${className}`}>
       <SectionTitle title="Estilo de founder" />
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 flex-1">
         {tiles.map((t) => (
-          <div key={t.label} className="rounded-2xl border border-stone-200 bg-stone-50/40 p-4">
+          <div key={t.label} className="rounded-2xl border border-stone-200 bg-stone-50/40 p-4 flex flex-col">
             <div className="text-3xl leading-none mb-3">{t.emoji}</div>
             <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
               {t.label}
@@ -749,15 +811,17 @@ function NeedsHealthCard({
 }) {
   if (needs.length === 0) {
     return (
-      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
         <SectionTitle title="Salud de búsquedas" />
-        <p className="text-sm text-stone-500 mt-3">Sin necesidades publicadas aún.</p>
+        <div className="flex-1 flex items-center">
+          <p className="text-sm text-stone-500">Sin necesidades publicadas aún.</p>
+        </div>
       </div>
     );
   }
   const sorted = [...needs].sort((a, b) => a.healthScore - b.healthScore);
   return (
-    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title="Salud de búsquedas" subtitle="Las peores arriba" />
       <div className="mt-4 space-y-2">
         {sorted.slice(0, 5).map((n) => {

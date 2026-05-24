@@ -287,9 +287,11 @@ export default function DashboardPage() {
           >
             <Menu size={18} />
           </button>
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center">
+            {/* variant=full ya incluye icono + texto "SaltoAI" — antes había
+                un <span>SaltoAI</span> redundante que mostraba el wordmark
+                dos veces en el topbar. */}
             <SaltoLogo variant="full" size={26} />
-            <span className="font-display font-semibold text-slate-900 tracking-tight text-sm">SaltoAI</span>
           </Link>
         </div>
         <UserButton />
@@ -322,9 +324,8 @@ export default function DashboardPage() {
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               >
                 <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center">
                     <SaltoLogo variant="full" size={24} />
-                    <span className="font-display font-semibold text-slate-900 text-sm">SaltoAI</span>
                   </div>
                   <button
                     type="button"
