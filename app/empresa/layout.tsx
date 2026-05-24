@@ -43,7 +43,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
         <RoleGate role="empresa">{children}</RoleGate>
       </main>
       <footer className="border-t border-slate-200 py-6 px-6 text-xs text-slate-500 flex justify-between max-w-7xl mx-auto w-full">
-        <span>Salto · Calidad, no volumen</span>
+        <span>SaltoAI · Calidad, no volumen</span>
         <span>Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI</span>
       </footer>
     </div>

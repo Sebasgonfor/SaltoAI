@@ -170,7 +170,7 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
               <div className="relative">
                 <div className="flex items-center gap-2 mb-1">
                   <Sparkles size={14} className="text-emerald-400" />
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Pre-evaluación de Salto IA</span>
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Pre-evaluación de SaltoAI</span>
                 </div>
                 <div className="flex items-baseline gap-3 mb-5">
                   <span className="font-display font-bold text-6xl text-emerald-400 tabular-nums leading-none">

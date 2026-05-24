@@ -25,7 +25,7 @@ function parseBasics(raw: unknown): JovenBasics | null {
   return { name, age, gender };
 }
 
-const EXTRACTION_PROMPT = `Eres el extractor de Perfil de Evidencia de Salto.
+const EXTRACTION_PROMPT = `Eres el extractor de Perfil de Evidencia de SaltoAI.
 A partir de la transcripción de la entrevista, extrae SOLO lo que el joven dijo, con evidencia citada.
 
 Reglas estrictas (anti-alucinación):
@@ -58,7 +58,7 @@ Otros campos:
 - traits: 2-5 rasgos conductuales observados, no juicios. Buenos: "Tolerancia al caos", "Autodidacta",
   "Orientación a resultados". Malos: "Buena persona", "Trabajador", "Dedicado".
 - summary: 2-3 frases en lenguaje natural describiendo a la persona y su trayectoria informal.
-- name: si la persona dijo su nombre, úsalo; si no, "Candidato/a Salto".
+- name: si la persona dijo su nombre, úsalo; si no, "Candidato/a SaltoAI".
 
 Idioma: español neutro latinoamericano.
 Devuelve JSON estricto con el schema indicado.`;

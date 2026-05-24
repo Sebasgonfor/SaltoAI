@@ -39,7 +39,7 @@ export default function PerfilIndex() {
         Tu Perfil de Evidencia se construye después de conversar.
       </h1>
       <p className="text-slate-600 leading-relaxed mb-8">
-        Primero tus datos básicos (nombre, edad), luego la entrevista. Salto extrae habilidades con evidencia citada y genera tu CV para ATS.
+        Primero tus datos básicos (nombre, edad), luego la entrevista. SaltoAI extrae habilidades con evidencia citada y genera tu CV para ATS.
       </p>
       <Link href="/joven/chat">
         <Button size="lg" className="gap-2">
