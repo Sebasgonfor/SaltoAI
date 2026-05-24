@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Sparkles, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio } from 'lucide-react';
+import { Sparkles, User, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { RoleGate } from '@/components/auth/role-gate';
@@ -484,8 +484,11 @@ function ChatJoven() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12 w-full">
-      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    // Full-height layout: ocupa todo el viewport menos los 80px del topbar
+    // sticky del layout (h-20). El header del chat y el grid se reparten ese
+    // espacio sin generar scroll externo en el body.
+    <div className="lg:h-[calc(100dvh-80px)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+      <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
             Paso 2 de 2 · Entrevista
@@ -574,14 +577,14 @@ function ChatJoven() {
         <div className="mb-4 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3">{formError}</div>
       )}
 
-      <div className="grid lg:grid-cols-12 gap-6">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[380px] max-h-[55vh] md:min-h-[520px] md:max-h-[600px] lg:min-h-[600px] lg:max-h-[700px] overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
+        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[480px] overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5 min-h-0">
             {displayMessages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
                   <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                    <Bot size={16} />
+                    <Sparkles size={16} />
                   </div>
                 )}
                 <div
@@ -594,9 +597,19 @@ function ChatJoven() {
                   <p className={`text-[15px] whitespace-pre-wrap ${msg.role === 'agent' ? 'font-display' : ''}`}>{msg.content}</p>
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600">
-                    <User size={16} />
-                  </div>
+                  user?.photoURL ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || 'Tú'}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-full flex-shrink-0 object-cover ring-2 ring-slate-100"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600">
+                      <User size={16} />
+                    </div>
+                  )
                 )}
               </div>
             ))}
@@ -607,15 +620,25 @@ function ChatJoven() {
                     <div className="px-4 py-2 rounded-2xl max-w-[85%] bg-slate-700/90 text-white text-sm italic">
                       {liveUserText}
                     </div>
-                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500">
-                      <User size={16} />
-                    </div>
+                    {user?.photoURL ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName || 'Tú'}
+                        referrerPolicy="no-referrer"
+                        className="w-9 h-9 rounded-full flex-shrink-0 object-cover ring-2 ring-slate-100 opacity-80"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500">
+                        <User size={16} />
+                      </div>
+                    )}
                   </div>
                 )}
                 {liveAgentText && (
                   <div className="flex gap-3 justify-start opacity-80">
                     <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600">
-                      <Bot size={16} />
+                      <Sparkles size={16} />
                     </div>
                     <div className="px-4 py-2 rounded-2xl max-w-[85%] bg-stone-50 border border-slate-100 text-slate-700 text-sm italic font-display">
                       {liveAgentText}
@@ -627,7 +650,7 @@ function ChatJoven() {
             {(loading || closing) && interviewMode === 'text' && (
               <div className="flex gap-3 justify-start">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                  <Bot size={16} />
+                  <Sparkles size={16} />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
@@ -642,7 +665,7 @@ function ChatJoven() {
             {closing && interviewMode === 'voice' && (
               <div className="flex gap-3 justify-start">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                  <Bot size={16} />
+                  <Sparkles size={16} />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
@@ -796,7 +819,7 @@ function ChatJoven() {
           </div>
         </section>
 
-        <aside className="lg:col-span-5 space-y-4 order-first lg:order-none">
+        <aside className="lg:col-span-5 space-y-4 order-first lg:order-none lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
           <div className="bg-slate-950 text-white rounded-3xl p-6 relative overflow-hidden">
             <div className="relative">
               <div className="flex items-center gap-2 mb-1">

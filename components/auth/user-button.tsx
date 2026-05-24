@@ -107,7 +107,7 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
           )}
           {account?.role === 'empresa' && (
             <Link
-              href="/empresa/publicar"
+              href="/empresa/chat"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
               role="menuitem"

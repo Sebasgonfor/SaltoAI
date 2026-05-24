@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
-  Bot,
-  User,
   Sparkles,
+  User,
   Layers,
   ArrowRight,
   Building2,
@@ -482,20 +481,17 @@ export default function ChatEmpresa() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-500 mt-6 max-w-sm mx-auto leading-relaxed">
-          ¿Preferís escribir tu necesidad en un solo texto largo?{' '}
-          <Link href="/empresa/publicar" className="text-emerald-700 underline">
-            Usar el formato anterior
-          </Link>
-          .
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12 w-full">
-      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    // Full-height layout: ocupa todo el viewport menos los 80px del topbar
+    // sticky del layout (h-20). El header del chat y el grid se reparten ese
+    // espacio sin generar scroll externo en el body. En mobile/pantallas
+    // bajas se relaja a min-h para no aplastar el contenido.
+    <div className="lg:h-[calc(100dvh-80px)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+      <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
             Paso 2 de 2 · Entrevista
@@ -555,14 +551,14 @@ export default function ChatEmpresa() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-12 gap-6">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[380px] max-h-[55vh] md:min-h-[520px] md:max-h-[600px] lg:min-h-[600px] lg:max-h-[700px] overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
+        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[480px] overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5 min-h-0">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
                   <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                    <Bot size={16} />
+                    <Sparkles size={16} />
                   </div>
                 )}
                 <div
@@ -577,16 +573,26 @@ export default function ChatEmpresa() {
                   </p>
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600">
-                    <User size={16} />
-                  </div>
+                  user?.photoURL ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || 'Tú'}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-full flex-shrink-0 object-cover ring-2 ring-slate-100"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600">
+                      <User size={16} />
+                    </div>
+                  )
                 )}
               </div>
             ))}
             {(loading || closing) && (
               <div className="flex gap-3 justify-start">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
-                  <Bot size={16} />
+                  <Sparkles size={16} />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
@@ -628,7 +634,7 @@ export default function ChatEmpresa() {
           </div>
         </section>
 
-        <aside className="lg:col-span-5 space-y-4">
+        <aside className="lg:col-span-5 space-y-4 lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
           <div className="bg-slate-950 text-white rounded-3xl p-6 relative overflow-hidden">
             <div className="relative">
               <div className="flex items-center gap-2 mb-1">
