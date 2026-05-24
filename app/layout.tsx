@@ -16,6 +16,10 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Salto - Tu primer empleo por potencial, no por CV',
   description: 'Conecta talento junior sin experiencia formal con startups y mipymes mediante matching de potencial impulsado por IA.',
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({

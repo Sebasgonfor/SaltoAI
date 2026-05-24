@@ -4,7 +4,7 @@ import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
 import { createProfile, getProfile, upsertProfileWithId, storageFromId } from "@/lib/db";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { validateForProfileExtraction } from "@/lib/input-validation";
+import { validateForProfileExtraction, parseJovenAge } from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage, Gender, JovenBasics, Profile } from "@/lib/types";
 
@@ -16,12 +16,12 @@ function parseBasics(raw: unknown): JovenBasics | null {
   if (!raw || typeof raw !== "object") return null;
   const b = raw as Record<string, unknown>;
   const name = typeof b.name === "string" ? b.name.trim() : "";
-  const age = typeof b.age === "number" ? b.age : Number(b.age);
+  const age = parseJovenAge(typeof b.age === "number" ? b.age : String(b.age ?? ""));
   const gender = b.gender as Gender;
   if (!name || name.length < 2) return null;
-  if (!Number.isFinite(age) || age < 16 || age > 35) return null;
+  if (age == null) return null;
   if (!VALID_GENDERS.includes(gender)) return null;
-  return { name, age: Math.round(age), gender };
+  return { name, age, gender };
 }
 
 const EXTRACTION_PROMPT = `Eres el extractor de Perfil de Evidencia de Salto.
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     if (!basics) {
       log.end({ status: 400, extra: { reason: "invalid_basics" } });
       return NextResponse.json(
-        { error: "Completa nombre, edad (16-35) y género antes de generar el perfil." },
+        { error: "Completa nombre, edad y género antes de generar el perfil." },
         { status: 400 }
       );
     }

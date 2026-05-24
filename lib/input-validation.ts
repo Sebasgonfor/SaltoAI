@@ -119,3 +119,22 @@ export function validateNeedDescription(raw: string): InterviewValidity {
   }
   return { ok: true };
 }
+
+export const JOVEN_AGE_MIN = 14;
+export const JOVEN_AGE_MAX = 99;
+
+/** Parsea edad desde formulario o persistencia (string o number). */
+export function parseJovenAge(raw: string | number | null | undefined): number | null {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return null;
+  const age = Math.round(n);
+  if (age < JOVEN_AGE_MIN || age > JOVEN_AGE_MAX) return null;
+  return age;
+}
+
+export function jovenAgeErrorMessage(): string {
+  return `Escribe una edad válida (${JOVEN_AGE_MIN}–${JOVEN_AGE_MAX} años).`;
+}
