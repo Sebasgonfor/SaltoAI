@@ -7,6 +7,7 @@ import {
   getMicroTask,
   getProfile,
 } from "@/lib/db";
+import { isDemoProfile } from "@/lib/profile-source";
 import type { MicroTask } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -91,6 +92,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "companyId, companyName, profileId, rawRequest son requeridos" },
         { status: 400 }
+      );
+    }
+
+    // Guard: no permitimos proponer microtasks contra perfiles demo
+    // (seed_xxx, legacy local_xxx). No hay user real al otro lado para
+    // recibirla. El founder vería "tarea creada" pero nadie la cumpliría.
+    if (isDemoProfile(body.profileId)) {
+      return NextResponse.json(
+        {
+          error:
+            "Este perfil es de demostración. No es un usuario real, así que no puede recibir microtasks. Buscá un candidato real desde tus matches.",
+          code: "demo_profile_no_destinatario",
+        },
+        { status: 400 },
       );
     }
 
