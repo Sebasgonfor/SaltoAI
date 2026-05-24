@@ -145,13 +145,14 @@ function inferCategory(profile: Profile | null): string {
   return 'Talento emergente';
 }
 
-/** ADN de 5 ejes — counts normalizados de lo que el perfil REALMENTE tiene. */
+/** ADN de 5 ejes — counts normalizados de lo que el perfil REALMENTE tiene.
+ *  Labels CORTOS (≤ 9 chars) para que entren en el SVG sin truncarse en
+ *  los vértices izquierdo y derecho (donde el textAnchor es end/start). */
 function computeRadar(
   profile: Profile | null,
   data: DashboardJovenData | null,
 ): { axis: string; value: number; raw: number; help: string }[] {
   if (!profile) return [];
-  // Caps razonables para que llenar el radar sea posible pero no trivial.
   const cap = (raw: number, max: number) =>
     Math.min(100, Math.round((raw / max) * 100));
 
@@ -164,9 +165,9 @@ function computeRadar(
   return [
     { axis: 'Evidencia', value: cap(evidence, 10), raw: evidence, help: 'Citas textuales en tu perfil' },
     { axis: 'Skills', value: cap(skills, 15), raw: skills, help: 'Habilidades declaradas' },
-    { axis: 'Verificación', value: data?.verifiedSkills.verifiedPct ?? 0, raw: verified, help: 'Skills con documento' },
+    { axis: 'Verificado', value: data?.verifiedSkills.verifiedPct ?? 0, raw: verified, help: 'Skills con documento' },
     { axis: 'Rasgos', value: cap(traits, 10), raw: traits, help: 'Cómo trabajas' },
-    { axis: 'Outcomes', value: cap(microtasks, 5), raw: microtasks, help: 'Microtasks completadas' },
+    { axis: 'Trabajos', value: cap(microtasks, 5), raw: microtasks, help: 'Microtasks completadas' },
   ];
 }
 
@@ -249,6 +250,10 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
           pendingCount={data.earnings.pendingCount}
           avgRating={data.earnings.averageRating}
           tasks={tasks}
+          profile={profile}
+          verifiedPct={data.verifiedSkills.verifiedPct}
+          inboxUnreplied={data.inboxSummary.unreplied}
+          profileId={profileId}
         />
         <OpportunitiesCard
           topOpportunity={data.topOpportunity}
@@ -300,13 +305,16 @@ function HeroDark({
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40 text-white p-5 md:p-7">
       <div className="absolute -top-20 -right-20 w-80 h-80 bg-amber-500/20 rounded-full blur-3xl" aria-hidden />
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
-        {/* Avatar */}
+        {/* Avatar — bajado de 20/24 a 16/18 para que no dominé visualmente
+            sobre el nombre y los stats. El usuario ES el contenido, no la
+            inicial. */}
         <div className="relative flex-shrink-0">
-          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-2xl md:text-3xl shadow-lg shadow-amber-900/40">
+          <div className="w-16 h-16 md:w-18 md:h-18 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl shadow-lg shadow-amber-900/40"
+               style={{ width: 72, height: 72 }}>
             {avatarText || '·'}
           </div>
-          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 border-2 border-stone-950 flex items-center justify-center">
-            <CheckCircle2 size={12} className="text-white" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-stone-950 flex items-center justify-center">
+            <CheckCircle2 size={10} className="text-white" />
           </div>
         </div>
 
@@ -426,15 +434,16 @@ function RadarCard({
     );
   }
 
-  // Antes: SVG 180 + bars laterales redundantes con el polígono. Las bars
-  // duplicaban la info y truncaban labels en columnas angostas.
-  // Ahora: radar grande centrado + valor de cada eje en su vértice (chip),
-  // y leyenda compacta debajo con (eje · valor) en chips.
-  const size = 240;
-  const cx = size / 2;
-  const cy = size / 2;
-  // Margen amplio para labels que viven AFUERA del último ring sin chocar.
-  const radius = size / 2 - 32;
+  // ViewBox horizontal MÁS ANCHO que el alto: los labels en los vértices
+  // laterales (3 y 9 horas) necesitan espacio extra para "Verificado" o
+  // "Trabajos" sin truncarse. Antes el SVG era cuadrado 240x240 y los
+  // textos se salían del card. Ahora 280x220 con el círculo centrado
+  // a la izquierda del centro horizontal — labels respiran.
+  const width = 280;
+  const height = 220;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width, height) / 2 - 38;
   const N = axes.length;
 
   const polygonPoints = axes
@@ -453,7 +462,7 @@ function RadarCard({
     <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title={title} subtitle={subtitle} />
       <div className="mt-2 flex-1 flex items-center justify-center">
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="max-w-full h-auto">
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="max-w-full h-auto">
           {/* Rings */}
           {rings.map((r, i) => (
             <polygon
@@ -556,43 +565,42 @@ function RadarCard({
 
 // ─── EarningsCard (presupuesto-like) ────────────────────────────────────────
 
+interface EarningsCardProps {
+  totalCOP: number;
+  completedCount: number;
+  pendingCount: number;
+  avgRating: number;
+  tasks: MicroTask[];
+  // Para el empty state accionable: contexto del joven para sugerir pasos.
+  profile: Profile;
+  verifiedPct: number;
+  inboxUnreplied: number;
+  profileId: string;
+}
+
 function EarningsCard({
   totalCOP,
   completedCount,
   pendingCount,
   avgRating,
   tasks,
-}: {
-  totalCOP: number;
-  completedCount: number;
-  pendingCount: number;
-  avgRating: number;
-  tasks: MicroTask[];
-}) {
-  // Empty state honesto: cuando todo está a $0, mostrar barras vacías es
-  // ruido visual. Mejor un mensaje claro + CTA + preview de lo que será
-  // este widget cuando haya data real.
+  profile,
+  verifiedPct,
+  inboxUnreplied,
+  profileId,
+}: EarningsCardProps) {
+  // Cuando el joven todavía no cobró NADA, una card "Ingresos $0" con
+  // 4 barras vacías es ruido + frustración. La reemplazamos por un
+  // checklist de PRÓXIMOS PASOS accionables — el dashboard te dice qué
+  // hacer ahora para llegar al primer ingreso. Cuando ya hay tasks, se
+  // muestra el desglose financiero clásico.
   if (totalCOP === 0 && tasks.length === 0) {
-    return (
-      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
-        <SectionTitle title="Ingresos por microtasks" />
-        <div className="mt-4 flex-1 flex flex-col items-center justify-center text-center px-3 py-6">
-          <div className="text-5xl mb-3" aria-hidden>💼</div>
-          <h3 className="font-display font-bold text-base text-stone-900 mb-1">
-            Tu primera microtask te espera
-          </h3>
-          <p className="text-xs text-stone-500 leading-relaxed max-w-xs">
-            Cuando una empresa te proponga una tarea pagada, vas a verla acá
-            con monto y status — y cuando cobres, el contador sube en tiempo real.
-          </p>
-        </div>
-        <div className="border-t border-stone-100 pt-3 mt-2">
-          <Link href="/joven/conectar" className="text-xs text-orange-700 font-semibold hover:underline inline-flex items-center gap-1.5">
-            Ver oportunidades activas <ArrowRight size={11} />
-          </Link>
-        </div>
-      </div>
-    );
+    return <NextStepsCard
+      profile={profile}
+      verifiedPct={verifiedPct}
+      inboxUnreplied={inboxUnreplied}
+      profileId={profileId}
+    />;
   }
 
   // Caso con tareas pero sin cobro todavía: mostrar bars solo de buckets
@@ -653,6 +661,124 @@ function EarningsCard({
           <span><strong>{pendingCount}</strong> tarea{pendingCount === 1 ? '' : 's'} en curso · acelerar la entrega libera más ingresos.</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── NextStepsCard — checklist accionable cuando aún no hay ingresos ────────
+
+interface Step {
+  done: boolean;
+  emoji: string;
+  title: string;
+  hint: string;
+  cta: { label: string; href: string };
+}
+
+function buildSteps(
+  profile: Profile,
+  verifiedPct: number,
+  inboxUnreplied: number,
+  profileId: string,
+): Step[] {
+  const hasEnoughSkills = (profile.skills?.length ?? 0) >= 5;
+  const hasEnoughEvidence = (profile.evidence?.length ?? 0) >= 3;
+  return [
+    {
+      done: hasEnoughSkills && hasEnoughEvidence,
+      emoji: '🎙️',
+      title: 'Perfil con peso',
+      hint: hasEnoughSkills && hasEnoughEvidence
+        ? `Tenés ${profile.skills.length} skills y ${profile.evidence.length} evidencias.`
+        : 'Volvé a la entrevista para sumar evidencia citada.',
+      cta: { label: 'Continuar entrevista', href: '/joven/chat' },
+    },
+    {
+      done: verifiedPct >= 30,
+      emoji: '🛡️',
+      title: 'Sube un certificado',
+      hint: verifiedPct >= 30
+        ? `${verifiedPct}% de tus skills están verificadas por documento.`
+        : 'Un diploma o constancia eleva el valor de tus skills.',
+      cta: { label: 'Mis documentos', href: `/joven/perfil/${profileId}` },
+    },
+    {
+      done: false,
+      emoji: '🔍',
+      title: 'Conectar con una empresa',
+      hint: 'Mirá quién está buscando tus skills hoy y propone conectar.',
+      cta: { label: 'Ver oportunidades', href: `/joven/conectar?profileId=${encodeURIComponent(profileId)}` },
+    },
+    ...(inboxUnreplied > 0
+      ? [
+          {
+            done: false,
+            emoji: '✉️',
+            title: 'Responder feedback recibido',
+            hint: `Tenés ${inboxUnreplied} mensaje${inboxUnreplied === 1 ? '' : 's'} de empresas sin responder.`,
+            cta: { label: 'Abrir inbox', href: `/joven/perfil/${profileId}` },
+          } as Step,
+        ]
+      : []),
+  ];
+}
+
+function NextStepsCard({
+  profile,
+  verifiedPct,
+  inboxUnreplied,
+  profileId,
+}: {
+  profile: Profile;
+  verifiedPct: number;
+  inboxUnreplied: number;
+  profileId: string;
+}) {
+  const steps = buildSteps(profile, verifiedPct, inboxUnreplied, profileId);
+  const doneCount = steps.filter((s) => s.done).length;
+  return (
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
+      <div className="flex items-center justify-between gap-2">
+        <SectionTitle
+          title="Próximos pasos"
+          subtitle="Para llegar a tu primer ingreso"
+        />
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold whitespace-nowrap">
+          {doneCount}/{steps.length}
+        </span>
+      </div>
+      <div className="mt-4 flex-1 space-y-2.5">
+        {steps.map((s) => (
+          <Link key={s.title} href={s.cta.href}>
+            <div className={`group rounded-2xl border p-3 flex items-start gap-3 transition-colors ${
+              s.done
+                ? 'border-emerald-200 bg-emerald-50/40'
+                : 'border-stone-200 hover:border-orange-300 hover:bg-orange-50/30'
+            }`}>
+              {/* Status indicator: check para done, emoji + dot pulse para pending */}
+              <div className="relative flex-shrink-0">
+                <span className="text-2xl leading-none">{s.emoji}</span>
+                {s.done && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-semibold ${s.done ? 'text-stone-600 line-through' : 'text-stone-900'}`}>
+                  {s.title}
+                </div>
+                <div className="text-[11px] text-stone-500 leading-snug mt-0.5">{s.hint}</div>
+                {!s.done && (
+                  <div className="text-[11px] text-orange-700 font-semibold mt-1 inline-flex items-center gap-1 group-hover:underline">
+                    {s.cta.label} <ArrowRight size={10} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

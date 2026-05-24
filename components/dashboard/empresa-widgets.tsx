@@ -270,11 +270,12 @@ function HeroDark({
       <div className="absolute -top-20 -right-20 w-80 h-80 bg-amber-500/20 rounded-full blur-3xl" aria-hidden />
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
         <div className="relative flex-shrink-0">
-          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-2xl md:text-3xl shadow-lg shadow-amber-900/40">
+          <div className="rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-xl md:text-2xl shadow-lg shadow-amber-900/40"
+               style={{ width: 72, height: 72 }}>
             {avatarText || '·'}
           </div>
-          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 border-2 border-stone-950 flex items-center justify-center">
-            <CheckCircle2 size={12} className="text-white" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-stone-950 flex items-center justify-center">
+            <CheckCircle2 size={10} className="text-white" />
           </div>
         </div>
 
@@ -380,12 +381,13 @@ function RadarCard({
       </div>
     );
   }
-  // Mismo principio que el del joven: radar grande centrado + label/valor
-  // en el vértice (sin bars laterales redundantes).
-  const size = 240;
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = size / 2 - 32;
+  // ViewBox horizontal para que labels laterales no se truncan en cards
+  // angostas. Misma fórmula que joven-widgets.
+  const width = 280;
+  const height = 220;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width, height) / 2 - 38;
   const N = axes.length;
 
   const polygonPoints = axes
@@ -404,7 +406,7 @@ function RadarCard({
     <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col">
       <SectionTitle title={title} subtitle={subtitle} />
       <div className="mt-2 flex-1 flex items-center justify-center">
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="max-w-full h-auto">
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="max-w-full h-auto">
           {rings.map((r, i) => (
             <polygon
               key={i}
