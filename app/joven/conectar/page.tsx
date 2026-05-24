@@ -118,12 +118,12 @@ function ConectarContent() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10 space-y-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
       <header>
         <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
           Conectar con empresas
         </div>
-        <h1 className="text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+        <h1 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
           Así te ven las empresas en Salto.
         </h1>
         {profile && (
@@ -167,7 +167,7 @@ function ConectarContent() {
           {opportunities.map((opp, i) => (
             <article
               key={opp.needId}
-              className={`bg-white border rounded-2xl p-6 md:p-8 transition-all ${
+              className={`bg-white border rounded-2xl p-4 sm:p-6 md:p-8 transition-all ${
                 i === 0 ? 'border-emerald-200 shadow-md shadow-emerald-100/40' : 'border-slate-200'
               }`}
             >
@@ -179,12 +179,12 @@ function ConectarContent() {
                       Mejor encaje
                     </Badge>
                   )}
-                  <h2 className="font-display font-bold text-2xl text-slate-900">{opp.companyName}</h2>
+                  <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900">{opp.companyName}</h2>
                   <p className="text-slate-700">{opp.role}</p>
                   <p className="text-sm text-slate-600 italic border-l-2 border-emerald-200 pl-3 mt-3">{opp.reason}</p>
                 </div>
-                <div className="flex items-baseline gap-1 md:text-right">
-                  <span className="font-display font-bold text-5xl text-emerald-600 tabular-nums">{opp.ics}</span>
+                <div className="flex items-baseline gap-1 md:text-right flex-shrink-0">
+                  <span className="font-display font-bold text-4xl sm:text-5xl text-emerald-600 tabular-nums">{opp.ics}</span>
                   <span className="text-xl text-emerald-600 font-bold">%</span>
                   <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold ml-2 self-end pb-2">
                     ICS
@@ -206,7 +206,7 @@ function ConectarContent() {
         </section>
       )}
 
-      <section className="bg-slate-950 text-white rounded-2xl p-8 text-center">
+      <section className="bg-slate-950 text-white rounded-2xl p-6 sm:p-8 text-center">
         <p className="text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
           El ICS es una señal de priorización, no un veredicto. Cuando una empresa te contacte, sabrás por qué encajaste — algo que LinkedIn casi nunca te dice.
         </p>

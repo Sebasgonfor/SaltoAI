@@ -169,7 +169,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   const [top, ...rest] = matches;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10 space-y-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
       {/* Necesidad estructurada */}
       <header className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -269,12 +269,12 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
             <span className="text-xs uppercase tracking-[0.18em] text-emerald-700 font-semibold">Mejor match</span>
           </div>
 
-          <article className="relative bg-gradient-to-br from-emerald-50 via-white to-amber-50/30 border border-emerald-200/60 rounded-3xl p-8 md:p-10 shadow-sm overflow-hidden">
+          <article className="relative bg-gradient-to-br from-emerald-50 via-white to-amber-50/30 border border-emerald-200/60 rounded-3xl p-5 sm:p-8 md:p-10 shadow-sm overflow-hidden">
             <div className="grid md:grid-cols-12 gap-8 items-start relative">
               {/* Left: identity + score */}
               <div className="md:col-span-5 space-y-5">
                 <div>
-                  <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
                     {top.profileName}
                   </h2>
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -285,7 +285,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 </div>
 
                 <div className="flex items-baseline gap-3 pt-4">
-                  <span className="font-display font-bold text-7xl md:text-8xl text-emerald-600 tabular-nums leading-none">
+                  <span className="font-display font-bold text-5xl sm:text-7xl md:text-8xl text-emerald-600 tabular-nums leading-none">
                     {top.ics}
                   </span>
                   <div className="space-y-0.5">
@@ -398,7 +398,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
 
       {/* Filosofía Salto */}
       {matches.length > 0 && (
-        <section className="bg-slate-950 text-white rounded-2xl p-8 md:p-10 text-center relative overflow-hidden">
+        <section className="bg-slate-950 text-white rounded-2xl p-6 sm:p-8 md:p-10 text-center relative overflow-hidden">
           <UserCheck size={28} className="mx-auto mb-4 text-emerald-400" />
           <h3 className="font-display font-semibold text-2xl md:text-3xl mb-3 tracking-tight">
             Salto promete <span className="text-emerald-400">calidad</span>, no volumen.

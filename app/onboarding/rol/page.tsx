@@ -140,13 +140,13 @@ function OnboardingRolInner() {
   return (
     <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
       <Header />
-      <main className="flex-1 flex flex-col items-center px-6 py-12 lg:py-20">
+      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 lg:py-20">
         <div className="max-w-3xl w-full">
           <header className="text-center mb-12">
             <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-3">
               Hola, {user.displayName?.split(' ')[0] || 'bienvenido'}
             </div>
-            <h1 className="text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
               ¿Cómo vas a usar Salto?
             </h1>
             <p className="text-slate-600 mt-4 max-w-xl mx-auto leading-relaxed">
@@ -155,7 +155,7 @@ function OnboardingRolInner() {
             </p>
           </header>
 
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-3 sm:gap-4">
             <RoleCard
               role="joven"
               icon={GraduationCap}
@@ -255,7 +255,7 @@ function RoleCard({ icon: Icon, title, tagline, bullets, accent, busy, disabled,
       type="button"
       disabled={disabled}
       onClick={onChoose}
-      className={`group text-left bg-white border border-slate-200 rounded-3xl p-7 transition-all shadow-sm hover:shadow-md ${accentClasses.ring} disabled:opacity-60 disabled:cursor-not-allowed`}
+      className={`group text-left bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 transition-all shadow-sm hover:shadow-md ${accentClasses.ring} disabled:opacity-60 disabled:cursor-not-allowed`}
     >
       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-5 ${accentClasses.icon}`}>
         <Icon size={22} />

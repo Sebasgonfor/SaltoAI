@@ -314,13 +314,13 @@ export default function EmpresaDashboardPage() {
   const firstName = user.displayName?.split(' ')[0] || 'fundador/a';
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10 space-y-10 w-full">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10 w-full">
       {/* Greeting */}
       <header>
         <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
           Tu mesa de trabajo
         </div>
-        <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
           {getGreeting(firstName)}
         </h1>
         <p className="text-slate-600 mt-2 max-w-2xl">
@@ -330,7 +330,7 @@ export default function EmpresaDashboardPage() {
       </header>
 
       {/* KPIs */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={Layers}
           value={kpis.needsCount}
@@ -450,7 +450,7 @@ export default function EmpresaDashboardPage() {
       </section>
 
       {/* Bottom strip — recordatorio del principio Salto */}
-      <section className="bg-slate-950 text-white rounded-2xl p-7 md:p-9 relative overflow-hidden">
+      <section className="bg-slate-950 text-white rounded-2xl p-5 sm:p-7 md:p-9 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/15 rounded-full blur-3xl" aria-hidden />
         <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>

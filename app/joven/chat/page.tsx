@@ -312,7 +312,7 @@ function ChatJoven() {
 
   if (phase === 'basics') {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-10 lg:py-16 w-full">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10 lg:py-16 w-full">
         <header className="mb-10 text-center">
           <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
             <UserCircle2 size={28} strokeWidth={1.75} />
@@ -333,7 +333,7 @@ function ChatJoven() {
               placeholder="Ej. Camila Silva"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              className="h-12 text-base"
+              className="h-11 sm:h-12 text-sm sm:text-base"
               autoComplete="name"
             />
           </div>
@@ -347,7 +347,7 @@ function ChatJoven() {
               placeholder="Ej. 21"
               value={formAge}
               onChange={(e) => setFormAge(e.target.value)}
-              className="h-12 text-base w-32"
+              className="h-11 sm:h-12 text-sm sm:text-base w-full sm:w-32"
             />
           </div>
 
@@ -419,7 +419,7 @@ function ChatJoven() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 lg:py-12 w-full">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12 w-full">
       <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
@@ -481,7 +481,7 @@ function ChatJoven() {
       )}
 
       <div className="grid lg:grid-cols-12 gap-6">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[600px] max-h-[700px] overflow-hidden">
+        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[380px] max-h-[55vh] md:min-h-[520px] md:max-h-[600px] lg:min-h-[600px] lg:max-h-[700px] overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -549,7 +549,7 @@ function ChatJoven() {
           </div>
         </section>
 
-        <aside className="lg:col-span-5 space-y-4">
+        <aside className="lg:col-span-5 space-y-4 order-first lg:order-none">
           <div className="bg-slate-950 text-white rounded-3xl p-6 relative overflow-hidden">
             <div className="relative">
               <div className="flex items-center gap-2 mb-1">
