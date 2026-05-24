@@ -23,6 +23,41 @@ export function isLastAnswerTooShort(messages: ChatMessage[], minWords = 2): boo
   return words.length < minWords;
 }
 
+/**
+ * Detecta si el último mensaje del agente es una pregunta cerrada (sí/no).
+ * Sirve para que el guard de "respuesta muy corta" no regañe al usuario
+ * cuando "No" / "Sí" / "Nunca" son respuestas legítimas a una pregunta
+ * que el propio agente formuló mal. Idealmente el prompt prohíbe sí/no,
+ * pero a veces se le escapa al LLM y queremos manejarlo con elegancia.
+ */
+export function isYesNoQuestion(text: string): boolean {
+  const t = (text ?? "").toLowerCase().trim();
+  if (!t.includes("?")) return false;
+  // Aperturas típicas de pregunta cerrada en español rioplatense/colombiano.
+  return /(^|[¿\s])(hubo|hubieron|alguna vez|alguien|tuviste|te pas[óo]|te toc[óo]|sab[ée]s|sabias|sab[ií]as|pod[ée]s|pudiste|fuiste|estuviste|conoces|conoc[ée]s|has |hab[ée]s|hac[ée]s|hiciste|llegaste|recordas|record[áa]s)/i.test(
+    t
+  );
+}
+
+export function lastAgentMessage(messages: ChatMessage[]): string {
+  const last = [...messages].reverse().find((m) => m.role === "agent");
+  return last?.content ?? "";
+}
+
+/**
+ * Variantes de re-prompt cuando el usuario respondió corto a una pregunta
+ * sí/no del agente. NO regaña — pide el ejemplo concreto.
+ */
+export const YES_NO_FOLLOWUP_PROMPTS = [
+  "Dale, contame ese momento — ¿qué pasó, qué hiciste, cómo terminó?",
+  "Perfecto. Ahora contame el ejemplo concreto: ¿cuándo fue y qué hiciste exactamente?",
+  "Buenísimo, vamos al caso real. Contame paso a paso qué hiciste y qué cambió.",
+] as const;
+
+export function pickYesNoFollowup(seed = 0): string {
+  return YES_NO_FOLLOWUP_PROMPTS[seed % YES_NO_FOLLOWUP_PROMPTS.length];
+}
+
 export interface InterviewValidity {
   ok: boolean;
   reason?: "no_user_turns" | "too_short" | "too_few_words";

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Bot, User, Sparkles, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio } from 'lucide-react';
 import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
+import { RoleGate } from '@/components/auth/role-gate';
 import { useVoiceInput } from '@/hooks/use-voice-input';
 import { useLiveInterview } from '@/hooks/use-live-interview';
 import { jovenAgeErrorMessage, parseJovenAge } from '@/lib/input-validation';
@@ -95,7 +96,21 @@ function clearPersisted(uid: string | null | undefined): void {
   }
 }
 
-export default function ChatJoven() {
+/**
+ * Default export envuelve el componente real con RoleGate. Antes el gate
+ * vivía en el layout (gateaba TODO /joven/*), pero eso bloqueaba a las
+ * empresas de ver perfiles. Ahora el gate vive aquí, en las pages que SÍ
+ * son privadas del joven (chat, tareas, conectar).
+ */
+export default function ChatJovenPage() {
+  return (
+    <RoleGate role="joven">
+      <ChatJoven />
+    </RoleGate>
+  );
+}
+
+function ChatJoven() {
   const router = useRouter();
   const { user } = useAuth();
   const [phase, setPhase] = useState<'basics' | 'interview'>('basics');

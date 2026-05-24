@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, User as UserIcon, ChevronDown, Building2, GraduationCap } from 'lucide-react';
+import { LogOut, User as UserIcon, ChevronDown, LayoutDashboard, Building2, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
@@ -105,6 +105,14 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
               </div>
             )}
           </div>
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+            role="menuitem"
+          >
+            <LayoutDashboard size={14} /> Mi dashboard
+          </Link>
           {account?.role === 'joven' && (
             <Link
               href={`/joven/perfil/${user.uid}`}
@@ -117,7 +125,7 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
           )}
           {account?.role === 'empresa' && (
             <Link
-              href="/empresa/chat"
+              href="/empresa/publicar"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
               role="menuitem"

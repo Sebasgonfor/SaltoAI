@@ -1,12 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
+import { gemini, GEMINI_LITE_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { countUserTurns, isLastAnswerTooShort } from "@/lib/input-validation";
+import {
+  countUserTurns,
+  isLastAnswerTooShort,
+  isYesNoQuestion,
+  lastAgentMessage,
+  pickYesNoFollowup,
+} from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
+// Subimos el timeout de la lambda en Vercel. Hobby permite hasta 60s; con 30
+// cubrimos cold-starts de Gemini sin pegarle al techo del plan.
+export const maxDuration = 30;
+
+/**
+ * Timeout duro del call a Gemini. Con flash-lite + thinking off una respuesta
+ * normal son 1-3s; 10s es margen amplio. Si se excede, caemos al banco de
+ * preguntas para no hacer esperar al founder.
+ */
+const GEMINI_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout:${label}:${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
 
 const MIN_USER_TURNS = 4;
 const MAX_USER_TURNS = 7;
@@ -35,20 +67,20 @@ const QUESTION_BANK: Record<(typeof TARGET_SLOTS)[number], string[]> = {
     "Olvidate del título del puesto un segundo. ¿Qué es lo que esta persona haría en un día normal? ¿Y en una semana cargada?",
   ],
   ritmo_contexto: [
-    "¿Cómo es el ritmo del día a día? ¿Hay picos, presión, multitarea, o es más estable? ¿Es presencial, remoto, híbrido, y en qué horario?",
-    "Contame del contexto operativo: ¿es caótico, ordenado, hay procesos escritos o se va resolviendo sobre la marcha? ¿Dónde y cuándo trabajaría?",
+    "Describime el ritmo del día a día: cómo se siente, dónde se trabaja (local, oficina, remoto) y en qué horario.",
+    "Contame el contexto operativo: cuán caótico u ordenado es, qué procesos hay escritos y qué se resuelve sobre la marcha. ¿Dónde y cuándo trabajaría?",
   ],
   restricciones_duras: [
-    "¿Hay algún requisito duro que sí o sí necesita la persona? Por ejemplo ubicación específica, idioma, alguna herramienta concreta, jornada completa, edad mínima legal.",
-    "¿Cuáles son los no-negociables del rol? Pensá en ubicación, horario, idioma, o herramientas específicas sin las cuales no podría empezar.",
+    "Decime los requisitos duros y no-negociables: ubicación, idioma, herramienta concreta, jornada, edad mínima legal. Listalos.",
+    "Contame qué no-negociables tiene el rol — ubicación, horario, idioma o herramientas específicas sin las cuales no podría empezar.",
   ],
   fallos_previos: [
-    "¿Han contratado para algo parecido antes? Si fue así, ¿qué les costó, qué tipo de persona no funcionó y por qué?",
+    "Contame la última vez que contrataron para algo parecido: qué les costó, qué tipo de persona no funcionó y por qué.",
     "Si ya intentaron contratar para este rol u otro parecido, contame qué falló. Esa señal nos sirve más que la lista de skills.",
   ],
   dealbreakers: [
-    "Pensando en candidatos: ¿qué rasgo o actitud sería un deal-breaker para vos? ¿Y qué cosas son “nice-to-have” pero no esenciales?",
-    "Si tuvieras que elegir entre dos candidatos parecidos, ¿qué rasgo te haría decir “este sí” o “este no”? Diferenciá lo esencial de lo deseable.",
+    "Decime qué rasgo o actitud sería un deal-breaker para vos, y qué cosas son “nice-to-have” pero no esenciales.",
+    "Si tuvieras que elegir entre dos candidatos parecidos, contame qué rasgo te haría decir “este sí” y cuál “este no”. Diferenciá esencial de deseable.",
   ],
 };
 
@@ -88,6 +120,12 @@ ESTILO:
 - Español natural rioplatense/colombiano, cercano, no corporativo.
 - UNA pregunta a la vez, corta y específica (máx 2 oraciones).
 - Tuteo o "vos", consistente.
+
+PROHIBIDO PREGUNTAS SÍ/NO:
+- Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabés…?", "¿Han contratado…?", "¿Hay…?".
+- Esas preguntas se contestan con "sí" o "no" y matan la entrevista.
+- Toda pregunta debe empezar con QUÉ, CÓMO, CUÁNDO, CUÁNTOS, CUÁL o un imperativo tipo "Contame…", "Pensá en…", "Dame un ejemplo de…".
+- Si querés explorar si algo ocurrió, pedí directamente el ejemplo: "Contame la última vez que contrataron para algo parecido y qué falló" en vez de "¿Contrataron antes?".
 
 CIERRE (done=true):
 - Marcá done=true cuando tengas AL MENOS 5 de los 6 slots cubiertos con detalle concreto.
@@ -185,15 +223,18 @@ export async function POST(req: NextRequest) {
     const userTurns = countUserTurns(messages);
 
     if (userTurns > 0 && isLastAnswerTooShort(messages, 3)) {
-      log.info("edge.too_short_answer", { userTurns });
-      log.end({ status: 200, extra: { edge: "too_short", done: false } });
+      const prevAgent = lastAgentMessage(messages);
+      const wasYesNo = isYesNoQuestion(prevAgent);
+      log.info("edge.too_short_answer", { userTurns, wasYesNo });
+      log.end({ status: 200, extra: { edge: "too_short", done: false, wasYesNo } });
       return NextResponse.json({
-        nextQuestion:
-          "Eso es muy poquito para trabajar. Contame con más detalle — ¿podés darme un ejemplo concreto?",
+        nextQuestion: wasYesNo
+          ? pickYesNoFollowup(userTurns)
+          : "Eso es muy poquito para trabajar. Contame con más detalle, dame un ejemplo concreto.",
         done: false,
         targetedSlot: null,
         slotsCovered: detectSlots(messages),
-        edge: "too_short",
+        edge: wasYesNo ? "yes_no_followup" : "too_short",
       });
     }
 
@@ -222,14 +263,36 @@ export async function POST(req: NextRequest) {
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devolvé la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marcá done=true si ya hay 5+ slots cubiertos con detalle.`;
 
-    const response = await gemini().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: userPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+    let response;
+    try {
+      response = await withTimeout(
+        gemini().models.generateContent({
+          // Lite es ~3-4x más rápido que flash para Q&A turn-by-turn y la
+          // tarea (elegir slot pendiente + redactar una pregunta) no necesita
+          // razonamiento profundo. thinkingBudget=0 desactiva el modo "thinking"
+          // que viene on por default en la familia 2.5 y agrega varios segundos.
+          model: GEMINI_LITE_MODEL,
+          contents: userPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+        GEMINI_TIMEOUT_MS,
+        "gemini.generateContent"
+      );
+    } catch (err) {
+      // Si Gemini se cuelga (cold start, sobrecarga), no dejamos colgar al
+      // founder: respondemos con el banco determinístico y seguimos.
+      if ((err as Error)?.message?.startsWith("timeout:")) {
+        log.warn("gemini.timeout", { message: (err as Error).message, userTurns });
+        const resp = fallbackResponse(messages);
+        log.end({ status: 200, extra: { mode: "fallback_timeout", done: resp.done, userTurns } });
+        return NextResponse.json({ ...resp, edge: "gemini_timeout" });
+      }
+      throw err;
+    }
 
     const parsed = JSON.parse(response.text || "{}");
     let done = !!parsed.done;

@@ -1,18 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
+import { gemini, GEMINI_LITE_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { countUserTurns, isLastAnswerTooShort } from "@/lib/input-validation";
 import {
   buildRestInterviewSystemPrompt,
   CLOSING_MESSAGE,
   MAX_USER_TURNS,
   MIN_USER_TURNS,
 } from "@/lib/interview-prompt";
+import {
+  countUserTurns,
+  isLastAnswerTooShort,
+  isYesNoQuestion,
+  lastAgentMessage,
+  pickYesNoFollowup,
+} from "@/lib/input-validation";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
+
+const GEMINI_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout:${label}:${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
 
 const FALLBACK_DONE_MESSAGE =
   "Genial, ya tengo evidencia suficiente. Voy a construir tu Perfil de Evidencia ahora.";
@@ -41,36 +66,36 @@ const TARGET_SIGNALS = [
 
 const QUESTION_BANK: Record<(typeof TARGET_SIGNALS)[number], string[]> = {
   iniciativa: [
-    "¿Hubo alguna vez algo que viste que estaba mal o que faltaba y decidiste arreglarlo sin que te lo pidieran? Cuéntame.",
-    "Pensá en algo que empezaste vos solo/a, sin esperar permiso. ¿Qué fue y cómo arrancaste?",
+    "Contame una vez que viste algo que estaba mal o faltaba, y decidiste arreglarlo sin que nadie te lo pidiera. ¿Qué fue y cómo arrancaste?",
+    "Pensá en algo que empezaste vos solo/a, sin esperar permiso. ¿Qué hiciste primero?",
   ],
   "aprendizaje autónomo": [
-    "¿Aprendiste algo por tu cuenta — YouTube, tutoriales, prueba y error — para resolver una situación concreta? Cuéntame cómo fue.",
+    "Contame de algo que aprendiste por tu cuenta — YouTube, tutoriales, prueba y error — para resolver una situación concreta. ¿Cómo fue?",
     "Cuando te topaste con algo que no sabías hacer, ¿cómo te las arreglaste para aprenderlo? Dame un ejemplo puntual.",
   ],
   "resolución de problemas": [
-    "Cuéntame un problema feo que se te apareció y nadie sabía cómo resolverlo. ¿Qué hiciste paso a paso?",
-    "¿Alguna vez algo se complicó y tuviste que improvisar una solución? ¿Cómo la pensaste?",
+    "Contame un problema feo que se te apareció y nadie sabía cómo resolverlo. ¿Qué hiciste paso a paso?",
+    "Pensá en una vez que algo se complicó y tuviste que improvisar una solución. ¿Cómo la pensaste?",
   ],
   "resultados medibles": [
-    "Eso que hiciste, ¿en qué cambió la situación? ¿Hay algún número, porcentaje o cantidad que recuerdes?",
-    "¿Cómo te diste cuenta de que tu trabajo funcionó? ¿Qué cambió concretamente — ventas, clientes, tiempos, errores?",
+    "Eso que hiciste, ¿en qué cambió la situación? Dame un número, porcentaje o cantidad si lo recordás.",
+    "Contame cómo te diste cuenta de que tu trabajo funcionó. ¿Qué cambió concretamente — ventas, clientes, tiempos, errores?",
   ],
   "atención al cliente": [
-    "Cuéntame de un cliente difícil o un reclamo que tuviste que resolver. ¿Qué dijo? ¿Qué hiciste vos?",
-    "Cuando tratabas con gente — clientes, vecinos, familias — ¿alguna situación tensa que manejaste bien? Detalles.",
+    "Contame de un cliente difícil o un reclamo que tuviste que resolver. ¿Qué dijo y qué hiciste vos?",
+    "Cuando tratabas con gente — clientes, vecinos, familias — contame una situación tensa que manejaste bien. Detalles.",
   ],
   "trabajo en equipo": [
-    "¿Hubo algún momento donde tuviste que coordinarte con otra persona o un grupo para que algo saliera? ¿Quién hizo qué?",
-    "Cuéntame de una vez que trabajaste junto a alguien — familia, amigos, equipo. ¿Cómo se dividieron las cosas?",
+    "Contame un momento donde tuviste que coordinarte con otra persona o un grupo para que algo saliera. ¿Quién hizo qué?",
+    "Pensá en una vez que trabajaste junto a alguien — familia, amigos, equipo. ¿Cómo se dividieron las cosas?",
   ],
   "adaptación al cambio": [
-    "¿Te tocó adaptarte de un día para el otro a algo nuevo — un cambio de plan, un imprevisto? Cuéntame cómo te ajustaste.",
+    "Contame una vez que tuviste que adaptarte de un día para el otro a algo nuevo — un cambio de plan, un imprevisto. ¿Cómo te ajustaste?",
     "Pensá en una vez que las reglas cambiaron a mitad de camino. ¿Qué hiciste para seguir adelante?",
   ],
   persistencia: [
-    "¿Hubo algo que intentaste varias veces antes de que saliera? Cuéntame cuántos intentos y qué te hizo no rendirte.",
-    "Algo que estuvo a punto de fracasar pero igual lo terminaste — ¿qué fue y cómo seguiste?",
+    "Contame algo que intentaste varias veces antes de que saliera. ¿Cuántos intentos y qué te hizo no rendirte?",
+    "Pensá en algo que estuvo a punto de fracasar pero igual lo terminaste. ¿Qué fue y cómo seguiste?",
   ],
 };
 
@@ -224,15 +249,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (userTurns > 0 && isLastAnswerTooShort(messages, 2)) {
-      log.info("edge.too_short_answer", { userTurns });
-      log.end({ status: 200, extra: { edge: "too_short", done: false } });
+      const prevAgent = lastAgentMessage(messages);
+      const wasYesNo = isYesNoQuestion(prevAgent);
+      log.info("edge.too_short_answer", { userTurns, wasYesNo });
+      log.end({ status: 200, extra: { edge: "too_short", done: false, wasYesNo } });
       return NextResponse.json({
-        nextQuestion:
-          "Eso es muy poquito. Cuéntame con más detalle: ¿qué hiciste vos, qué pasó, en qué cambió la situación?",
+        nextQuestion: wasYesNo
+          ? pickYesNoFollowup(userTurns)
+          : "Eso es muy poquito. Contame con más detalle: ¿qué hiciste vos, qué pasó, en qué cambió la situación?",
         done: false,
         targetedSignal: null,
-        signalsCovered: heuristicCovered,
-        edge: "too_short",
+        signalsCovered: detectSignals(messages),
+        edge: wasYesNo ? "yes_no_followup" : "too_short",
       });
     }
 
@@ -264,14 +292,30 @@ export async function POST(req: NextRequest) {
       `PREGUNTAS QUE YA HICISTE (NO las repitas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devolvé la SIGUIENTE pregunta o marcá done=true si ya hay 4+ señales cubiertas con detalle.`;
 
-    const response = await gemini().models.generateContent({
-      model: GEMINI_MODEL,
-      contents: userPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+    let response;
+    try {
+      response = await withTimeout(
+        gemini().models.generateContent({
+          model: GEMINI_LITE_MODEL,
+          contents: userPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+        GEMINI_TIMEOUT_MS,
+        "gemini.generateContent"
+      );
+    } catch (err) {
+      if ((err as Error)?.message?.startsWith("timeout:")) {
+        log.warn("gemini.timeout", { message: (err as Error).message, userTurns });
+        const resp = smartFallbackResponse(messages);
+        log.end({ status: 200, extra: { mode: "fallback_timeout", done: resp.done, userTurns } });
+        return NextResponse.json({ ...resp, edge: "gemini_timeout" });
+      }
+      throw err;
+    }
 
     const parsed = JSON.parse(response.text || "{}");
     let done = !!parsed.done;

@@ -17,6 +17,7 @@ import {
 import type { Gender, Profile } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
+import { useAuth } from '@/lib/auth-context';
 
 const GENDER_LABEL: Record<Gender, string> = {
   mujer: 'Mujer',
@@ -26,7 +27,13 @@ const GENDER_LABEL: Record<Gender, string> = {
 };
 
 export default function PerfilPorId({ params }: { params: Promise<{ id: string }> }) {
+  // NO RoleGate: este perfil es contenido público de matching. Una empresa
+  // logueada como `empresa` viene desde /empresa/matches/{needId} y necesita
+  // ver al candidato sin chocar contra un muro. El banner contextual abajo
+  // se ocupa de la UX cuando el viewer es founder.
   const { id } = use(params);
+  const { account } = useAuth();
+  const viewerIsEmpresa = account?.role === 'empresa';
   const [perfil, setPerfil] = useState<Profile | null>(null);
   const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +96,31 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-14">
+      {/* Banner contextual: cuando un founder visita este perfil desde sus
+          matches, le damos contexto + camino de vuelta. Sin esto, ve el
+          chrome del joven ("Entrevista", "Mis tareas") sin entender por
+          qué llegó acá. */}
+      {viewerIsEmpresa && (
+        <div className="bg-gradient-to-r from-emerald-50 to-emerald-50/30 border border-emerald-200/60 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3 text-sm text-slate-700">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+              <Building2 size={14} />
+            </div>
+            <div className="leading-snug">
+              <span className="font-semibold text-slate-900">Estás viendo el perfil de un candidato</span>
+              <span className="text-slate-600 hidden md:inline"> · Salto te muestra evidencia citada, no un CV.</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/empresa">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <ArrowRight size={13} className="rotate-180" /> Mis matches
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* HERO */}
       <header className="relative space-y-4">
         <div className="flex flex-wrap items-center gap-2">

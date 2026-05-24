@@ -64,11 +64,16 @@ function OnboardingRolInner() {
   }, [user, account, impliedRole]);
 
   // Si ya hay rol asignado, sacarlo de aquí inmediatamente.
+  // El router.replace tiene que vivir en useEffect, no en el render:
+  // si no, React tira "Cannot update a component while rendering a different
+  // component" porque cambiar la URL es un setState side-effect.
+  useEffect(() => {
+    if (!account) return;
+    const target = next !== '/' ? next : defaultDestination(account.role);
+    router.replace(target);
+  }, [account, next, router]);
+
   if (account) {
-    if (typeof window !== 'undefined') {
-      const target = next !== '/' ? next : defaultDestination(account.role);
-      router.replace(target);
-    }
     return null;
   }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Lock, UserCog, Building2, GraduationCap, ArrowRight } from 'lucide-react';
@@ -32,7 +33,13 @@ export function RoleGate({ role, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 1. Bootstrap de auth
+  useEffect(() => {
+    if (loading || roleLoading) return;
+    if (!user || account) return;
+    if (pathname === '/onboarding/rol') return;
+    router.replace(`/onboarding/rol?next=${encodeURIComponent(pathname || '/')}`);
+  }, [user, account, loading, roleLoading, pathname, router]);
+
   if (loading || roleLoading) {
     return (
       <div className="max-w-6xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
@@ -41,7 +48,6 @@ export function RoleGate({ role, children }: Props) {
     );
   }
 
-  // 2. Sin sesión → formulario email / Google
   if (!user) {
     const copy = COPY[role];
     return (
@@ -57,9 +63,7 @@ export function RoleGate({ role, children }: Props) {
             intendedRole={role}
             title={copy.title}
             subtitle={copy.desc}
-            onSuccess={() => {
-              /* onAuthStateChanged resuelve rol y re-renderiza */
-            }}
+            onSuccess={() => {}}
           />
           <p className="text-xs text-slate-400 text-center mt-6">
             Si ya tenés cuenta con otro rol, te llevamos a tu área correcta.
@@ -69,11 +73,7 @@ export function RoleGate({ role, children }: Props) {
     );
   }
 
-  // 3. Sesión sin rol asignado → onboarding
   if (!account) {
-    if (typeof window !== 'undefined' && pathname !== '/onboarding/rol') {
-      router.replace(`/onboarding/rol?next=${encodeURIComponent(pathname || '/')}`);
-    }
     return (
       <div className="max-w-6xl mx-auto px-6 py-24 w-full flex items-center justify-center text-slate-500 text-sm">
         Llevándote a elegir tu rol…
@@ -81,7 +81,6 @@ export function RoleGate({ role, children }: Props) {
     );
   }
 
-  // 4. Sesión con rol equivocado → muro explícito (sin redirección sigilosa)
   if (account.role !== role) {
     const other = account.role;
     const otherHref = other === 'joven' ? '/joven/chat' : '/empresa/chat';
@@ -124,6 +123,5 @@ export function RoleGate({ role, children }: Props) {
     );
   }
 
-  // 5. Todo bien → renderiza la sección
   return <>{children}</>;
 }

@@ -6,8 +6,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Briefcase, Clock, DollarSign, ArrowRight, Star, Trophy, Search } from 'lucide-react';
 import type { MicroTask } from '@/lib/types';
+import { RoleGate } from '@/components/auth/role-gate';
 
-export default function TareasJoven() {
+/**
+ * Listado de micro-tareas del joven. Privado — solo el dueño debe verlo.
+ * RoleGate movido del layout a esta page (ver app/joven/layout.tsx).
+ */
+export default function TareasJovenPage() {
+  return (
+    <RoleGate role="joven">
+      <TareasJoven />
+    </RoleGate>
+  );
+}
+
+function TareasJoven() {
   const [profileId, setProfileId] = useState<string>('');
   const [tasks, setTasks] = useState<MicroTask[]>([]);
   const [loading, setLoading] = useState(false);

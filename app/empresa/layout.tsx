@@ -12,6 +12,14 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
           <SaltoLogo variant="full" size={56} />
         </Link>
         <nav className="flex gap-1 items-center text-sm font-medium">
+          {/* "Inicio" → dashboard founder. Agregado como primer item porque
+              hasta acá no había forma de "volver a casa" desde un match. */}
+          <Link
+            href="/empresa"
+            className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          >
+            Inicio
+          </Link>
           <Link
             href="/empresa/chat"
             className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
