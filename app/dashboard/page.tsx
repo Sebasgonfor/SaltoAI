@@ -378,13 +378,16 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Widgets enriquecidos — solo si ya hay perfil. Sin perfil el
-              joven todavía no tiene microtasks, earnings ni visibilidad
-              de mercado, y el onboarding banner se ocupa de empujar a
-              la entrevista. */}
+          {/* Widgets enriquecidos — pasaporte de talento visual. Solo si
+              ya hay perfil. Sin perfil el onboarding banner se ocupa. */}
           {!dataLoading && profile && (
             <FadeUp delay={0.12}>
-              <JovenWidgets uid={user.uid} profileId={user.uid} />
+              <JovenWidgets
+                uid={user.uid}
+                profileId={user.uid}
+                profile={profile}
+                tasks={tasks}
+              />
             </FadeUp>
           )}
 

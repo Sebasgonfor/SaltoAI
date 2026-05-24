@@ -1,37 +1,37 @@
 'use client';
 
 /**
- * Widgets enriquecidos del dashboard del founder (`/empresa`).
+ * Dashboard visual rico de la empresa (`/empresa`).
  *
- * Consume `/api/dashboard/empresa?uid=X` (un solo request, todos los KPIs +
- * funnel + calibración + top candidates + necesidades con salud + financials).
+ * Rediseñado con lenguaje visual tipo "pasaporte del founder":
+ *   - Hero dark con avatar (iniciales) + categoría + ring (Salud del pipeline)
+ *   - Grid 3-col: ADN radar de búsqueda + Inversión + Top candidatos cross-need
+ *   - Grid 2x2 estilo founder + Necesidades con salud (lista priorizada)
+ *   - Pipeline funnel + Calibración
  *
- * Filosofía: convertir "lista de needs + tasks" en una vista de inteligencia
- * operativa. El founder tiene 30s para mirar su dashboard antes de la próxima
- * reunión — cada widget debe decirle algo accionable.
+ * Toda la data viene de `/api/dashboard/empresa` + `needs` y `tasks` que ya
+ * están en `/empresa/page.tsx`.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Activity,
-  Users,
-  TrendingUp,
-  DollarSign,
-  HeartPulse,
-  Target,
-  AlertTriangle,
-  CheckCircle2,
   ArrowRight,
+  Briefcase,
+  CheckCircle2,
+  ChevronRight,
+  DollarSign,
+  Eye,
+  HeartPulse,
   Sparkles,
   Star,
-  Briefcase,
-  ChevronRight,
-  Eye,
   Zap,
+  AlertTriangle,
+  TrendingUp,
+  Users,
 } from 'lucide-react';
+import type { CompanyNeed, MicroTask } from '@/lib/types';
 
 // ─── Tipos del endpoint ──────────────────────────────────────────────────────
 
@@ -91,235 +91,548 @@ interface DashboardEmpresaData {
   };
 }
 
-// ─── Hook de fetch ──────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function useDashboardData(uid: string | undefined) {
   const [data, setData] = useState<DashboardEmpresaData | null>(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/dashboard/empresa?uid=${encodeURIComponent(uid)}`,
-        );
+        const res = await fetch(`/api/dashboard/empresa?uid=${encodeURIComponent(uid)}`);
         if (!res.ok) return;
         const json = (await res.json()) as DashboardEmpresaData;
         if (!cancelled) setData(json);
-      } catch {
-        /* silent */
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      } catch {/* silent */}
+      finally { if (!cancelled) setLoading(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [uid]);
-
   return { data, loading };
+}
+
+function initials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+function shortDate(ts: number): string {
+  return new Date(ts).toLocaleDateString('es-CO', {
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function inferFounderCategory(
+  needs: CompanyNeed[],
+  data: DashboardEmpresaData,
+): string {
+  if (needs.length === 0) return 'Founder en SaltoAI';
+  if (data.kpis.hiresConfirmed >= 2) return 'Constructor de equipo';
+  if (needs.length >= 3) return 'Founder en crecimiento';
+  if (data.kpis.candidatesInPipeline >= 5) return 'Founder activo';
+  if (data.calibration.alignmentLabel === 'alineado') return 'Founder calibrado';
+  return 'Founder en SaltoAI';
+}
+
+/** ADN de búsqueda (5 ejes). */
+function computeRadar(
+  data: DashboardEmpresaData,
+): { axis: string; value: number; raw: number; help: string }[] {
+  const avgHealth =
+    data.needsWithHealth.length === 0
+      ? 0
+      : Math.round(
+          data.needsWithHealth.reduce((a, b) => a + b.healthScore, 0) /
+            data.needsWithHealth.length,
+        );
+  const cap = (raw: number, max: number) =>
+    Math.min(100, Math.round((raw / max) * 100));
+
+  return [
+    { axis: 'Salud', value: avgHealth, raw: avgHealth, help: 'Health score promedio' },
+    { axis: 'Pipeline', value: cap(data.kpis.candidatesInPipeline, 15), raw: data.kpis.candidatesInPipeline, help: 'Candidatos únicos' },
+    { axis: 'Match IA', value: data.kpis.avgIcsAcrossNeeds, raw: data.kpis.avgIcsAcrossNeeds, help: 'ICS promedio' },
+    { axis: 'Conversión', value: data.pipelineFunnel.conversionRates.microtaskToHire, raw: data.pipelineFunnel.conversionRates.microtaskToHire, help: 'Microtask → hire %' },
+    { axis: 'Inversión', value: cap(data.financials.totalInvestedCOP, 5_000_000), raw: data.financials.totalInvestedCOP, help: 'COP invertido' },
+  ];
+}
+
+function computeHireScore(data: DashboardEmpresaData): number {
+  const r = computeRadar(data);
+  return Math.round(r.reduce((a, b) => a + b.value, 0) / r.length);
 }
 
 // ─── Componente principal ───────────────────────────────────────────────────
 
-export function EmpresaWidgets({ uid }: { uid: string }) {
+interface Props {
+  uid: string;
+  companyName: string;
+  needs: CompanyNeed[];
+  tasks: MicroTask[];
+}
+
+export function EmpresaWidgets({ uid, companyName, needs, tasks }: Props) {
   const { data, loading } = useDashboardData(uid);
 
-  if (loading) {
+  const radar = useMemo(() => (data ? computeRadar(data) : []), [data]);
+  const hireScore = useMemo(() => (data ? computeHireScore(data) : 0), [data]);
+  const category = useMemo(
+    () => (data ? inferFounderCategory(needs, data) : 'Founder en SaltoAI'),
+    [needs, data],
+  );
+
+  if (loading || !data) {
     return (
-      <section className="space-y-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
+      <section className="space-y-5" aria-label="Pasaporte del founder">
+        <div className="h-44 rounded-3xl bg-slate-100 animate-pulse" />
+        <div className="grid lg:grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-72 rounded-3xl bg-slate-100 animate-pulse" />
           ))}
         </div>
       </section>
     );
   }
-  if (!data) return null;
 
   return (
-    <section className="space-y-5" aria-label="Métricas enriquecidas">
-      {/* ── Hero KPI strip enriquecido (4 cards adicionales a las base) ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
-          icon={<Users size={14} />}
-          label="Candidatos en pipeline"
-          value={data.kpis.candidatesInPipeline}
-          hint="Únicos vistos / con microtask"
-          tone="emerald"
+    <section className="space-y-5" aria-label="Pasaporte del founder">
+      {/* ─── HERO ────────────────────────────────────────────────────── */}
+      <HeroDark
+        avatarText={initials(companyName)}
+        name={companyName}
+        category={category}
+        ringValue={hireScore}
+        ringLabel="Hire Score"
+        statusText={`${needs.length} ${needs.length === 1 ? 'necesidad activa' : 'necesidades activas'} · ${tasks.length} microtasks creadas`}
+        stats={[
+          { icon: '🎯', label: 'Necesidades', value: String(data.kpis.needsCount) },
+          { icon: '👥', label: 'Candidatos', value: String(data.kpis.candidatesInPipeline) },
+          { icon: '💼', label: 'Microtasks', value: String(tasks.length) },
+          { icon: '✅', label: 'Hires', value: String(data.kpis.hiresConfirmed) },
+        ]}
+      />
+
+      {/* ─── Grid 3-col superior ─────────────────────────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        <RadarCard
+          title="ADN de búsqueda"
+          subtitle="Tu motor en 5 ejes"
+          axes={radar}
         />
-        <KpiCard
-          icon={<TrendingUp size={14} />}
-          label="ICS promedio"
-          value={data.kpis.avgIcsAcrossNeeds}
-          unit="%"
-          hint={`${data.kpis.feedbackReceived} feedbacks dados`}
-          tone={
-            data.kpis.avgIcsAcrossNeeds >= 70
-              ? 'good'
-              : data.kpis.avgIcsAcrossNeeds >= 50
-                ? 'warn'
-                : 'neutral'
-          }
-        />
-        <KpiCard
-          icon={<DollarSign size={14} />}
-          label="Invertido COP"
-          value={`$${(data.financials.totalInvestedCOP / 1000).toFixed(0)}k`}
-          hint={`${data.financials.paidCount} microtasks pagadas`}
-        />
-        <KpiCard
-          icon={<Star size={14} />}
-          label="Hires confirmados"
-          value={data.kpis.hiresConfirmed}
-          hint={
-            data.kpis.hiresConfirmed === 0
-              ? 'Marca "lo contraté" tras la microtask'
-              : 'Contratación formal validada'
-          }
-          tone={data.kpis.hiresConfirmed > 0 ? 'good' : 'neutral'}
-        />
+        <InversionCard financials={data.financials} tasks={tasks} />
+        <CandidatesCard candidates={data.topCandidates} />
       </div>
 
-      {/* ── Pipeline funnel ── */}
-      <PipelineFunnelWidget funnel={data.pipelineFunnel} />
+      {/* ─── Pipeline funnel ─────────────────────────────────────────── */}
+      <PipelineCard funnel={data.pipelineFunnel} />
 
-      {/* ── Calibración + Salud por necesidad ── */}
-      <div className="grid lg:grid-cols-2 gap-5">
-        <CalibrationWidget calibration={data.calibration} />
-        <NeedsHealthWidget needs={data.needsWithHealth} />
+      {/* ─── Grid 2x2 estilo + Necesidades con salud ─────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        <StyleGrid tiles={inferStyleTiles(needs, tasks, data)} className="lg:col-span-2" />
+        <NeedsHealthCard needs={data.needsWithHealth} />
       </div>
 
-      {/* ── Top candidatos cross-need ── */}
-      {data.topCandidates.length > 0 && (
-        <TopCandidatesWidget candidates={data.topCandidates} />
-      )}
+      {/* ─── Calibración ─────────────────────────────────────────────── */}
+      <CalibrationCard calibration={data.calibration} />
     </section>
   );
 }
 
-// ─── KpiCard ─────────────────────────────────────────────────────────────────
+// ─── HeroDark ────────────────────────────────────────────────────────────────
 
-function KpiCard({
-  icon,
-  label,
-  value,
-  unit,
-  hint,
-  tone = 'neutral',
+function HeroDark({
+  avatarText,
+  name,
+  category,
+  ringValue,
+  ringLabel,
+  statusText,
+  stats,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  unit?: string;
-  hint?: string;
-  tone?: 'good' | 'warn' | 'bad' | 'emerald' | 'neutral';
+  avatarText: string;
+  name: string;
+  category: string;
+  ringValue: number;
+  ringLabel: string;
+  statusText: string;
+  stats: { icon: string; label: string; value: string }[];
 }) {
-  const color =
-    tone === 'good'
-      ? 'text-emerald-600'
-      : tone === 'emerald'
-        ? 'text-emerald-600'
-        : tone === 'warn'
-          ? 'text-amber-600'
-          : tone === 'bad'
-            ? 'text-rose-600'
-            : 'text-slate-900';
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">
-        <span className="text-emerald-600">{icon}</span>
-        <span>{label}</span>
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40 text-white p-5 md:p-7">
+      <div className="absolute -top-20 -right-20 w-80 h-80 bg-amber-500/20 rounded-full blur-3xl" aria-hidden />
+      <div className="relative flex flex-col md:flex-row md:items-center gap-5">
+        <div className="relative flex-shrink-0">
+          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-display font-bold text-2xl md:text-3xl shadow-lg shadow-amber-900/40">
+            {avatarText || '·'}
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 border-2 border-stone-950 flex items-center justify-center">
+            <CheckCircle2 size={12} className="text-white" />
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight">
+              {name}
+            </h1>
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold shadow-sm">
+              {category}
+            </span>
+            {ringValue >= 70 && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-950/40 border border-amber-700/40 text-amber-300 text-xs font-semibold">
+                Score {ringValue}
+              </span>
+            )}
+          </div>
+          <p className="text-stone-400 text-sm">{statusText}</p>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl">
+            {stats.map((s) => (
+              <div key={s.label} className="flex items-center gap-2.5">
+                <span className="text-xl leading-none">{s.icon}</span>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+                    {s.label}
+                  </div>
+                  <div className="font-display font-bold text-base text-white tabular-nums truncate">
+                    {s.value}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-shrink-0 flex flex-col items-center">
+          <RingScore value={ringValue} size={108} />
+          <div className="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-semibold mt-2">
+            {ringLabel}
+          </div>
+        </div>
       </div>
-      <div className={`font-display font-bold text-2xl md:text-3xl tabular-nums leading-none ${color}`}>
-        {value}
-        {unit && <span className="text-base font-semibold ml-0.5">{unit}</span>}
-      </div>
-      {hint && <div className="text-[11px] text-slate-500 mt-1.5 line-clamp-2">{hint}</div>}
     </div>
   );
 }
 
-// ─── PipelineFunnelWidget ────────────────────────────────────────────────────
+// ─── RingScore SVG ──────────────────────────────────────────────────────────
 
-function PipelineFunnelWidget({
+function RingScore({ value, size = 96 }: { value: number; size?: number }) {
+  const clamped = Math.max(0, Math.min(100, value));
+  const stroke = 9;
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (clamped / 100) * circ;
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={cx} cy={cy} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
+        <circle
+          cx={cx} cy={cy} r={r}
+          stroke="url(#ringGradEmp)"
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          strokeLinecap="round"
+        />
+        <defs>
+          <linearGradient id="ringGradEmp" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#ea580c" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display font-bold text-3xl text-white tabular-nums leading-none">
+          {clamped}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── RadarCard ─────────────────────────────────────────────────────────────
+
+function RadarCard({
+  title,
+  subtitle,
+  axes,
+}: {
+  title: string;
+  subtitle?: string;
+  axes: { axis: string; value: number; raw: number; help: string }[];
+}) {
+  if (axes.length === 0) {
+    return (
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+        <SectionTitle title={title} />
+        <p className="text-sm text-stone-500 mt-3">Sin datos suficientes.</p>
+      </div>
+    );
+  }
+  const size = 180;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size / 2 - 14;
+  const N = axes.length;
+
+  const points = axes.map((a, i) => {
+    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+    const v = a.value / 100;
+    return {
+      x: cx + Math.cos(angle) * radius * v,
+      y: cy + Math.sin(angle) * radius * v,
+    };
+  });
+  const polygon = points.map((p) => `${p.x},${p.y}`).join(' ');
+  const rings = [0.25, 0.5, 0.75, 1.0];
+  const axisLines = axes.map((_, i) => {
+    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+  });
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <SectionTitle title={title} subtitle={subtitle} />
+      <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
+        <svg width={size} height={size} className="flex-shrink-0">
+          {rings.map((r, i) => (
+            <polygon
+              key={i}
+              points={axes
+                .map((_, j) => {
+                  const angle = (Math.PI * 2 * j) / N - Math.PI / 2;
+                  const x = cx + Math.cos(angle) * radius * r;
+                  const y = cy + Math.sin(angle) * radius * r;
+                  return `${x},${y}`;
+                })
+                .join(' ')}
+              fill="none"
+              stroke="#e7e5e4"
+              strokeWidth={1}
+            />
+          ))}
+          {axisLines.map((p, i) => (
+            <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#e7e5e4" strokeWidth={1} />
+          ))}
+          <polygon points={polygon} fill="rgba(234, 88, 12, 0.18)" stroke="#ea580c" strokeWidth={2} />
+          {points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={3} fill="#ea580c" />
+          ))}
+          {axes.map((a, i) => {
+            const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+            const x = cx + Math.cos(angle) * (radius + 6);
+            const y = cy + Math.sin(angle) * (radius + 6);
+            const anchor: 'start' | 'middle' | 'end' =
+              x < cx - 1 ? 'end' : x > cx + 1 ? 'start' : 'middle';
+            return (
+              <text
+                key={i}
+                x={x}
+                y={y}
+                fontSize={9}
+                textAnchor={anchor}
+                dominantBaseline="middle"
+                fill="#78716c"
+                fontWeight="600"
+              >
+                {a.axis}
+              </text>
+            );
+          })}
+        </svg>
+        <div className="flex-1 w-full space-y-2 min-w-0">
+          {axes.map((a) => (
+            <div key={a.axis} className="flex items-center gap-3 text-sm">
+              <span className="text-stone-700 w-24 truncate text-xs">{a.axis}</span>
+              <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-full bg-orange-500 transition-all" style={{ width: `${a.value}%` }} />
+              </div>
+              <span className="font-mono tabular-nums text-xs font-bold text-stone-900 w-7 text-right">
+                {a.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── InversionCard (presupuesto-like) ──────────────────────────────────────
+
+function InversionCard({
+  financials,
+  tasks,
+}: {
+  financials: DashboardEmpresaData['financials'];
+  tasks: MicroTask[];
+}) {
+  const paidSum = tasks.filter((t) => t.status === 'paid').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+  const evaluatedSum = tasks.filter((t) => t.status === 'evaluated').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+  const deliveredSum = tasks.filter((t) => t.status === 'delivered').reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+  const pendingSum = tasks
+    .filter((t) => t.status === 'pending' || t.status === 'in_progress')
+    .reduce((a, t) => a + (t.amountCOP ?? 0), 0);
+
+  const max = Math.max(1, paidSum, evaluatedSum, deliveredSum, pendingSum);
+  const rows: { label: string; value: number; color: string }[] = [
+    { label: 'Pagadas', value: paidSum, color: 'bg-emerald-500' },
+    { label: 'Evaluadas', value: evaluatedSum, color: 'bg-emerald-400' },
+    { label: 'Por evaluar', value: deliveredSum, color: 'bg-amber-400' },
+    { label: 'En progreso', value: pendingSum, color: 'bg-stone-300' },
+  ];
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <SectionTitle title="Inversión en talento" />
+      <div className="mt-3">
+        <div className="font-display font-bold text-4xl text-stone-900 tabular-nums leading-none">
+          ${financials.totalInvestedCOP.toLocaleString('es-CO')}
+        </div>
+        <div className="text-xs text-stone-500 mt-1">
+          COP · {tasks.length} {tasks.length === 1 ? 'microtask' : 'microtasks'} creadas
+          {financials.averageTaskCOP > 0 && ` · prom $${financials.averageTaskCOP.toLocaleString('es-CO')}/u`}
+        </div>
+      </div>
+      <div className="mt-5 space-y-2.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-3 text-sm">
+            <span className="text-stone-700 flex-1 truncate text-xs">{r.label}</span>
+            <div className="w-24 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+              <div className={`h-full ${r.color}`} style={{ width: `${(r.value / max) * 100}%` }} />
+            </div>
+            <span className="font-mono tabular-nums text-xs font-semibold text-stone-900 w-16 text-right">
+              ${r.value.toLocaleString('es-CO')}
+            </span>
+          </div>
+        ))}
+      </div>
+      {financials.pendingCount > 0 && (
+        <div className="mt-5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center gap-2 text-xs text-amber-900">
+          <span>⏳</span>
+          <span><strong>{financials.pendingCount}</strong> microtask{financials.pendingCount === 1 ? '' : 's'} en curso esperando entrega.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CandidatesCard (flag rows estilo) ─────────────────────────────────────
+
+function CandidatesCard({
+  candidates,
+}: {
+  candidates: DashboardEmpresaData['topCandidates'];
+}) {
+  return (
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="flex items-center justify-between mb-1">
+        <SectionTitle title="Top candidatos" />
+        {candidates.length > 0 && (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold">
+            {candidates.length} cross-need
+          </span>
+        )}
+      </div>
+      {candidates.length === 0 ? (
+        <p className="text-sm text-stone-500 mt-3 leading-relaxed">
+          Cuando abras perfiles o propongas microtasks, los candidatos que
+          aparezcan en varias búsquedas tuyas van a salir acá ordenados.
+        </p>
+      ) : (
+        candidates.map((c) => (
+          <Link key={c.profileId} href={`/joven/perfil/${c.profileId}`}>
+            <div className="mt-3 group cursor-pointer">
+              <div className="flex items-start justify-between gap-3 mb-1.5">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {initials(c.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-stone-900 truncate group-hover:text-orange-700 transition-colors">
+                      {c.name}
+                    </div>
+                    <div className="text-[11px] text-stone-500 truncate">
+                      {c.appearancesInShortlists} {c.appearancesInShortlists === 1 ? 'aparición' : 'apariciones'}
+                      {c.microtasksProposed > 0 && ` · ${c.microtasksProposed} task${c.microtasksProposed === 1 ? '' : 's'}`}
+                    </div>
+                  </div>
+                </div>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 flex-shrink-0">
+                  ICS {c.avgIcsAcrossNeeds || '—'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-orange-500 transition-all" style={{ width: `${c.avgIcsAcrossNeeds}%` }} />
+                </div>
+                <span className="text-[11px] font-mono tabular-nums font-bold text-stone-900 w-9 text-right">
+                  {c.avgIcsAcrossNeeds || 0}%
+                </span>
+              </div>
+            </div>
+          </Link>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ─── PipelineCard ──────────────────────────────────────────────────────────
+
+function PipelineCard({
   funnel,
 }: {
   funnel: DashboardEmpresaData['pipelineFunnel'];
 }) {
   const stages = [
-    { label: 'Shortlist', value: funnel.totalShortlist, key: 'sh' },
-    { label: 'Perfiles abiertos', value: funnel.profilesOpened, key: 'op' },
-    { label: 'Microtasks propuestas', value: funnel.microtasksProposed, key: 'mp' },
-    { label: 'Entregadas', value: funnel.microtasksDelivered, key: 'md' },
-    { label: 'Evaluadas', value: funnel.microtasksRated, key: 'mr' },
-    { label: 'Contratados', value: funnel.hiresConfirmed, key: 'hi' },
+    { emoji: '🎯', label: 'Shortlist', value: funnel.totalShortlist },
+    { emoji: '👀', label: 'Perfiles abiertos', value: funnel.profilesOpened },
+    { emoji: '💼', label: 'Microtasks propuestas', value: funnel.microtasksProposed },
+    { emoji: '📦', label: 'Entregadas', value: funnel.microtasksDelivered },
+    { emoji: '⭐', label: 'Evaluadas', value: funnel.microtasksRated },
+    { emoji: '✅', label: 'Contratados', value: funnel.hiresConfirmed },
   ];
   const max = Math.max(1, ...stages.map((s) => s.value));
-  const tones = [
-    'bg-emerald-500',
-    'bg-emerald-500',
-    'bg-amber-400',
-    'bg-amber-400',
-    'bg-slate-700',
-    'bg-slate-900',
-  ];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
-        <Activity size={12} className="text-emerald-600" />
-        Tu pipeline de contratación
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <SectionTitle title="Pipeline de contratación" subtitle="Del match al hire" />
       </div>
-      <h3 className="font-display font-semibold text-lg text-slate-900 mb-1">
-        Del match al hire — paso por paso.
-      </h3>
-      <p className="text-xs text-slate-500 mb-5 max-w-2xl leading-relaxed">
-        Cada etapa cae más a la derecha. Las pérdidas grandes entre etapas son tu
-        palanca: si abres muchos perfiles pero propones pocas microtasks, el
-        cuello de botella está en el primer interview.
-      </p>
-
-      <div className="space-y-2.5">
-        {stages.map((s, i) => {
+      <div className="mt-4 space-y-2.5">
+        {stages.map((s) => {
           const pct = (s.value / max) * 100;
           return (
-            <div key={s.key} className="flex items-center gap-3 text-sm">
-              <div className="w-44 text-slate-700 truncate">{s.label}</div>
-              <div className="flex-1 h-7 bg-slate-100 rounded-lg relative overflow-hidden">
+            <div key={s.label} className="flex items-center gap-3 text-sm">
+              <span className="text-xl leading-none w-7 text-center flex-shrink-0">{s.emoji}</span>
+              <span className="text-stone-700 w-44 text-xs truncate">{s.label}</span>
+              <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-lg transition-all ${tones[i]}`}
+                  className="h-full bg-orange-500 transition-all"
                   style={{ width: `${pct}%` }}
                 />
-                <span className="absolute inset-y-0 left-3 flex items-center text-xs text-white font-semibold tabular-nums">
-                  {s.value > 0 && s.value}
-                </span>
               </div>
-              <div className="w-12 text-right font-mono tabular-nums font-bold text-slate-900">
+              <span className="font-mono tabular-nums text-xs font-bold text-stone-900 w-9 text-right">
                 {s.value}
-              </div>
+              </span>
             </div>
           );
         })}
       </div>
-
-      <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-3 gap-3 text-center">
-        <ConversionStat
-          label="Shortlist → Abrir"
-          value={funnel.conversionRates.shortlistToOpen}
-        />
-        <ConversionStat
-          label="Abrir → Microtask"
-          value={funnel.conversionRates.openToMicrotask}
-        />
-        <ConversionStat
-          label="Microtask → Hire"
-          value={funnel.conversionRates.microtaskToHire}
-          highlight
-        />
+      <div className="mt-5 pt-4 border-t border-stone-100 grid grid-cols-3 gap-3 text-center">
+        <ConversionStat label="Shortlist → Abrir" value={funnel.conversionRates.shortlistToOpen} />
+        <ConversionStat label="Abrir → Microtask" value={funnel.conversionRates.openToMicrotask} />
+        <ConversionStat label="Microtask → Hire" value={funnel.conversionRates.microtaskToHire} highlight />
       </div>
     </div>
   );
@@ -334,115 +647,92 @@ function ConversionStat({
   value: number;
   highlight?: boolean;
 }) {
-  const color = highlight
-    ? value >= 30
-      ? 'text-emerald-600'
-      : 'text-amber-600'
-    : 'text-slate-900';
+  const color = highlight ? (value >= 30 ? 'text-emerald-600' : 'text-amber-600') : 'text-stone-900';
   return (
     <div>
-      <div className={`font-display font-bold text-xl tabular-nums ${color}`}>
-        {value}%
-      </div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mt-0.5">
-        {label}
-      </div>
+      <div className={`font-display font-bold text-xl tabular-nums ${color}`}>{value}%</div>
+      <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold mt-0.5">{label}</div>
     </div>
   );
 }
 
-// ─── CalibrationWidget ──────────────────────────────────────────────────────
+// ─── StyleGrid ────────────────────────────────────────────────────────────
 
-function CalibrationWidget({
-  calibration,
+interface StyleTile {
+  emoji: string;
+  label: string;
+  value: string;
+  hint: string;
+}
+
+function inferStyleTiles(
+  needs: CompanyNeed[],
+  tasks: MicroTask[],
+  data: DashboardEmpresaData,
+): StyleTile[] {
+  // Velocidad de publicación
+  const newest = needs.reduce((m, n) => Math.max(m, n.createdAt), 0);
+  const daysSinceNewest = newest === 0 ? 999 : Math.floor((Date.now() - newest) / (1000 * 60 * 60 * 24));
+  const velocidad: StyleTile = daysSinceNewest <= 7
+    ? { emoji: '🚀', label: 'Cadencia', value: 'Activa', hint: `Última necesidad publicada hace ${daysSinceNewest}d` }
+    : daysSinceNewest <= 30
+      ? { emoji: '📅', label: 'Cadencia', value: 'Regular', hint: `Última publicación hace ${daysSinceNewest}d` }
+      : { emoji: '💤', label: 'Cadencia', value: 'Detenida', hint: 'Publicá una nueva necesidad' };
+
+  // Estilo de evaluación: avg rating del founder
+  const evals = tasks
+    .filter((t) => typeof t.companyRating === 'number')
+    .map((t) => t.companyRating!) ;
+  const avgEval = evals.length === 0 ? 0 : evals.reduce((a, b) => a + b, 0) / evals.length;
+  const estiloEval: StyleTile = avgEval === 0
+    ? { emoji: '⏳', label: 'Estilo eval', value: 'Por estrenar', hint: 'Aún sin evaluaciones' }
+    : avgEval >= 4
+      ? { emoji: '🌟', label: 'Estilo eval', value: 'Generoso', hint: `Promedio ${avgEval.toFixed(1)}/5` }
+      : avgEval >= 3
+        ? { emoji: '⚖️', label: 'Estilo eval', value: 'Balanceado', hint: `Promedio ${avgEval.toFixed(1)}/5` }
+        : { emoji: '🔥', label: 'Estilo eval', value: 'Exigente', hint: `Promedio ${avgEval.toFixed(1)}/5` };
+
+  // Calibración con la IA
+  const calibracion: StyleTile = data.calibration.alignmentLabel === 'alineado'
+    ? { emoji: '🤝', label: 'Vs. IA', value: 'Alineado', hint: 'Tu juicio coincide con la pre-eval' }
+    : data.calibration.alignmentLabel === 'optimista'
+      ? { emoji: '🌤️', label: 'Vs. IA', value: 'IA optimista', hint: `Delta ${data.calibration.avgDelta} pts` }
+      : data.calibration.alignmentLabel === 'conservador'
+        ? { emoji: '🧊', label: 'Vs. IA', value: 'IA conservadora', hint: `Delta ${data.calibration.avgDelta} pts` }
+        : { emoji: '🎲', label: 'Vs. IA', value: 'Sin pares aún', hint: 'Evaluá una microtask' };
+
+  // Resultado: tasa de hire
+  const conversion = data.pipelineFunnel.conversionRates.microtaskToHire;
+  const conversionTile: StyleTile = conversion >= 30
+    ? { emoji: '🏆', label: 'Conversión', value: 'Alta', hint: `${conversion}% microtask → hire` }
+    : conversion >= 10
+      ? { emoji: '📈', label: 'Conversión', value: 'Mejorando', hint: `${conversion}% microtask → hire` }
+      : { emoji: '🌱', label: 'Conversión', value: 'En siembra', hint: 'Primer hire pendiente' };
+
+  return [velocidad, estiloEval, calibracion, conversionTile];
+}
+
+function StyleGrid({
+  tiles,
+  className = '',
 }: {
-  calibration: DashboardEmpresaData['calibration'];
+  tiles: StyleTile[];
+  className?: string;
 }) {
-  if (calibration.alignmentLabel === 'sin_datos' || calibration.totalPaired === 0) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
-          <Zap size={12} className="text-emerald-600" />
-          Calibración del motor IA
-        </div>
-        <h3 className="font-display font-semibold text-lg text-slate-900 mb-3">
-          Sin pares pre-eval vs. rating todavía
-        </h3>
-        <p className="text-sm text-slate-600 leading-relaxed">
-          Cuando evaluás microtasks, comparamos tu rating con la pre-eval que
-          hizo la IA. Si el motor está optimista o conservador, lo vas a ver acá.
-          Eso reentrena los pesos.
-        </p>
-      </div>
-    );
-  }
-  const tone =
-    calibration.alignmentLabel === 'alineado'
-      ? { color: 'text-emerald-600', label: 'Bien alineado', bg: 'bg-emerald-50/40 border-emerald-200/60' }
-      : calibration.alignmentLabel === 'optimista'
-        ? { color: 'text-amber-600', label: 'IA optimista', bg: 'bg-amber-50/40 border-amber-200/60' }
-        : { color: 'text-rose-600', label: 'IA conservadora', bg: 'bg-rose-50/40 border-rose-200/60' };
-
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
-        <Zap size={12} className="text-emerald-600" />
-        Calibración del motor IA
-      </div>
-      <h3 className="font-display font-semibold text-lg text-slate-900 mb-3">
-        ¿La pre-eval coincide con tu juicio?
-      </h3>
-
-      <div className={`${tone.bg} border rounded-xl p-3 mb-4 flex items-start gap-2.5`}>
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${tone.color}`}>
-          <Sparkles size={13} />
-        </div>
-        <div className="flex-1">
-          <div className={`font-semibold text-sm ${tone.color}`}>{tone.label}</div>
-          <p className="text-xs text-slate-700 leading-relaxed mt-0.5">
-            Delta promedio:{' '}
-            <strong className="font-mono tabular-nums">
-              {calibration.avgDelta > 0 ? '+' : ''}{calibration.avgDelta}
-            </strong>{' '}
-            puntos sobre {calibration.totalPaired} microtasks evaluadas.
-            {calibration.alignmentLabel === 'optimista' &&
-              ' La IA está prediciendo mejor de lo que tú confirmás — bajaremos el peso de la pre-eval.'}
-            {calibration.alignmentLabel === 'conservador' &&
-              ' La IA está siendo más dura que vos — los candidatos son mejores de lo que predijo.'}
-            {calibration.alignmentLabel === 'alineado' &&
-              ' El motor está calibrado para tu criterio. Las pre-evals son confiables.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Pairs preview: max 5 más recientes */}
-      <div className="space-y-1.5">
-        {calibration.pairs.slice(0, 5).map((p, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors"
-          >
-            <div className="flex items-center gap-3 text-xs">
-              <span className="font-mono tabular-nums text-slate-500">
-                IA: <strong className="text-slate-900">{p.icsAtMatch}</strong>
-              </span>
-              <ArrowRight size={11} className="text-slate-300" />
-              <span className="font-mono tabular-nums text-slate-500">
-                Tu rating:{' '}
-                <strong className="text-amber-600">{p.founderRating}/5</strong>
-              </span>
+    <div className={`bg-white border border-stone-200 rounded-3xl p-5 md:p-6 ${className}`}>
+      <SectionTitle title="Estilo de founder" />
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-2xl border border-stone-200 bg-stone-50/40 p-4">
+            <div className="text-3xl leading-none mb-3">{t.emoji}</div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+              {t.label}
             </div>
-            <span
-              className={`text-[10px] font-mono tabular-nums font-semibold ${
-                Math.abs(p.delta) <= 10
-                  ? 'text-emerald-600'
-                  : p.delta > 0
-                    ? 'text-amber-600'
-                    : 'text-rose-600'
-              }`}
-            >
-              {p.delta > 0 ? '+' : ''}{p.delta}
-            </span>
+            <div className="font-display font-bold text-base text-stone-900 mt-0.5">
+              {t.value}
+            </div>
+            <div className="text-[11px] text-stone-500 mt-1 leading-snug">{t.hint}</div>
           </div>
         ))}
       </div>
@@ -450,74 +740,58 @@ function CalibrationWidget({
   );
 }
 
-// ─── NeedsHealthWidget ─────────────────────────────────────────────────────
+// ─── NeedsHealthCard ──────────────────────────────────────────────────────
 
-function NeedsHealthWidget({
+function NeedsHealthCard({
   needs,
 }: {
   needs: DashboardEmpresaData['needsWithHealth'];
 }) {
   if (needs.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
-          <HeartPulse size={12} className="text-emerald-600" />
-          Salud de tus necesidades
-        </div>
-        <p className="text-sm text-slate-500 mt-3">
-          Sin necesidades publicadas todavía.
-        </p>
+      <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+        <SectionTitle title="Salud de búsquedas" />
+        <p className="text-sm text-stone-500 mt-3">Sin necesidades publicadas aún.</p>
       </div>
     );
   }
-  // Order: peor salud primero (las que más necesitan atención).
   const sorted = [...needs].sort((a, b) => a.healthScore - b.healthScore);
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
-        <HeartPulse size={12} className="text-emerald-600" />
-        Salud de tus necesidades
-      </div>
-      <h3 className="font-display font-semibold text-lg text-slate-900 mb-1">
-        Cuáles afinar primero
-      </h3>
-      <p className="text-xs text-slate-500 mb-4">
-        Score 0-100 que combina contexto, skills declaradas y rasgos. Las
-        peores arriba.
-      </p>
-
-      <div className="space-y-2">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
+      <SectionTitle title="Salud de búsquedas" subtitle="Las peores arriba" />
+      <div className="mt-4 space-y-2">
         {sorted.slice(0, 5).map((n) => {
-          const tone =
+          const dot =
             n.healthScore >= 80
-              ? { dot: 'bg-emerald-500', text: 'text-emerald-600' }
+              ? 'bg-emerald-500'
               : n.healthScore >= 50
-                ? { dot: 'bg-amber-400', text: 'text-amber-600' }
-                : { dot: 'bg-rose-500', text: 'text-rose-600' };
+                ? 'bg-amber-400'
+                : 'bg-rose-500';
+          const text =
+            n.healthScore >= 80
+              ? 'text-emerald-600'
+              : n.healthScore >= 50
+                ? 'text-amber-600'
+                : 'text-rose-600';
           return (
             <Link key={n.id} href={`/empresa/matches/${n.id}`}>
-              <div className="flex items-start gap-3 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/30 transition-colors group">
-                <span className={`w-2 h-2 rounded-full ${tone.dot} flex-shrink-0 mt-2`} />
+              <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl border border-stone-200 hover:border-orange-300 hover:bg-orange-50/30 transition-colors group">
+                <span className={`w-2 h-2 rounded-full ${dot} flex-shrink-0 mt-1.5`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-slate-900 truncate">
-                      {n.role}
-                    </span>
-                    <span className={`font-mono tabular-nums text-xs font-bold ${tone.text}`}>
+                    <span className="text-sm font-medium text-stone-900 truncate">{n.role}</span>
+                    <span className={`font-mono tabular-nums text-xs font-bold ${text}`}>
                       {n.healthScore}
                     </span>
                   </div>
                   {n.topIssue && (
-                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                    <p className="text-[11px] text-stone-500 mt-0.5 truncate">
                       <AlertTriangle size={9} className="inline mr-1 text-amber-500" />
                       {n.topIssue}
                     </p>
                   )}
                 </div>
-                <ChevronRight
-                  size={13}
-                  className="text-slate-300 group-hover:text-emerald-500 flex-shrink-0 mt-1.5"
-                />
+                <ChevronRight size={13} className="text-stone-300 group-hover:text-orange-500 flex-shrink-0 mt-1" />
               </div>
             </Link>
           );
@@ -527,70 +801,94 @@ function NeedsHealthWidget({
   );
 }
 
-// ─── TopCandidatesWidget ───────────────────────────────────────────────────
+// ─── CalibrationCard ──────────────────────────────────────────────────────
 
-function TopCandidatesWidget({
-  candidates,
+function CalibrationCard({
+  calibration,
 }: {
-  candidates: DashboardEmpresaData['topCandidates'];
+  calibration: DashboardEmpresaData['calibration'];
 }) {
-  return (
-    <div className="bg-slate-950 text-white rounded-2xl p-5 md:p-6 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" aria-hidden />
-      <div className="relative">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-emerald-300 font-semibold mb-1">
-          <Sparkles size={12} />
-          Top candidatos cross-need
-        </div>
-        <h3 className="font-display font-semibold text-lg text-white mb-1">
-          Los perfiles que aparecen una y otra vez en tus shortlists.
-        </h3>
-        <p className="text-xs text-slate-400 mb-4 max-w-2xl leading-relaxed">
-          Si un mismo joven sube en múltiples búsquedas tuyas con ICS alto, es
-          señal de fit transversal — vale la pena el follow-up.
+  if (calibration.alignmentLabel === 'sin_datos' || calibration.totalPaired === 0) {
+    return (
+      <div className="bg-gradient-to-br from-stone-50 to-amber-50/30 border border-stone-200 rounded-3xl p-5 md:p-6">
+        <SectionTitle title="Calibración del motor IA" />
+        <p className="text-sm text-stone-600 mt-3 leading-relaxed">
+          Cuando evalúes microtasks, comparamos tu rating con la pre-eval de la IA.
+          El delta promedio nos dice si el motor está optimista, conservador o
+          alineado con tu juicio. Eso reentrena los pesos.
         </p>
+      </div>
+    );
+  }
 
-        <div className="space-y-1.5">
-          {candidates.map((c) => (
-            <Link key={c.profileId} href={`/joven/perfil/${c.profileId}`}>
-              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-900/60 transition-colors group">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center flex-shrink-0 font-semibold text-sm">
-                  {c.name
-                    .split(' ')
-                    .map((w) => w[0])
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{c.name}</div>
-                  <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-0.5">
-                    <span>
-                      <Eye size={9} className="inline mr-1" />
-                      {c.appearancesInShortlists} vistas
-                    </span>
-                    {c.avgIcsAcrossNeeds > 0 && (
-                      <span>
-                        ICS ~<strong className="text-emerald-300">{c.avgIcsAcrossNeeds}</strong>
-                      </span>
-                    )}
-                    {c.microtasksProposed > 0 && (
-                      <span>
-                        <Briefcase size={9} className="inline mr-1" />
-                        {c.microtasksProposed} task{c.microtasksProposed === 1 ? '' : 's'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight
-                  size={14}
-                  className="text-slate-500 group-hover:text-emerald-300 flex-shrink-0"
-                />
-              </div>
-            </Link>
-          ))}
+  const tone =
+    calibration.alignmentLabel === 'alineado'
+      ? { emoji: '🎯', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200/60', label: 'Bien alineado' }
+      : calibration.alignmentLabel === 'optimista'
+        ? { emoji: '🌤️', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200/60', label: 'IA optimista' }
+        : { emoji: '🧊', color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200/60', label: 'IA conservadora' };
+
+  return (
+    <div className={`border rounded-3xl p-5 md:p-6 ${tone.bg}`}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <SectionTitle title="Calibración del motor IA" />
+          <h3 className={`font-display font-bold text-lg mt-1 ${tone.color}`}>
+            {tone.emoji} {tone.label}
+          </h3>
+        </div>
+        <div className="text-right">
+          <div className={`font-display font-bold text-3xl tabular-nums ${tone.color}`}>
+            {calibration.avgDelta > 0 ? '+' : ''}{calibration.avgDelta}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+            Delta promedio
+          </div>
         </div>
       </div>
+      <p className="text-sm text-stone-700 leading-relaxed mb-4">
+        Sobre {calibration.totalPaired} microtasks evaluadas.
+        {calibration.alignmentLabel === 'optimista' &&
+          ' La IA predice mejor de lo que tú confirmás — bajaremos el peso de la pre-eval.'}
+        {calibration.alignmentLabel === 'conservador' &&
+          ' La IA es más dura que tú — los candidatos rinden mejor de lo previsto.'}
+        {calibration.alignmentLabel === 'alineado' &&
+          ' Las pre-evals son confiables para tu criterio.'}
+      </p>
+      <div className="space-y-1.5">
+        {calibration.pairs.slice(0, 5).map((p, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/60 border border-stone-200"
+          >
+            <div className="flex items-center gap-3 text-xs">
+              <span className="font-mono tabular-nums text-stone-500">
+                IA: <strong className="text-stone-900">{p.icsAtMatch}</strong>
+              </span>
+              <ArrowRight size={11} className="text-stone-300" />
+              <span className="font-mono tabular-nums text-stone-500">
+                Tu rating: <strong className="text-amber-600">{p.founderRating}/5</strong>
+              </span>
+            </div>
+            <span className={`text-[10px] font-mono tabular-nums font-semibold ${
+              Math.abs(p.delta) <= 10 ? 'text-emerald-600' : p.delta > 0 ? 'text-amber-600' : 'text-rose-600'
+            }`}>
+              {p.delta > 0 ? '+' : ''}{p.delta}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── SectionTitle ─────────────────────────────────────────────────────────
+
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-semibold">{title}</div>
+      {subtitle && <div className="text-xs text-stone-400 mt-0.5">{subtitle}</div>}
     </div>
   );
 }
