@@ -1,7 +1,6 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { UserButton } from '@/components/auth/user-button';
 import { NavLink } from '@/components/nav-link';
 import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
 
@@ -83,12 +82,6 @@ export function JovenNav({
         onNavigate={onNavigate}
         className={linkClass}
       />
-      {!isCol && (
-        <>
-          <div className="h-5 w-px bg-slate-200 mx-2" />
-          <UserButton />
-        </>
-      )}
     </nav>
   );
 }

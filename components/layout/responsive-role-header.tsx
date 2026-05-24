@@ -14,6 +14,8 @@ type Props = {
   drawerNav: (close: () => void) => React.ReactNode;
   /** Acciones a la derecha en móvil (p. ej. UserButton). */
   mobileTrailing?: React.ReactNode;
+  /** Acciones fuera del nav con scroll (p. ej. UserButton en desktop). */
+  desktopTrailing?: React.ReactNode;
 };
 
 export function ResponsiveRoleHeader({
@@ -21,6 +23,7 @@ export function ResponsiveRoleHeader({
   desktopNav,
   drawerNav,
   mobileTrailing,
+  desktopTrailing,
 }: Props) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -40,7 +43,7 @@ export function ResponsiveRoleHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-20 px-4 sm:px-6 h-14 md:h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-50 px-4 sm:px-6 h-14 md:h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 sm:gap-2 min-w-0">
           <button
             type="button"
@@ -56,9 +59,17 @@ export function ResponsiveRoleHeader({
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-0.5 text-sm font-medium min-w-0 flex-1 justify-end overflow-x-auto scrollbar-thin">
-          {desktopNav}
-        </nav>
+        <div className="hidden md:flex items-center gap-2 min-w-0 flex-1 justify-end">
+          <nav className="flex items-center gap-0.5 text-sm font-medium min-w-0 overflow-x-auto scrollbar-thin">
+            {desktopNav}
+          </nav>
+          {desktopTrailing ? (
+            <>
+              <div className="h-5 w-px bg-slate-200 shrink-0" aria-hidden />
+              <div className="flex items-center shrink-0">{desktopTrailing}</div>
+            </>
+          ) : null}
+        </div>
 
         {mobileTrailing ? (
           <div className="flex items-center gap-1 flex-shrink-0 md:hidden">{mobileTrailing}</div>
