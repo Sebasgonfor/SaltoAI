@@ -168,10 +168,10 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
         <section className="bg-emerald-50/40 border border-emerald-200 rounded-2xl p-6 md:p-8">
           <h2 className="font-display font-bold text-xl text-slate-900 mb-1">Tu entrega</h2>
           <p className="text-sm text-slate-600 mb-4">
-            Puedes pegar tu trabajo directamente, o un link a Google Drive / Notion / lo que uses. Sé concreto y mostrá tu razonamiento si vale la pena.
+            Puedes pegar tu trabajo directamente, o un link a Google Drive / Notion / lo que uses. Sé concreto y muestra tu razonamiento si vale la pena.
           </p>
           <Textarea
-            placeholder="Pegá tu entregable acá. Si es un archivo externo, incluí el link y un resumen corto."
+            placeholder="Pega tu entregable aquí. Si es un archivo externo, incluye el link y un resumen corto."
             className="min-h-40 bg-white text-[15px] leading-relaxed"
             value={deliverable}
             onChange={(e) => setDeliverable(e.target.value)}

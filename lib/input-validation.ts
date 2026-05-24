@@ -33,7 +33,7 @@ export function isLastAnswerTooShort(messages: ChatMessage[], minWords = 2): boo
 export function isYesNoQuestion(text: string): boolean {
   const t = (text ?? "").toLowerCase().trim();
   if (!t.includes("?")) return false;
-  // Aperturas típicas de pregunta cerrada en español neutro LATAM.
+  // Aperturas típicas de pregunta cerrada en español neutro latinoamericano.
   return /(^|[¿\s])(hubo|hubieron|alguna vez|alguien|tuviste|te pas[óo]|te toc[óo]|sab[ée]s|sabias|sab[ií]as|pod[ée]s|pudiste|fuiste|estuviste|conoces|conoc[ée]s|has |hab[ée]s|hac[ée]s|hiciste|llegaste|recordas|record[áa]s)/i.test(
     t
   );
@@ -49,7 +49,7 @@ export function lastAgentMessage(messages: ChatMessage[]): string {
  * sí/no del agente. NO regaña — pide el ejemplo concreto.
  */
 export const YES_NO_FOLLOWUP_PROMPTS = [
-  "Dale, cuéntame ese momento — ¿qué pasó, qué hiciste, cómo terminó?",
+  "Bueno, cuéntame ese momento — ¿qué pasó, qué hiciste, cómo terminó?",
   "Perfecto. Ahora cuéntame el ejemplo concreto: ¿cuándo fue y qué hiciste exactamente?",
   "Buenísimo, vamos al caso real. Cuéntame paso a paso qué hiciste y qué cambió.",
 ] as const;
@@ -106,7 +106,7 @@ export function validateNeedDescription(raw: string): InterviewValidity {
     return {
       ok: false,
       reason: "no_user_turns",
-      message: "Necesito una descripción de tu necesidad. Cuéntame qué buscás y en qué contexto.",
+      message: "Necesito una descripción de tu necesidad. Cuéntame qué buscas y en qué contexto.",
     };
   }
   if (words < 8) {

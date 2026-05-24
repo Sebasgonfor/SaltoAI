@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (!companyFilter) {
     log.end({ status: 400, extra: { reason: "company_param_required" } });
     return NextResponse.json(
-      { error: "Pasá ?company=<nombre exacto> para identificar qué borrar." },
+      { error: "Pasa ?company=<nombre exacto> para identificar qué borrar." },
       { status: 400 }
     );
   }

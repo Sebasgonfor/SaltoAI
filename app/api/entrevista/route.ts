@@ -288,9 +288,9 @@ export async function POST(req: NextRequest) {
       `${SYSTEM_PROMPT}${nameHint}\n\n` +
       `HISTORIAL (turno actual del joven: ${userTurns}/${MAX_USER_TURNS}):\n${transcript}\n\n` +
       `SEÑALES YA DETECTADAS (heurística): ${heuristicCovered.join(", ") || "ninguna"}\n` +
-      `SEÑALES PENDIENTES (priorizá una): ${remaining.join(", ") || "ninguna — ya están todas"}\n\n` +
+      `SEÑALES PENDIENTES (prioriza una): ${remaining.join(", ") || "ninguna — ya están todas"}\n\n` +
       `PREGUNTAS QUE YA HICISTE (NO las repitas):\n${askedSoFar || "(ninguna)"}\n\n` +
-      `Devolvé la SIGUIENTE pregunta o marca done=true si ya hay 4+ señales cubiertas con detalle.`;
+      `Devuelve la SIGUIENTE pregunta o marca done=true si ya hay 4+ señales cubiertas con detalle.`;
 
     let response;
     try {

@@ -34,7 +34,7 @@ export function JovenNav() {
       <NavLink
         href="/joven/chat"
         label="Entrevista"
-        hint="Conversá con la IA para construir o actualizar tu Perfil de Evidencia."
+        hint="Conversa con la IA para construir o actualizar tu Perfil de Evidencia."
       />
       <NavLink
         href={perfilHref}

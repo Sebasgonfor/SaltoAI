@@ -16,8 +16,8 @@ export const maxDuration = 30;
  * vería como 55%). Ahora pasa por la misma `scoreCandidates()` que /api/match:
  * mismo LLM, mismo fallback, mismo cálculo de ICS. Simetría real.
  *
- * Implementación: invertimos el problema — en lugar de "rankeá N candidatos
- * para 1 necesidad", hacemos "rankeá N necesidades para 1 candidato". El
+ * Implementación: invertimos el problema — en lugar de "rankea N candidatos
+ * para 1 necesidad", hacemos "rankea N necesidades para 1 candidato". El
  * scorer no distingue: la pipeline (shortlist semántico → hard filter → LLM
  * batch → heurística fallback) funciona en ambas direcciones porque la
  * relación (need, profile) → score es simétrica.

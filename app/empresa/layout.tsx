@@ -15,7 +15,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
         <nav className="flex gap-1 items-center text-sm font-medium">
           {/* matchPrefix=false en "Inicio" porque /empresa es prefijo de TODO el
               árbol — si fuera true, "Inicio" quedaría activo en cualquier ruta
-              /empresa/*. Acá queremos match exacto. */}
+              /empresa/*. Aquí queremos match exacto. */}
           <NavLink
             href="/empresa"
             label="Inicio"
@@ -25,7 +25,7 @@ export default function EmpresaLayout({ children }: { children: React.ReactNode 
           <NavLink
             href="/empresa/chat"
             label="Publicar necesidad"
-            hint="Conversá con la IA para describir el rol — extrae skills, contexto y restricciones."
+            hint="Conversa con la IA para describir el rol — extrae skills, contexto y restricciones."
           />
           <NavLink
             href="/empresa/matches"

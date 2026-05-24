@@ -41,7 +41,7 @@ interface StyleCard {
 
 /**
  * Mantener sincronizado con `CV_STYLES` en `lib/cv-templates.ts`.
- * La ruta /api/cv?styles=list lo expone, pero hardcodear acá nos ahorra
+ * La ruta /api/cv?styles=list lo expone, pero hardcodear aquí nos ahorra
  * un round-trip al cargar la página y mantiene la UI snappy.
  */
 const STYLES: StyleCard[] = [
@@ -324,7 +324,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 <Settings2 size={12} /> Paso obligatorio · antes de enviar
               </div>
               <h3 className="font-display font-semibold text-lg text-slate-900 leading-tight">
-                Completá tus datos de contacto
+                Completa tus datos de contacto
               </h3>
               <p className="text-xs text-slate-600 mt-1 max-w-md leading-relaxed">
                 Sin email, teléfono y ciudad, las empresas no pueden contactarte. Se guardan
@@ -474,7 +474,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
           <div className="flex items-start gap-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg mb-3">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
             <span>
-              Completá email, teléfono y ciudad arriba para habilitar la descarga de tu CV.
+              Completa email, teléfono y ciudad arriba para habilitar la descarga de tu CV.
             </span>
           </div>
         )}

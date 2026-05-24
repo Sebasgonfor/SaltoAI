@@ -24,7 +24,7 @@ import { useAuth } from '@/lib/auth-context';
 
 const MAX_TURNS = 7;
 
-// Mismos slots que el endpoint /api/entrevista-empresa. Si cambian allá, cambiar acá.
+// Mismos slots que el endpoint /api/entrevista-empresa. Si cambian allá, cambiar aquí.
 const SLOTS: { key: string; label: string; match: RegExp }[] = [
   {
     key: 'equipo',
@@ -288,7 +288,7 @@ export default function ChatEmpresa() {
       if (!res.ok || !data.id) {
         const fallback =
           data?.error ||
-          'No pudimos construir tu necesidad con lo que contaste. Profundizá un poco más con un ejemplo concreto.';
+          'No pudimos construir tu necesidad con lo que contaste. Profundiza un poco más con un ejemplo concreto.';
         setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
         setSubmitError(fallback);
         setClosing(false);
@@ -353,8 +353,8 @@ export default function ChatEmpresa() {
       ]);
       setSubmitError(
         aborted
-          ? 'El servidor demoró demasiado. Reintentá en unos segundos.'
-          : 'No pudimos contactar al servidor. Revisá tu conexión y reintentá.'
+          ? 'El servidor demoró demasiado. Reinténtalo en unos segundos.'
+          : 'No pudimos contactar al servidor. Revisa tu conexión y reinténtalo.'
       );
       setLoading(false);
     }
@@ -703,7 +703,7 @@ export default function ChatEmpresa() {
           <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex gap-3">
             <Layers size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 leading-relaxed">
-              <strong className="font-semibold">Tip:</strong> describí el día real. "Atiende caja,
+              <strong className="font-semibold">Tip:</strong> describe el día real. "Atiende caja,
               contesta WhatsApp y arma pedidos" es mucho mejor señal que "perfil multifuncional".
             </p>
           </div>

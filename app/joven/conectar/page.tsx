@@ -223,7 +223,7 @@ function ConectarContent() {
 export default function ConectarPage() {
   // RoleGate envuelve afuera del Suspense — las oportunidades del joven son
   // privadas a él (el founder ve sus matches en /empresa/matches/{needId},
-  // no acá). Antes el gate vivía en el layout, ahora vive per-page.
+  // no aquí). Antes el gate vivía en el layout, ahora vive per-page.
   return (
     <RoleGate role="joven">
       <Suspense

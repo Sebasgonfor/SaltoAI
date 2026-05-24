@@ -3,7 +3,7 @@
 /**
  * Dashboard del founder (`/empresa`) — la "casa" que faltaba.
  *
- * Hasta acá el flujo empresa no tenía hub: el founder publicaba una necesidad,
+ * Hasta aquí el flujo empresa no tenía hub: el founder publicaba una necesidad,
  * caía en `/empresa/matches/{needId}` y desde ahí no había vuelta a la lista.
  * Este page resuelve eso reuniendo en una sola vista:
  *   - Saludo + estado de cuenta.
@@ -324,7 +324,7 @@ export default function EmpresaDashboardPage() {
           {getGreeting(firstName)}
         </h1>
         <p className="text-slate-600 mt-2 max-w-2xl">
-          Acá ves todas tus necesidades publicadas, los candidatos en evaluación y las micro-tareas
+          Aquí ves todas tus necesidades publicadas, los candidatos en evaluación y las micro-tareas
           en curso. Calidad sobre volumen — 10 candidatos por necesidad, no 200 CVs.
         </p>
       </header>
@@ -335,7 +335,7 @@ export default function EmpresaDashboardPage() {
           icon={Layers}
           value={kpis.needsCount}
           label="Necesidades"
-          hint="Publicadas por ti"
+          hint="Publicadas por tú"
           tone="emerald"
         />
         <KpiCard
@@ -431,7 +431,7 @@ export default function EmpresaDashboardPage() {
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
               Cuando entres a un match y propongas una tarea pagada para validar al candidato,
-              aparece acá. Es lo que reemplaza la "entrevista clásica" — pagás por evidencia real,
+              aparece aquí. Es lo que reemplaza la "entrevista clásica" — pagás por evidencia real,
               no por una conversación.
             </p>
           </div>

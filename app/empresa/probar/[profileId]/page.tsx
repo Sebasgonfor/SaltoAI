@@ -170,7 +170,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
           Pagale una tarea real a {profile.name.split(' ')[0]} antes de comprometerte.
         </h1>
         <p className="text-lg text-slate-600 leading-relaxed">
-          Salto IA estructura tu intención libre en una micro-tarea concreta con criterios de evaluación claros, monto justo y deadline razonable. Si funciona, pasás a contratación formal con evidencia real, no un CV.
+          Salto IA estructura tu intención libre en una micro-tarea concreta con criterios de evaluación claros, monto justo y deadline razonable. Si funciona, pasas a contratación formal con evidencia real, no un CV.
         </p>
       </header>
 

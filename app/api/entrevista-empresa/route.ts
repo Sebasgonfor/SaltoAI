@@ -64,10 +64,10 @@ const QUESTION_BANK: Record<(typeof TARGET_SLOTS)[number], string[]> = {
   ],
   actividad_semanal: [
     "Si esta persona ya estuviera trabajando con ustedes la próxima semana, ¿qué cosas concretas haría de lunes a viernes? No me des un cargo, dame las tareas reales.",
-    "Olvidate del título del puesto un segundo. ¿Qué es lo que esta persona haría en un día normal? ¿Y en una semana cargada?",
+    "Olvídate del título del puesto un segundo. ¿Qué es lo que esta persona haría en un día normal? ¿Y en una semana cargada?",
   ],
   ritmo_contexto: [
-    "Describime el ritmo del día a día: cómo se siente, dónde se trabaja (local, oficina, remoto) y en qué horario.",
+    "Descríbeme el ritmo del día a día: cómo se siente, dónde se trabaja (local, oficina, remoto) y en qué horario.",
     "Cuéntame el contexto operativo: cuán caótico u ordenado es, qué procesos hay escritos y qué se resuelve sobre la marcha. ¿Dónde y cuándo trabajaría?",
   ],
   restricciones_duras: [
@@ -111,15 +111,15 @@ A lo largo de 4-7 turnos, tus preguntas deben cubrir estos 6 slots:
 6. dealbreakers — qué rasgos son esenciales vs nice-to-have.
 
 REGLAS DE COBERTURA:
-- NO repitas ángulos. Si un slot ya quedó cubierto, pasá al siguiente — preferí slots aún no cubiertos.
+- NO repitas ángulos. Si un slot ya quedó cubierto, pasa al siguiente — prefiere slots aún no cubiertos.
 - Si una respuesta es vaga (sin datos concretos), profundiza UNA VEZ y después salta al siguiente slot.
 - Haz puente narrativo con lo que el founder acaba de decir, no salto brusco.
 - No inventes contexto. No proyectes. Si el founder no menciona algo, no lo agregues a tu siguiente pregunta como si lo hubiera dicho.
 
 ESTILO:
-- Español natural neutro LATAM, cercano, no corporativo.
+- Español natural neutro latinoamericano, cercano, no corporativo.
 - UNA pregunta a la vez, corta y específica (máx 2 oraciones).
-- Tuteo o "tú", consistente.
+- Tuteo neutro (tú), consistente. PROHIBIDO voseo argentino ("tú", "tienes", "cuéntame", "fíjate") — usa siempre español neutro latinoamericano.
 
 PROHIBIDO PREGUNTAS SÍ/NO:
 - Nunca empieces con "¿Hubo…?", "¿Alguna vez…?", "¿Tuviste…?", "¿Sabes…?", "¿Han contratado…?", "¿Hay…?".
@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
       `${SYSTEM_PROMPT}\n\n` +
       `HISTORIAL (turno actual del founder: ${userTurns}/${MAX_USER_TURNS}):\n${transcript}\n\n` +
       `SLOTS YA DETECTADOS POR HEURÍSTICA (informativo, no vinculante): ${heuristicCovered.join(", ") || "ninguno"}\n` +
-      `SLOTS PENDIENTES (priorizá uno de estos): ${remaining.join(", ") || "ninguno — ya están todos"}\n\n` +
+      `SLOTS PENDIENTES (prioriza uno de estos): ${remaining.join(", ") || "ninguno — ya están todos"}\n\n` +
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devuelve la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marca done=true si ya hay 5+ slots cubiertos con detalle.`;
 

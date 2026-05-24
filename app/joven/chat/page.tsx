@@ -426,7 +426,7 @@ function ChatJoven() {
     }
   };
 
-  // NOTA: el bloque `if (phase === 'basics')` que existía acá (con JSX inline
+  // NOTA: el bloque `if (phase === 'basics')` que existía aquí (con JSX inline
   // del wizard) era código stale dejado por un refactor a `<BasicsWizard>` —
   // el merge de feat/data lo dejó "cosido" con la siguiente función y rompió
   // el parser de TS. El render real del paso 1 vive más abajo (línea ~504).

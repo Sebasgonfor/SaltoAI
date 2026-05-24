@@ -200,7 +200,7 @@ function buildContactLine(opts: CvOptions): { html: string; hasContact: boolean 
   }
   return {
     html: `<p class="contact placeholder">[Email] · [Teléfono] · [Ciudad] · [LinkedIn]</p>
-<p class="screen-only contact-hint">Completá tus datos de contacto antes de enviar. Vuelve al perfil para pasarlos como parámetros o editá el PDF luego de imprimir.</p>`,
+<p class="screen-only contact-hint">Completa tus datos de contacto antes de enviar. Vuelve al perfil para pasarlos como parámetros o edita el PDF luego de imprimir.</p>`,
     hasContact: false,
   };
 }
@@ -729,7 +729,7 @@ function renderCreative(p: Profile, opts: CvOptions): string {
   `;
 
   // El <main> va PRIMERO en el orden del DOM para que ATS lean el contenido
-  // central antes del sidebar. CSS Grid sigue mostrándolos lado a lado.
+  // central antes del sidebar. CSS Grid sigue muestrandolos lado a lado.
   const inner = `<main class="creative">
   <section class="creative-main" style="grid-column: 2;">
     <header>
@@ -803,7 +803,7 @@ export function renderCv(profile: Profile, style: CvStyle, opts: CvOptions): str
 }
 
 /**
- * Versión plain-text, alineada al estilo elegido. Para campos "Pegá tu CV"
+ * Versión plain-text, alineada al estilo elegido. Para campos "Pega tu CV"
  * de ATS legacy (Computrabajo / OCC / Bumeran). El estilo afecta el ORDEN
  * de las secciones, no el rendering en sí (todo es texto).
  */

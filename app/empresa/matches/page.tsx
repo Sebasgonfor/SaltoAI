@@ -15,13 +15,13 @@ export default function MatchesIndex() {
         <Sparkles size={28} strokeWidth={1.75} />
       </div>
       <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
-        Necesitás publicar primero
+        Necesitas publicar primero
       </div>
       <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight mb-4 leading-tight">
-        Publicá una necesidad y verás hasta 10 candidatos con desglose ICS.
+        Publica una necesidad y verás hasta 10 candidatos con desglose ICS.
       </h1>
       <p className="text-slate-600 leading-relaxed mb-8">
-        Contanos tu contexto real en lenguaje natural. La IA lo estructura, busca por
+        Cuéntanos tu contexto real en lenguaje natural. La IA lo estructura, busca por
         compatibilidad semántica y te devuelve los mejores 10 con score explicable — no 200 CVs.
       </p>
       <div className="flex flex-col sm:flex-row gap-2 justify-center">

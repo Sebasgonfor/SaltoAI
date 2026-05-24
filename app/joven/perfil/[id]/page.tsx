@@ -98,7 +98,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
       {/* Banner contextual: cuando un founder visita este perfil desde sus
           matches, le damos contexto + camino de vuelta. Sin esto, ve el
           chrome del joven ("Entrevista", "Mis tareas") sin entender por
-          qué llegó acá. */}
+          qué llegó aquí. */}
       {viewerIsEmpresa && (
         <div className="bg-gradient-to-r from-emerald-50 to-emerald-50/30 border border-emerald-200/60 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3 text-sm text-slate-700">
@@ -221,7 +221,7 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             </a>
             <p className="w-full text-xs text-slate-500 mt-2 leading-relaxed">
               <strong className="text-slate-700">Recomendación:</strong> en lugar de mandar el
-              CV a tu mail, proponé una micro-tarea pagada acotada. Te llega evidencia REAL de
+              CV a tu mail, propón una micro-tarea pagada acotada. Te llega evidencia REAL de
               cómo trabaja antes de comprometerte con un contrato.
             </p>
           </div>

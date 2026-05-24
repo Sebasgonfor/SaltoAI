@@ -25,7 +25,7 @@ Reglas:
 CRÍTICO:
 - NO inventes skills no respaldadas por la evidencia.
 - NO repitas skills ya listadas en el perfil. El objetivo es REVELAR, no enumerar.
-- Si la evidencia es muy pobre, devuelve hiddenSkills vacío y un closingMessage honesto ("aún no tenemos suficiente para revelar más, contanos más").
+- Si la evidencia es muy pobre, devuelve hiddenSkills vacío y un closingMessage honesto ("aún no tenemos suficiente para revelar más, cuéntanos más").
 - Idioma: español natural, registro LATAM.`;
 
 const hiddenSkillSchema = {
@@ -92,18 +92,18 @@ function mockLatent(): LatentProfile {
     suggestedRoles: [
       {
         roleTitle: "Asistente de operaciones en local pequeño",
-        whyFits: "Ya operaste un local informal con clientes reales. Sabés que se cae un proveedor y hay que resolver en 10 minutos.",
+        whyFits: "Ya operaste un local informal con clientes reales. Sabes que se cae un proveedor y hay que resolver en 10 minutos.",
         readinessHint: "Te conviene practicar cómo contar 1-2 logros concretos con cifras antes de la entrevista.",
       },
       {
         roleTitle: "Community manager junior para emprendimientos",
         whyFits: "Hiciste crecer una cuenta de negocio sin presupuesto. Eso es exactamente lo que buscan los founders en etapa cero.",
-        readinessHint: "Anotá tus métricas reales: cuántos seguidores tenías al empezar, cuántos al terminar.",
+        readinessHint: "Anota tus métricas reales: cuántos seguidores tenías al empezar, cuántos al terminar.",
       },
       {
         roleTitle: "Atención al cliente para startups de servicios",
         whyFits: "Atendiste reclamos a toda hora sin guion. Eso es soft skill puro, no se enseña en universidades.",
-        readinessHint: "Prepará 1 historia donde un cliente complicado terminó comprando o agradeciendo.",
+        readinessHint: "Prepara 1 historia donde un cliente complicado terminó comprando o agradeciendo.",
       },
     ],
     closingMessage:

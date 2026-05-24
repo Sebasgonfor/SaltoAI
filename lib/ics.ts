@@ -39,10 +39,10 @@ export const RETURN_SIZE = 10;
 const GEMINI_TIMEOUT_MS = 25_000;
 
 const RANK_BATCH_PROMPT = `Eres el motor de scoring ICS (Índice de Compatibilidad Salto).
-Recibís UNA necesidad de empresa y N candidatos (shortlist). Devolvés un objeto con un array "results" del MISMO largo y MISMO orden que la lista de candidatos.
+Recibís UNA necesidad de empresa y N candidatos (shortlist). Devuelves un objeto con un array "results" del MISMO largo y MISMO orden que la lista de candidatos.
 
-Para cada candidato devolvé:
-- profileId: copiá EXACTAMENTE el profileId del candidato en esa posición. NO inventes IDs.
+Para cada candidato devuelve:
+- profileId: copia EXACTAMENTE el profileId del candidato en esa posición. NO inventes IDs.
 - skillsFit (0-100): cuán bien las habilidades del candidato cubren los requiredSkills (semánticamente, no por keywords). "Atención al Cliente" cubre "manejo de clientes en local" → suma.
 - behavioralFit (0-100): compatibilidad entre traits del candidato y desiredTraits de la empresa.
 - learningSignal (0-100): evidencia REAL de aprendizaje autónomo / resolver sin guía en el campo evidence. Si no hay evidencia clara, bajo (20-40). Si hay caso concreto (aprendió Excel por YouTube, descubrió cómo hacer X solo), alto (70+).
@@ -53,7 +53,7 @@ Para cada candidato devolvé:
 - topSkills: hasta 3 skills del candidato más relevantes para ESTE rol.
 
 CRÍTICO:
-- Compará los candidatos entre sí. NO inflar todos al mismo nivel.
+- Compara los candidatos entre sí. NO inflar todos al mismo nivel.
 - NO inventes datos. Si un campo no tiene evidencia, refleja eso en score bajo + redFlag honesto.
 - El array results debe tener el MISMO orden que la lista recibida.`;
 
@@ -317,7 +317,7 @@ async function rankBatchWithLLM(
   const response = await withTimeout(
     gemini().models.generateContent({
       model: GEMINI_MODEL,
-      contents: `${RANK_BATCH_PROMPT}\n\nNECESIDAD:\n${JSON.stringify(needPayload, null, 2)}\n\nCANDIDATOS (en orden):\n${JSON.stringify(candidatesPayload, null, 2)}\n\nDevolvé { "results": [...] } con un objeto por candidato, en el MISMO orden y con el MISMO profileId.`,
+      contents: `${RANK_BATCH_PROMPT}\n\nNECESIDAD:\n${JSON.stringify(needPayload, null, 2)}\n\nCANDIDATOS (en orden):\n${JSON.stringify(candidatesPayload, null, 2)}\n\nDevuelve { "results": [...] } con un objeto por candidato, en el MISMO orden y con el MISMO profileId.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: batchSchema,
@@ -451,7 +451,7 @@ export async function scoreCandidates(
     }
   } else {
     degradedReason =
-      "Modo demo sin clave de IA: los scores son heurísticos. Configurá GEMINI_API_KEY para ranking real.";
+      "Modo demo sin clave de IA: los scores son heurísticos. Configura GEMINI_API_KEY para ranking real.";
   }
 
   // 3. Resolver cada match: LLM si lo tenemos para ese profile, heurística si no.

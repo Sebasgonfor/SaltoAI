@@ -259,7 +259,7 @@ export async function recordFeedback(
   const data: FeedbackEntry = { ...entry, timestamp: Date.now() };
   if (useFirestore(FEEDBACK)) {
     try {
-      // stripUndefined es clave acá: `note`, `needId`, `profileId` y
+      // stripUndefined es clave aquí: `note`, `needId`, `profileId` y
       // `source` son opcionales. Sin esto, Firestore rechaza el addDoc
       // con "Unsupported field value: undefined".
       const ref = await addDoc(
