@@ -292,13 +292,13 @@ function HeroDark({
               </span>
             )}
           </div>
-          <p className="text-stone-400 text-sm">{statusText}</p>
+          <p className="text-stone-300 text-sm">{statusText}</p>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl">
             {stats.map((s) => (
               <div key={s.label} className="flex items-center gap-2.5">
                 <span className="text-xl leading-none">{s.icon}</span>
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+                  <div className="text-[10px] uppercase tracking-wider text-amber-200/70 font-semibold">
                     {s.label}
                   </div>
                   <div className="font-display font-bold text-base text-white tabular-nums truncate">
@@ -312,7 +312,9 @@ function HeroDark({
 
         <div className="flex-shrink-0 flex flex-col items-center">
           <RingScore value={ringValue} size={108} />
-          <div className="text-[10px] uppercase tracking-[0.18em] text-stone-500 font-semibold mt-2">
+          {/* amber-200/80 sobre stone-950 mantiene el aire cálido del hero
+              y resuelve el contraste insuficiente del stone-500 anterior. */}
+          <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80 font-semibold mt-2">
             {ringLabel}
           </div>
         </div>
