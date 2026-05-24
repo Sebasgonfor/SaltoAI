@@ -120,6 +120,8 @@ export async function createProfile(
         collection(db, PROFILES),
         stripUndefined(data as unknown as Record<string, unknown>)
       );
+      const saved = { ...data, id: ref.id };
+      memProfiles.set(ref.id, saved);
       return { id: ref.id, storage: "firestore" };
     } catch (e) {
       disableFirestoreWithWarning(e, "createProfile", PROFILES);
@@ -135,7 +137,9 @@ export async function getProfile(id: string): Promise<Profile | null> {
     try {
       const snap = await getDoc(doc(db, PROFILES, id));
       if (!snap.exists()) return memProfiles.get(id) ?? null;
-      return { id: snap.id, ...(snap.data() as Omit<Profile, "id">) };
+      const profile = { id: snap.id, ...(snap.data() as Omit<Profile, "id">) };
+      memProfiles.set(id, profile);
+      return profile;
     } catch (e) {
       disableFirestoreWithWarning(e, "getProfile", PROFILES);
     }
@@ -157,6 +161,8 @@ export async function getAllProfiles(): Promise<Profile[]> {
 }
 
 export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): Promise<void> {
+  const profile = { ...p, id };
+  memProfiles.set(id, profile);
   if (useFirestore(PROFILES)) {
     try {
       await setDoc(doc(db, PROFILES, id), stripUndefined(p as unknown as Record<string, unknown>));
@@ -165,7 +171,6 @@ export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): P
       disableFirestoreWithWarning(e, "upsertProfileWithId", PROFILES);
     }
   }
-  memProfiles.set(id, { ...p, id });
 }
 
 export async function createNeed(

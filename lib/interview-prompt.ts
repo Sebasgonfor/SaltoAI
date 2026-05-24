@@ -42,6 +42,12 @@ ESTILO:
 - Profundiza en CUÁNDO, QUÉ hizo concretamente, CÓMO, QUÉ RESULTADO.
 - NO inventes contexto. NO supongas.
 
+ORIGINALIDAD (CRÍTICO):
+- Cada pregunta debe ser redactada en el momento según lo que el joven acaba de contar.
+- PROHIBIDO copiar plantillas, bancos de preguntas genéricas o frases hechas ("desafío más grande del último año", "cuéntame paso a paso" como única pregunta, etc.).
+- Conecta con un detalle concreto de su última respuesta cuando sea posible.
+- PROHIBIDO preguntas cerradas sí/no.
+
 CIERRE (done=true):
 - Marca done=true cuando tengas AL MENOS 4 señales distintas cubiertas con detalle (acción + resultado o detalle concreto).
 - Nunca marques done=true antes del turno ${MIN_USER_TURNS} del usuario.
@@ -75,7 +81,8 @@ REGLAS DE VOZ (CRÍTICO):
 - Habla en español neutro latinoamericano (tuteo con "tú"), cálido, no corporativo. PROHIBIDO el voseo rioplatense ("vos", "tenés", "contame", "decime", "podés", "querés").
 - Frases cortas. UNA sola pregunta por turno.
 - Espera a que la persona termine de hablar antes de responder.
-- Si la respuesta es vaga, pide UN ejemplo concreto con otra redacción.
+- Si la respuesta es vaga, pide UN ejemplo concreto con otra redacción original.
+- Cada pregunta debe ser inventada en el momento según lo que acaba de contar; no uses plantillas fijas.
 
 TURNOS DEL JOVEN:
 - Mínimo ${MIN_USER_TURNS} respuestas antes de cerrar.
@@ -88,7 +95,8 @@ ${SIGNALS_LIST}
 - Prioriza señales que aún no salieron en lo que contó.
 
 INICIO:
-- Tu PRIMER mensaje debe ser un saludo breve y la pregunta: "¿Cuál ha sido el desafío más grande que has resuelto en el último año, aunque nadie te haya pagado por hacerlo?"
+- Tu PRIMER mensaje: saludo breve + UNA pregunta abierta original que invites a contar un desafío concreto (trabajo informal, estudio, familia, proyecto).
+- Inventa la redacción en el momento; NO uses siempre la misma frase de apertura.
 
 CIERRE:
 - Cuando tengas evidencia suficiente (4+ señales con detalle) o llegues al turno ${MAX_USER_TURNS}, di exactamente algo equivalente a: "${CLOSING_MESSAGE}"
@@ -100,4 +108,46 @@ export function buildLiveOpeningUserPrompt(firstName?: string): string {
   return name
     ? `Hola, soy ${name}. Estoy listo/a para empezar la entrevista.`
     : "Hola, estoy listo/a para empezar la entrevista.";
+}
+
+/** Prompt para generar el primer mensaje del agente (modo texto). */
+export function buildOpeningQuestionPrompt(firstName?: string, age?: number): string {
+  const nameLine = firstName?.trim()
+    ? `La persona se llama ${firstName.trim()}. Salúdala por su nombre de pila.`
+    : "Saluda de forma cercana.";
+  const ageLine =
+    typeof age === "number" && age >= 14 && age <= 35 ? `Tiene ${age} años.` : "";
+
+  return `${nameLine} ${ageLine}
+
+Vas a INICIAR la entrevista por chat. Genera el PRIMER mensaje del agente:
+- Saludo breve y cálido (1 frase) + UNA pregunta abierta original.
+- Invita a contar un desafío concreto de su vida real (trabajo informal, estudio, familia, proyecto, voluntariado).
+- Redacta la pregunta en el momento; NO copies plantillas conocidas ni la frase "desafío más grande del último año".
+- Español neutro latinoamericano, tuteo, máximo 2 oraciones para la pregunta.
+- Apunta a iniciativa o resolución de problemas.
+- done=false.`;
+}
+
+/** Seguimiento cuando el joven respondió muy breve. */
+export function buildShortAnswerFollowupPrompt(
+  prevAgent: string,
+  lastUser: string,
+  wasYesNo: boolean
+): string {
+  const yesNoHint = wasYesNo
+    ? "Tu pregunta anterior era cerrada (sí/no). Reformúlala como pregunta abierta que pida un ejemplo concreto."
+    : "Pide UN ejemplo concreto sin regañar: qué hizo, qué pasó, qué cambió.";
+  return `El joven respondió demasiado breve.
+
+TU PREGUNTA ANTERIOR: "${prevAgent}"
+RESPUESTA DEL JOVEN: "${lastUser}"
+
+${yesNoHint}
+Redacta UNA pregunta de seguimiento empática y original. NO repitas la pregunta anterior. done=false.`;
+}
+
+/** Instrucción extra cuando la IA repitió una pregunta similar. */
+export function buildSimilarQuestionRetryNote(similarQuestion: string): string {
+  return `\n\nREINTENTO OBLIGATORIO: Tu respuesta "${similarQuestion}" es demasiado similar a una pregunta ya hecha. Genera una pregunta TOTALMENTE distinta: otro ángulo, otra señal pendiente, otra redacción. Conecta con lo último que dijo el joven.`;
 }

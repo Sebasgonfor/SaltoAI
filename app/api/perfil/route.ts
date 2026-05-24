@@ -5,6 +5,7 @@ import { embed } from "@/lib/embeddings";
 import { createProfile, getProfile, upsertProfileWithId, storageFromId } from "@/lib/db";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateForProfileExtraction, parseJovenAge } from "@/lib/input-validation";
+import { sanitizeEvidenceForCv } from "@/lib/cv-evidence";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage, Gender, JovenBasics, Profile } from "@/lib/types";
 
@@ -31,17 +32,25 @@ Reglas estrictas (anti-alucinación):
 - Cada skill DEBE estar anclada a un hecho REAL que el joven mencionó. Si no hay sustento en la transcripción, NO la incluyas.
 - NO inventes números, fechas ni resultados. Si el joven no los mencionó, no aparecen.
 
-Formato de evidencia (CV-ready):
-- Cada quote se redacta en TERCERA PERSONA, tiempo PASADO, empezando con un VERBO DE ACCIÓN fuerte
-  ("Triplicó", "Diseñó", "Coordinó", "Aprendió", "Resolvió", "Atendió", "Implementó", "Lideró").
-- Conserva los detalles cuantificables que el joven dio (cifras, %, cantidades, plazos, número de clientes). NO los inventes; si no los dio, omitilos.
-- Cada quote es 1 oración, máximo 2. Concisa, en español natural, sin jerga corporativa.
-- Reformula lo que dijo el joven (paráfrasis cercana), no copies textual la primera persona —
-  el resultado debe leerse como un bullet de CV listo para imprimir.
+Formato de evidencia (CV-ready — sección "Experiencia y logros"):
+- Cada entrada tiene "skill" (competencia con nombre de mercado laboral) + "quote" (logro concreto).
+- El campo "quote" se redacta en TERCERA PERSONA, tiempo PASADO, empezando con un VERBO DE ACCIÓN fuerte
+  ("Triplicó", "Diseñó", "Coordinó", "Aprendió", "Resolvió", "Atendió", "Implementó", "Gestionó").
+- Prioriza HABILIDAD DEMOSTRADA + RESULTADO. El reclutador debe entender qué sabe hacer la persona
+  y qué impacto tuvo, no el relato anecdótico.
+- Traduce contexto informal a lenguaje laboral neutro:
+  · "local de su tía" → "comercio familiar" · "negocio del barrio" → "pequeño comercio local"
+  · "aprendió sola por YouTube" → "Aprendió de forma autónoma mediante tutoriales en línea"
+  · NO copies modismos, muletillas ("tipo", "básicamente") ni tono de chat.
+- Omite detalles que no aporten valor laboral (chisme, emociones, contexto familiar innecesario).
+  Si el relato es vago o solo actitud sin hecho concreto, NO lo incluyas.
+- Conserva cifras, plazos y métricas SOLO si el joven las mencionó. NO inventes números.
+- Cada quote: 1 oración, máximo 2. Sin repetir el nombre de la skill al inicio del quote.
+- PROHIBIDO redactar meta-evidencia ("Contó que...", "Dijo que...", "Mencionó...") — solo hechos.
 - Ejemplos del formato deseado:
-  · "Triplicó las ventas del local de su tía en 6 meses gestionando pedidos por Instagram."
-  · "Aprendió por su cuenta a editar Reels y consiguió 200 clientes nuevos sin pagar publicidad."
-  · "Resolvió reclamos de clientes en un evento de 80 personas sin que escalara a la organización."
+  · skill: "Gestión de Redes Sociales" → quote: "Triplicó las ventas de un comercio familiar en 6 meses gestionando pedidos por Instagram."
+  · skill: "Marketing de Contenidos" → quote: "Aprendió de forma autónoma a editar Reels y captó 200 clientes nuevos sin inversión en pauta."
+  · skill: "Atención al Cliente" → quote: "Resolvió reclamos de 80 asistentes en un evento masivo sin escalamiento a la organización."
 
 Otros campos:
 - skills: 3-6 habilidades concretas con nombre estándar de mercado laboral (ej. "Atención al Cliente",
@@ -98,7 +107,10 @@ function mockExtraction(
     skills: ["Comunicación", "Iniciativa"],
     traits: ["Proactividad"],
     evidence: [
-      { skill: "Comunicación", quote: "Contó su historia con detalle al agente de SaltoAI." },
+      {
+        skill: "Iniciativa",
+        quote: "Identificó oportunidades de mejora en la conversación y aportó ejemplos concretos de su trayectoria.",
+      },
     ],
   };
 }
@@ -191,6 +203,32 @@ export async function POST(req: NextRequest) {
           { status: 422 }
         );
       }
+    }
+
+    extracted = {
+      ...extracted,
+      evidence: sanitizeEvidenceForCv(extracted.evidence),
+    };
+
+    if (extracted.skills.length === 0 && extracted.evidence.length > 0) {
+      extracted.skills = [...new Set(extracted.evidence.map((e) => e.skill))];
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'A',location:'app/api/perfil/route.ts:POST',message:'perfil extraction after sanitize',data:{skills:extracted.skills.length,evidence:extracted.evidence.length,uid:!!uid},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
+    if (extracted.evidence.length === 0 && extracted.skills.length === 0) {
+      log.warn("edge.empty_extraction_after_polish");
+      log.end({ status: 422, extra: { code: "no_evidence_extracted" } });
+      return NextResponse.json(
+        {
+          error:
+            "No pudimos anclar evidencia concreta en lo que contaste. Vuelve al chat y profundiza con ejemplos puntuales (qué hiciste, cuándo, qué cambió).",
+          code: "no_evidence_extracted",
+        },
+        { status: 422 }
+      );
     }
 
     const embedding = await embed(buildEmbeddingText(extracted));
