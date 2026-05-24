@@ -228,6 +228,34 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
               {need.companyName}
             </h1>
             <p className="text-lg text-slate-700 max-w-3xl">{need.role}</p>
+            {need.jobNature && (
+              <div className="mt-2 inline-flex items-center gap-2 text-xs">
+                <Badge
+                  variant="outline"
+                  className={
+                    need.jobNature === 'cuantitativa'
+                      ? 'bg-blue-50 text-blue-800 border-blue-200'
+                      : need.jobNature === 'cualitativa'
+                        ? 'bg-violet-50 text-violet-800 border-violet-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                  }
+                  title={
+                    need.jobNature === 'cuantitativa'
+                      ? 'El motor pondera ALTO los resultados medibles del candidato.'
+                      : need.jobNature === 'cualitativa'
+                        ? 'El motor NO castiga al candidato por no traer métricas — valora detalle, constancia y confiabilidad.'
+                        : 'Pesos balanceados; no se favorece ni penaliza la ausencia de métricas.'
+                  }
+                >
+                  Rol {need.jobNature}
+                </Badge>
+                {need.jobNatureReason && (
+                  <span className="text-slate-500 italic max-w-md truncate" title={need.jobNatureReason}>
+                    {need.jobNatureReason}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <Link href="/empresa/chat">
             <Button variant="outline" size="sm">Editar necesidad</Button>
