@@ -277,7 +277,10 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
 
       {/* ── TOPBAR ── */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 h-14 px-4 flex items-center justify-between">
+      {/* backdrop-blur-md en sticky recalculaba el filter en cada frame de
+          scroll → uno de los mayores culpables del scroll lento. Lo cambio
+          por fondo sólido. Se ve igual de premium y el scroll va smooth. */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-14 px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
