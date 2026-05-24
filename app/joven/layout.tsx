@@ -17,13 +17,9 @@ import { UserButton } from '@/components/auth/user-button';
 export default function JovenLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
-      <header className="px-6 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between sticky top-0 z-20">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <SaltoLogo variant="light" size={32} />
-          <div className="flex flex-col leading-tight">
-            <span className="font-display font-semibold text-slate-900 tracking-tight">Salto</span>
-            <span className="text-[10px] uppercase tracking-[0.15em] text-emerald-600 font-medium">para jóvenes</span>
-          </div>
+      <header className="px-6 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between sticky top-0 z-20">
+        <Link href="/" className="flex items-center shrink-0 group">
+          <SaltoLogo variant="full" size={56} />
         </Link>
         <nav className="flex gap-1 items-center text-sm font-medium">
           <Link

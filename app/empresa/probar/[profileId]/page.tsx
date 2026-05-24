@@ -117,7 +117,7 @@ export default function ProbarCandidato({ params }: { params: Promise<{ profileI
     return (
       <div className="max-w-md mx-auto px-6 py-24 text-center">
         <h2 className="text-xl font-display font-medium mb-4">Candidato no encontrado</h2>
-        <Link href="/empresa/publicar">
+        <Link href="/empresa/chat">
           <Button>Publicar necesidad</Button>
         </Link>
       </div>

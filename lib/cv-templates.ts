@@ -106,6 +106,39 @@ export function isCvStyle(s: string): s is CvStyle {
   return CV_STYLES.some((m) => m.id === s);
 }
 
+// ---------- Caps de contenido (single-page rule) ----------
+//
+// Un CV ATS de junior debe caber en UNA hoja A4. El Perfil de Evidencia puede
+// generar 13+ evidencias y muchas skills — eso empuja el render a 2-3 páginas.
+// Capeamos en la capa de plantilla, NO en el matching: el motor sigue viendo
+// el perfil completo, solo la versión imprimible se acota.
+const MAX_EVIDENCE_FOR_CV = 6;
+const MAX_SKILLS_FOR_CV = 10;
+const MAX_TRAITS_FOR_CV = 6;
+const MAX_QUOTE_CHARS = 180; // si una cita es enorme, se trunca con "…"
+
+function trimQuote(q: string): string {
+  const s = q.trim();
+  if (s.length <= MAX_QUOTE_CHARS) return s;
+  return s.slice(0, MAX_QUOTE_CHARS - 1).replace(/\s+\S*$/, "") + "…";
+}
+
+/**
+ * Devuelve una versión "imprimible" del perfil: top-N de cada campo, citas
+ * truncadas. Se llama una sola vez en cada renderXxx antes de tocar los
+ * bloques. NO modifica el objeto original.
+ */
+function capProfileForCv(p: Profile): Profile {
+  return {
+    ...p,
+    skills: p.skills.slice(0, MAX_SKILLS_FOR_CV),
+    traits: p.traits.slice(0, MAX_TRAITS_FOR_CV),
+    evidence: p.evidence
+      .slice(0, MAX_EVIDENCE_FOR_CV)
+      .map((e) => ({ ...e, quote: trimQuote(e.quote) })),
+  };
+}
+
 // ---------- Helpers comunes ----------
 
 export function escapeHtml(s: string): string {
@@ -209,8 +242,8 @@ const BASE_CSS = `
   html, body { margin: 0; padding: 0; }
   body {
     font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
-    font-size: 11pt;
-    line-height: 1.45;
+    font-size: 10.5pt;
+    line-height: 1.4;
     color: #1a1a1a;
     background: #f6f6f6;
   }
@@ -222,7 +255,7 @@ const BASE_CSS = `
     box-shadow: 0 1px 6px rgba(0,0,0,0.05);
   }
   h1 {
-    font-size: 22pt;
+    font-size: 20pt;
     margin: 0 0 2px;
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -249,61 +282,71 @@ const BASE_CSS = `
     border-radius: 4px;
     border: 1px solid #fde68a;
   }
-  section { margin-top: 18px; page-break-inside: avoid; break-inside: avoid; }
+  section { margin-top: 12px; page-break-inside: avoid; break-inside: avoid; }
   h2 {
-    font-size: 10.5pt;
+    font-size: 10pt;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin: 0 0 6px;
-    padding-bottom: 3px;
+    letter-spacing: 0.08em;
+    margin: 0 0 4px;
+    padding-bottom: 2px;
     border-bottom: 1px solid #222;
     font-weight: 700;
     color: #111;
   }
   h3 {
-    font-size: 11pt;
-    margin: 10px 0 4px;
+    font-size: 10.5pt;
+    margin: 6px 0 2px;
     font-weight: 700;
     color: #111;
   }
-  .section-note { font-size: 9.5pt; color: #555; margin: 0 0 6px; font-style: italic; }
-  ul { margin: 4px 0 0; padding-left: 20px; }
-  li { margin-bottom: 4px; }
+  .section-note { font-size: 9pt; color: #555; margin: 0 0 4px; font-style: italic; }
+  ul { margin: 2px 0 0; padding-left: 18px; }
+  li { margin-bottom: 2px; }
   .skills-list, .traits-list, .languages-list {
     columns: 2;
-    column-gap: 28px;
-    padding-left: 18px;
+    column-gap: 24px;
+    padding-left: 16px;
   }
-  .experience-list li { margin-bottom: 8px; }
+  .experience-list li { margin-bottom: 4px; }
   .experience-list li strong { color: #111; }
-  .entry { margin-bottom: 10px; }
-  .entry .meta { font-size: 9.5pt; color: #555; margin: 0 0 2px; }
-  .entry .role { font-weight: 700; font-size: 11pt; margin: 0 0 2px; }
+  .entry { margin-bottom: 6px; }
+  .entry .meta { font-size: 9pt; color: #555; margin: 0 0 2px; }
+  .entry .role { font-weight: 700; font-size: 10.5pt; margin: 0 0 2px; }
   p.freeform { margin: 0; }
   .tailored {
-    margin: 6px 0 12px;
-    font-size: 9.5pt;
+    margin: 4px 0 8px;
+    font-size: 9pt;
     color: #065f46;
     background: #d1fae5;
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
     border: 1px solid #6ee7b7;
   }
   .doc-footer {
-    margin-top: 28px;
-    padding-top: 10px;
+    margin-top: 16px;
+    padding-top: 6px;
     border-top: 1px solid #ddd;
-    font-size: 8.5pt;
+    font-size: 8pt;
     color: #666;
-    line-height: 1.4;
+    line-height: 1.35;
   }
-  @page { size: A4; margin: 16mm 18mm; }
+  /* Single-page rule. Márgenes apretados (12/14mm) + body 10pt + secciones
+     compactas → cabe en A4 si el render respeta los caps de contenido. */
+  @page { size: A4; margin: 12mm 14mm; }
   @media print {
-    body { background: white; }
+    body { background: white; font-size: 10pt; line-height: 1.35; }
     main { max-width: none; margin: 0; padding: 0; box-shadow: none; }
     .screen-only { display: none !important; }
-    .skills-list, .traits-list, .languages-list { columns: 1; }
+    .skills-list, .traits-list, .languages-list { columns: 2; column-gap: 18px; }
     a { color: inherit; text-decoration: none; }
+    h1 { font-size: 17pt; }
+    h2 { font-size: 9.5pt; margin-bottom: 3px; }
+    h3 { font-size: 10pt; }
+    section { margin-top: 9px; }
+    /* El footer institucional ocupa una línea — lo escondemos en print para
+       no provocar overflow a una segunda hoja por una sola línea. */
+    .doc-footer { display: none; }
+    .tailored { display: none; }
   }
 `;
 
@@ -739,18 +782,23 @@ function renderCreative(p: Profile, opts: CvOptions): string {
 // ---------- Dispatcher ----------
 
 export function renderCv(profile: Profile, style: CvStyle, opts: CvOptions): string {
+  // Capeamos el perfil ANTES de pasarlo a la plantilla. Esto garantiza una
+  // sola hoja A4 sin necesidad de tocar cada renderer ni meter lógica de
+  // truncate en los bloques. El perfil completo sigue vivo en el motor de
+  // matching; lo que se acota es solo la versión imprimible.
+  const p = capProfileForCv(profile);
   switch (style) {
     case "chronological":
-      return renderChronological(profile, opts);
+      return renderChronological(p, opts);
     case "functional":
-      return renderFunctional(profile, opts);
+      return renderFunctional(p, opts);
     case "hybrid":
-      return renderHybrid(profile, opts);
+      return renderHybrid(p, opts);
     case "creative":
-      return renderCreative(profile, opts);
+      return renderCreative(p, opts);
     case "minimalist":
     default:
-      return renderMinimalist(profile, opts);
+      return renderMinimalist(p, opts);
   }
 }
 
@@ -759,7 +807,10 @@ export function renderCv(profile: Profile, style: CvStyle, opts: CvOptions): str
  * de ATS legacy (Computrabajo / OCC / Bumeran). El estilo afecta el ORDEN
  * de las secciones, no el rendering en sí (todo es texto).
  */
-export function renderPlainText(profile: Profile, style: CvStyle, opts: CvOptions): string {
+export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOptions): string {
+  // Mismo cap que el HTML — para que la versión "Texto plano" que pega en
+  // ATS legacy también respete el límite single-page (~50 líneas).
+  const profile = capProfileForCv(rawProfile);
   const lines: string[] = [];
   lines.push(profile.name);
   lines.push(deriveHeadline(profile, opts.headline));

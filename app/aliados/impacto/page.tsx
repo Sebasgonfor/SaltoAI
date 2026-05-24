@@ -430,7 +430,7 @@ export default function ImpactoDashboard() {
                   Conocer el producto <ArrowRight size={16} />
                 </Button>
               </Link>
-              <Link href="/empresa/publicar">
+              <Link href="/empresa/chat">
                 <Button
                   variant="outline"
                   className="gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-800 h-12 px-6"

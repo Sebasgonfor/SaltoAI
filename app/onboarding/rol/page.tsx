@@ -3,8 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { GraduationCap, Building2, ArrowRight, Lock, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { GraduationCap, Building2, ArrowRight, Sparkles } from 'lucide-react';
+import { AuthForm } from '@/components/auth/auth-form';
 import { useAuth, type UserRole } from '@/lib/auth-context';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 
@@ -33,9 +33,8 @@ function roleFromNext(next: string): UserRole | null {
 function OnboardingRolInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, account, loading, chooseRole, signInWithGoogle } = useAuth();
+  const { user, account, loading, chooseRole } = useAuth();
   const [submitting, setSubmitting] = useState<UserRole | null>(null);
-  const [signingIn, setSigningIn] = useState(false);
   const next = isSafeNext(params.get('next'));
   const impliedRole = roleFromNext(next);
   const autoResolvedRef = useRef(false);
@@ -106,31 +105,11 @@ function OnboardingRolInner() {
       <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center px-6 py-16">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
-            <div className="w-14 h-14 mx-auto mb-6 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <Lock size={22} />
-            </div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-900 tracking-tight leading-tight">
-              Inicia sesión para elegir tu rol.
-            </h1>
-            <p className="text-slate-600 mt-3 leading-relaxed">
-              Necesitamos saber si vas a usar Salto como joven buscando oportunidades o como empresa contratando.
-            </p>
-            <Button
-              size="lg"
-              className="h-12 px-6 mt-8 gap-3"
-              disabled={signingIn}
-              onClick={async () => {
-                setSigningIn(true);
-                try {
-                  await signInWithGoogle();
-                } finally {
-                  setSigningIn(false);
-                }
-              }}
-            >
-              {signingIn ? 'Abriendo Google…' : 'Continuar con Google'}
-            </Button>
+          <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 md:p-10 shadow-sm">
+            <AuthForm
+              title="Inicia sesión para elegir tu rol"
+              subtitle="Necesitamos saber si vas a usar Salto como joven buscando oportunidades o como empresa contratando."
+            />
           </div>
         </main>
       </div>
@@ -215,10 +194,9 @@ export default function OnboardingRolPage() {
 
 function Header() {
   return (
-    <header className="px-6 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center sticky top-0 z-20">
-      <Link href="/" className="flex items-center gap-2.5">
-        <SaltoLogo variant="light" size={32} />
-        <span className="font-display font-semibold text-slate-900 tracking-tight">Salto</span>
+    <header className="px-6 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center sticky top-0 z-20">
+      <Link href="/" className="flex items-center shrink-0">
+        <SaltoLogo variant="full" size={56} />
       </Link>
     </header>
   );

@@ -383,15 +383,10 @@ export default function EmpresaDashboardPage() {
               No tenés que escribir un job description perfecto. Contás en lenguaje natural qué te
               hace falta y la IA estructura el rol, el contexto y los rasgos que exige.
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <div className="flex justify-center">
               <Link href="/empresa/chat">
                 <Button className="gap-2">
-                  <Plus size={14} /> Publicar con el agente
-                </Button>
-              </Link>
-              <Link href="/empresa/publicar">
-                <Button variant="outline" className="gap-2">
-                  Modo rápido (formulario)
+                  <Plus size={14} /> Publicar necesidad con IA
                 </Button>
               </Link>
             </div>
