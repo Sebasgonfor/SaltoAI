@@ -4,11 +4,15 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured } from './firebase';
 import { getUserAccount, setUserRole, type UserAccount, type UserRole } from './accounts';
+import { isAuthCancellation } from './auth-errors';
 
 interface AuthContextValue {
   user: User | null;
@@ -18,6 +22,13 @@ interface AuthContextValue {
   roleLoading: boolean;
   configured: boolean;
   signInWithGoogle: (intendedRole?: UserRole) => Promise<User | null>;
+  signInWithEmail: (email: string, password: string, intendedRole?: UserRole) => Promise<User | null>;
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    displayName: string | undefined,
+    intendedRole?: UserRole
+  ) => Promise<User | null>;
   /** Setea el rol por primera vez. No-op si ya tiene rol. */
   chooseRole: (role: UserRole) => Promise<UserAccount | null>;
   signOut: () => Promise<void>;
@@ -71,6 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [configured]);
 
+  const setPendingRole = useCallback((intendedRole?: UserRole) => {
+    if (intendedRole) pendingRoleRef.current = intendedRole;
+  }, []);
+
   const signInWithGoogle = useCallback(
     async (intendedRole?: UserRole) => {
       if (!configured) {
@@ -79,20 +94,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
         return null;
       }
-      if (intendedRole) pendingRoleRef.current = intendedRole;
+      setPendingRole(intendedRole);
       try {
         const cred = await signInWithPopup(auth, googleProvider);
         return cred.user;
       } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-          return null;
-        }
+        if (isAuthCancellation(err)) return null;
         console.error('[auth] signInWithGoogle failed', err);
         throw err;
       }
     },
-    [configured]
+    [configured, setPendingRole]
+  );
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string, intendedRole?: UserRole) => {
+      if (!configured) {
+        alert(
+          'Firebase no está configurado. Define NEXT_PUBLIC_FIREBASE_* en .env.local para habilitar el inicio de sesión.'
+        );
+        return null;
+      }
+      setPendingRole(intendedRole);
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        return cred.user;
+      } catch (err: unknown) {
+        console.error('[auth] signInWithEmail failed', err);
+        throw err;
+      }
+    },
+    [configured, setPendingRole]
+  );
+
+  const signUpWithEmail = useCallback(
+    async (
+      email: string,
+      password: string,
+      displayName: string | undefined,
+      intendedRole?: UserRole
+    ) => {
+      if (!configured) {
+        alert(
+          'Firebase no está configurado. Define NEXT_PUBLIC_FIREBASE_* en .env.local para habilitar el registro.'
+        );
+        return null;
+      }
+      setPendingRole(intendedRole);
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const name = displayName?.trim();
+        if (name) {
+          await updateProfile(cred.user, { displayName: name });
+        }
+        return cred.user;
+      } catch (err: unknown) {
+        console.error('[auth] signUpWithEmail failed', err);
+        throw err;
+      }
+    },
+    [configured, setPendingRole]
   );
 
   const chooseRole = useCallback(
@@ -120,6 +181,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         roleLoading,
         configured,
         signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
         chooseRole,
         signOut,
       }}

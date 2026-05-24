@@ -3,17 +3,19 @@ import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { countUserTurns, isLastAnswerTooShort } from "@/lib/input-validation";
+import {
+  buildRestInterviewSystemPrompt,
+  CLOSING_MESSAGE,
+  MAX_USER_TURNS,
+  MIN_USER_TURNS,
+} from "@/lib/interview-prompt";
 import { startLog } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const MIN_USER_TURNS = 3;
-const MAX_USER_TURNS = 5;
-
-<<<<<<< HEAD
-const CLOSING_MESSAGE =
-  "Genial, tengo lo que necesitaba. Voy a construir tu Perfil de Evidencia ahora.";
+const FALLBACK_DONE_MESSAGE =
+  "Genial, ya tengo evidencia suficiente. Voy a construir tu Perfil de Evidencia ahora.";
 
 const FALLBACK_QUESTIONS = [
   "¿Qué hiciste tú concretamente en esa situación? Cuéntame paso a paso.",
@@ -21,11 +23,10 @@ const FALLBACK_QUESTIONS = [
   "¿Tuviste que aprender algo nuevo por tu cuenta para resolverlo?",
   "¿Qué harías distinto si te pasara algo parecido en un trabajo formal?",
 ];
-=======
+
 /**
  * Las 8 señales que el panel lateral del chat detecta en vivo.
- * Mantener este array sincronizado con `SIGNALS` en
- * `app/joven/chat/page.tsx` — el agente apunta a cubrirlas todas.
+ * Mantener sincronizado con `SIGNALS` en `app/joven/chat/page.tsx`.
  */
 const TARGET_SIGNALS = [
   "iniciativa",
@@ -37,24 +38,18 @@ const TARGET_SIGNALS = [
   "adaptación al cambio",
   "persistencia",
 ] as const;
->>>>>>> main
 
-/**
- * Banco de aperturas por señal — el agente elige una variante distinta a
- * las preguntas ya hechas. Sirve al fallback (sin Gemini) y como ancla del
- * prompt cuando el modelo "se queda" en una señal sola.
- */
 const QUESTION_BANK: Record<(typeof TARGET_SIGNALS)[number], string[]> = {
   iniciativa: [
-    "¿Hubo alguna vez algo que viste que estaba mal o que faltaba y decidiste arreglarlo sin que te lo pidieran? Contame.",
+    "¿Hubo alguna vez algo que viste que estaba mal o que faltaba y decidiste arreglarlo sin que te lo pidieran? Cuéntame.",
     "Pensá en algo que empezaste vos solo/a, sin esperar permiso. ¿Qué fue y cómo arrancaste?",
   ],
   "aprendizaje autónomo": [
-    "¿Aprendiste algo por tu cuenta — YouTube, tutoriales, prueba y error — para resolver una situación concreta? Contame cómo fue.",
+    "¿Aprendiste algo por tu cuenta — YouTube, tutoriales, prueba y error — para resolver una situación concreta? Cuéntame cómo fue.",
     "Cuando te topaste con algo que no sabías hacer, ¿cómo te las arreglaste para aprenderlo? Dame un ejemplo puntual.",
   ],
   "resolución de problemas": [
-    "Contame un problema feo que se te apareció y nadie sabía cómo resolverlo. ¿Qué hiciste paso a paso?",
+    "Cuéntame un problema feo que se te apareció y nadie sabía cómo resolverlo. ¿Qué hiciste paso a paso?",
     "¿Alguna vez algo se complicó y tuviste que improvisar una solución? ¿Cómo la pensaste?",
   ],
   "resultados medibles": [
@@ -62,93 +57,24 @@ const QUESTION_BANK: Record<(typeof TARGET_SIGNALS)[number], string[]> = {
     "¿Cómo te diste cuenta de que tu trabajo funcionó? ¿Qué cambió concretamente — ventas, clientes, tiempos, errores?",
   ],
   "atención al cliente": [
-    "Contame de un cliente difícil o un reclamo que tuviste que resolver. ¿Qué dijo? ¿Qué hiciste vos?",
+    "Cuéntame de un cliente difícil o un reclamo que tuviste que resolver. ¿Qué dijo? ¿Qué hiciste vos?",
     "Cuando tratabas con gente — clientes, vecinos, familias — ¿alguna situación tensa que manejaste bien? Detalles.",
   ],
   "trabajo en equipo": [
     "¿Hubo algún momento donde tuviste que coordinarte con otra persona o un grupo para que algo saliera? ¿Quién hizo qué?",
-    "Contame de una vez que trabajaste junto a alguien — familia, amigos, equipo. ¿Cómo se dividieron las cosas?",
+    "Cuéntame de una vez que trabajaste junto a alguien — familia, amigos, equipo. ¿Cómo se dividieron las cosas?",
   ],
   "adaptación al cambio": [
-    "¿Te tocó adaptarte de un día para el otro a algo nuevo — un cambio de plan, un imprevisto? Contame cómo te ajustaste.",
+    "¿Te tocó adaptarte de un día para el otro a algo nuevo — un cambio de plan, un imprevisto? Cuéntame cómo te ajustaste.",
     "Pensá en una vez que las reglas cambiaron a mitad de camino. ¿Qué hiciste para seguir adelante?",
   ],
   persistencia: [
-    "¿Hubo algo que intentaste varias veces antes de que saliera? Contame cuántos intentos y qué te hizo no rendirte.",
+    "¿Hubo algo que intentaste varias veces antes de que saliera? Cuéntame cuántos intentos y qué te hizo no rendirte.",
     "Algo que estuvo a punto de fracasar pero igual lo terminaste — ¿qué fue y cómo seguiste?",
   ],
 };
 
-const FALLBACK_DONE_MESSAGE =
-  "Genial, ya tengo evidencia suficiente. Voy a construir tu Perfil de Evidencia ahora.";
-
-const SYSTEM_PROMPT = `Eres el entrevistador de Salto, una plataforma de matching laboral por potencial para LATAM.
-Tu trabajo NO es evaluar ni validar. Tu trabajo es EXTRAER EVIDENCIA LABORAL de la historia de vida de un joven que busca su primer empleo formal.
-
-<<<<<<< HEAD
-Presupuesto de turnos (del joven):
-- Mínimo ${MIN_USER_TURNS} respuestas del joven antes de poder cerrar.
-- Máximo ${MAX_USER_TURNS} respuestas del joven: en el turno ${MAX_USER_TURNS} SIEMPRE devuelves done=true y un mensaje de cierre amable (no hagas otra pregunta).
-
-Reglas de conversación:
-- Habla en español colombiano natural, cercano, no corporativo.
-- Haz UNA pregunta a la vez. Corta y específica.
-- Cava en CUÁNDO, QUÉ hizo concretamente, CÓMO, y QUÉ RESULTADO.
-- Profundiza en lo que el joven YA mencionó antes de cambiar de tema.
-- Busca evidencia de: iniciativa, resolución de problemas, aprendizaje autónomo, manejo de personas/clientes, persistencia, adaptación.
-- NO inventes contexto. NO hagas suposiciones.
-
-Anti-bucle (CRÍTICO):
-- NUNCA repitas la misma pregunta ni frases casi idénticas del historial. Lee el AGENTE anterior y formula algo distinto.
-- Si el joven responde vago, evasivo o muy corto (menos de ~15 palabras útiles): (1) pide UN ejemplo concreto con otra redacción, o (2) si ya pediste concreción 2 veces, cambia a otro ángulo (resultado, aprendizaje, otra experiencia), o (3) si vas en turno >= 4, cierra con done=true usando lo que sí dijo.
-- Si el joven no coopera pero mencionó alguna actividad, extrae lo posible y en turno >= 4 puedes cerrar con done=true (mejor perfil parcial que bucle infinito).
-
-Cuándo marcar done=true:
-- Tienes al menos 2-3 señales con acciones y resultados (aunque sean modestas), O
-- Llegaste al turno ${MAX_USER_TURNS} del joven, O
-- El joven ya dio suficiente para un perfil honesto aunque sea breve.
-
-Cuando done=true, nextQuestion debe ser un mensaje de cierre (sin signo de interrogación al final), por ejemplo: "${CLOSING_MESSAGE}"
-
-Devuelve JSON: { "nextQuestion": "...", "done": boolean, "reasoning": "1 frase interna" }`;
-=======
-OBJETIVO DE COBERTURA (clave):
-A lo largo de la entrevista (3-5 turnos del joven), tu set de preguntas debe APUNTAR a cubrir, de forma diversa, las 8 señales que Salto detecta:
-1. Iniciativa — algo que arrancó sin que se lo pidieran.
-2. Aprendizaje autónomo — aprendió algo solo/a (tutoriales, prueba-error).
-3. Resolución de problemas — destrabó algo improvisando.
-4. Resultados medibles — números, %, ventas, clientes, tiempos.
-5. Atención al cliente / personas — manejo de reclamos, gente difícil.
-6. Trabajo en equipo — coordinó con otros.
-7. Adaptación al cambio — se ajustó a un imprevisto / cambio de reglas.
-8. Persistencia — siguió intentando después de un fallo.
-
-REGLAS DE COBERTURA:
-- NO repitas el ángulo de una pregunta anterior. Si ya preguntaste por "iniciativa", la siguiente debe atacar OTRA señal — sobre todo las que aún NO aparecieron en la conversación.
-- En cada turno, mirá explícitamente qué señales YA salieron en lo que dijo el joven, y elegí preguntar por una señal AÚN NO CUBIERTA, idealmente conectada a lo que el joven acaba de mencionar (puente narrativo, no salto brusco).
-- Si una respuesta del joven cubre dos señales a la vez, perfecto: la siguiente pregunta apunta a una tercera señal.
-- Profundizá UNA VEZ en la señal recién mencionada si vino vaga (sin números, sin acciones concretas) — después saltá a otra señal.
-
-ESTILO:
-- Español natural rioplatense/colombiano, cercano, no corporativo.
-- UNA pregunta a la vez. Corta y específica (máx 2 oraciones).
-- Cavá en CUÁNDO, QUÉ hizo concretamente, CÓMO, QUÉ RESULTADO.
-- NO inventes contexto. NO supongas. Si la respuesta es vaga, pedí concreción ANTES de cambiar de señal.
-
-CIERRE (done=true):
-- Marcá done=true cuando tengas AL MENOS 4 señales distintas cubiertas con detalle (acción + resultado o detalle concreto).
-- Nunca marques done=true antes del turno 3 del usuario.
-- Después del turno 5, marcá done=true sí o sí (cap).
-
-Devuelve JSON con:
-{
-  "nextQuestion": "tu pregunta — UNA, conectada y dirigida a una señal aún no cubierta o poco profunda",
-  "done": boolean,
-  "targetedSignal": "una de: iniciativa | aprendizaje autónomo | resolución de problemas | resultados medibles | atención al cliente | trabajo en equipo | adaptación al cambio | persistencia",
-  "signalsCovered": ["lista de señales YA cubiertas con evidencia concreta en la conversación"],
-  "reasoning": "una frase interna: por qué elegiste esta señal y no otra"
-}`;
->>>>>>> main
+const SYSTEM_PROMPT = buildRestInterviewSystemPrompt();
 
 const schema = {
   type: Type.OBJECT,
@@ -162,11 +88,6 @@ const schema = {
   required: ["nextQuestion", "done"],
 };
 
-/**
- * Heurística simple para detectar qué señales ya salieron en la conversación,
- * espejo de las regex del panel lateral del chat. Sirve al fallback y le da
- * al LLM un "prior" en el prompt — no decide el `done`, solo informa.
- */
 const SIGNAL_PATTERNS: Record<(typeof TARGET_SIGNALS)[number], RegExp> = {
   iniciativa: /(yo (mismo|sola|solo)|decid[íi]|propuse|me puse|empec[ée]|arranqu[ée])/i,
   "aprendizaje autónomo": /(aprend[ií]|tutoriales?|youtube|sol[ao]|por mi cuenta|nadie me enseñó)/i,
@@ -194,14 +115,7 @@ function alreadyAskedTokens(messages: ChatMessage[]): string {
     .join(" || ");
 }
 
-/**
- * Selecciona una pregunta del banco apuntando a una señal aún no cubierta,
- * y evita repetir preguntas ya hechas por el agente.
- */
-function pickFallbackQuestion(messages: ChatMessage[]): {
-  question: string;
-  signal: string;
-} {
+function pickFallbackQuestion(messages: ChatMessage[]): { question: string; signal: string } {
   const covered = new Set(detectSignals(messages));
   const askedBlob = alreadyAskedTokens(messages);
   const uncovered = TARGET_SIGNALS.filter((s) => !covered.has(s));
@@ -209,14 +123,14 @@ function pickFallbackQuestion(messages: ChatMessage[]): {
 
   for (const sig of order) {
     for (const q of QUESTION_BANK[sig]) {
-      // Evitamos repetir preguntas literales o casi literales.
       const head = q.toLowerCase().slice(0, 24);
       if (!askedBlob.includes(head)) return { question: q, signal: sig };
     }
   }
-  // Último recurso: profundizar genéricamente sin repetir el opener.
+
   return {
-    question: "Profundicemos un poco más en eso último: ¿qué hiciste exactamente, paso a paso, y qué cambió?",
+    question:
+      "Profundicemos un poco más en eso último: ¿qué hiciste exactamente, paso a paso, y qué cambió?",
     signal: "resolución de problemas",
   };
 }
@@ -253,77 +167,77 @@ function pickAlternateQuestion(userTurns: number): string {
   return FALLBACK_QUESTIONS[idx];
 }
 
-function maxTurnsResponse(): { nextQuestion: string; done: true } {
-  return { nextQuestion: CLOSING_MESSAGE, done: true };
+function maxTurnsResponse(signalsCovered: string[]) {
+  return {
+    nextQuestion: CLOSING_MESSAGE,
+    done: true as const,
+    targetedSignal: null,
+    signalsCovered,
+  };
 }
 
-function fallbackResponse(messages: ChatMessage[]): { nextQuestion: string; done: boolean } {
+function smartFallbackResponse(messages: ChatMessage[]) {
   const userTurns = countUserTurns(messages);
-  if (userTurns >= MAX_USER_TURNS) {
-<<<<<<< HEAD
-    return maxTurnsResponse();
-  }
-  const q = pickAlternateQuestion(userTurns);
-  return { nextQuestion: q, done: false };
-}
+  const signalsCovered = detectSignals(messages);
 
-export async function POST(req: NextRequest) {
-  let messagesSnapshot: ChatMessage[] = [];
-=======
+  if (userTurns >= MAX_USER_TURNS || signalsCovered.length >= 4) {
     return {
       nextQuestion: FALLBACK_DONE_MESSAGE,
       done: true,
       targetedSignal: null,
-      signalsCovered: detectSignals(messages),
+      signalsCovered,
     };
   }
+
   const { question, signal } = pickFallbackQuestion(messages);
   return {
     nextQuestion: question,
     done: false,
     targetedSignal: signal,
-    signalsCovered: detectSignals(messages),
+    signalsCovered,
   };
 }
 
 export async function POST(req: NextRequest) {
   const log = startLog(req, "entrevista");
->>>>>>> main
+  let messagesSnapshot: ChatMessage[] = [];
+
   try {
     const { messages, firstName } = (await req.json()) as {
       messages: ChatMessage[];
       firstName?: string;
     };
     messagesSnapshot = messages;
+
     if (!Array.isArray(messages) || messages.length === 0) {
       log.end({ status: 400, extra: { reason: "messages_required" } });
       return NextResponse.json({ error: "messages required" }, { status: 400 });
     }
 
     const userTurns = countUserTurns(messages);
+    const heuristicCovered = detectSignals(messages);
 
-<<<<<<< HEAD
     if (userTurns >= MAX_USER_TURNS) {
-      return NextResponse.json(maxTurnsResponse());
-=======
-    // Edge case: el joven mandó 1 palabra como respuesta (no es bug, es UX).
-    // No pasamos esto al LLM — pedimos concreción nosotros para no quemar cuota.
+      const resp = maxTurnsResponse(heuristicCovered);
+      log.end({ status: 200, extra: { mode: "hard_cap", done: true, userTurns } });
+      return NextResponse.json(resp);
+    }
+
     if (userTurns > 0 && isLastAnswerTooShort(messages, 2)) {
       log.info("edge.too_short_answer", { userTurns });
       log.end({ status: 200, extra: { edge: "too_short", done: false } });
       return NextResponse.json({
         nextQuestion:
-          "Eso es muy poquito. Contame con más detalle: ¿qué hiciste vos, qué pasó, en qué cambió la situación?",
+          "Eso es muy poquito. Cuéntame con más detalle: ¿qué hiciste vos, qué pasó, en qué cambió la situación?",
         done: false,
         targetedSignal: null,
-        signalsCovered: detectSignals(messages),
+        signalsCovered: heuristicCovered,
         edge: "too_short",
       });
->>>>>>> main
     }
 
     if (!hasGeminiKey()) {
-      const resp = fallbackResponse(messages);
+      const resp = smartFallbackResponse(messages);
       log.end({ status: 200, extra: { mode: "fallback", done: resp.done, userTurns } });
       return NextResponse.json(resp);
     }
@@ -332,30 +246,27 @@ export async function POST(req: NextRequest) {
       .map((m) => `${m.role === "user" ? "JOVEN" : "AGENTE"}: ${m.content}`)
       .join("\n");
 
-    const heuristicCovered = detectSignals(messages);
     const remaining = TARGET_SIGNALS.filter((s) => !heuristicCovered.includes(s));
     const askedSoFar = messages
       .filter((m) => m.role === "agent")
       .map((m) => `- "${m.content}"`)
       .join("\n");
 
-    const userPrompt =
-      `${SYSTEM_PROMPT}\n\n` +
-      `HISTORIAL (turno actual del joven: ${userTurns}/${MAX_USER_TURNS}):\n${transcript}\n\n` +
-      `SEÑALES YA DETECTADAS POR HEURÍSTICA (informativo, no vinculante): ${heuristicCovered.join(", ") || "ninguna"}\n` +
-      `SEÑALES PENDIENTES (priorizá una de estas): ${remaining.join(", ") || "ninguna — ya están todas"}\n\n` +
-      `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
-      `Devolvé la SIGUIENTE pregunta (única, dirigida a una señal pendiente, conectada a lo que el joven dijo), o marcá done=true si ya hay 4+ señales cubiertas con detalle.`;
+    const nameHint = firstName?.trim()
+      ? `\nLa persona se llama ${firstName.trim()}. Puedes tutearla por su nombre de pila de vez en cuando.`
+      : "";
 
-    const turnHint = `\nTurno actual del joven: ${userTurns} de ${MAX_USER_TURNS}. Quedan ${MAX_USER_TURNS - userTurns} turnos antes del cierre obligatorio.`;
+    const userPrompt =
+      `${SYSTEM_PROMPT}${nameHint}\n\n` +
+      `HISTORIAL (turno actual del joven: ${userTurns}/${MAX_USER_TURNS}):\n${transcript}\n\n` +
+      `SEÑALES YA DETECTADAS (heurística): ${heuristicCovered.join(", ") || "ninguna"}\n` +
+      `SEÑALES PENDIENTES (priorizá una): ${remaining.join(", ") || "ninguna — ya están todas"}\n\n` +
+      `PREGUNTAS QUE YA HICISTE (NO las repitas):\n${askedSoFar || "(ninguna)"}\n\n` +
+      `Devolvé la SIGUIENTE pregunta o marcá done=true si ya hay 4+ señales cubiertas con detalle.`;
 
     const response = await gemini().models.generateContent({
       model: GEMINI_MODEL,
-<<<<<<< HEAD
-      contents: `${SYSTEM_PROMPT}${nameHint}${turnHint}\n\nHistorial:\n${transcript}\n\nDevuelve la siguiente pregunta o marca done si corresponde.`,
-=======
       contents: userPrompt,
->>>>>>> main
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
@@ -369,7 +280,6 @@ export async function POST(req: NextRequest) {
         ? parsed.nextQuestion.trim()
         : pickAlternateQuestion(userTurns);
 
-<<<<<<< HEAD
     if (userTurns < MIN_USER_TURNS) done = false;
     if (userTurns >= MAX_USER_TURNS) {
       done = true;
@@ -377,18 +287,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (!done && isTooSimilarToLastAgent(nextQuestion, messages)) {
-      nextQuestion = pickAlternateQuestion(userTurns + 1);
+      nextQuestion = pickFallbackQuestion(messages).question;
     }
 
-    return NextResponse.json({ nextQuestion, done });
-  } catch (err) {
-    console.error("entrevista error:", err);
-    return NextResponse.json(fallbackResponse(messagesSnapshot));
-=======
     const out = {
-      nextQuestion:
-        parsed.nextQuestion ||
-        "Contame un poco más, ¿qué hiciste exactamente y qué cambió después?",
+      nextQuestion,
       done,
       targetedSignal: parsed.targetedSignal ?? null,
       signalsCovered: Array.isArray(parsed.signalsCovered)
@@ -408,28 +311,20 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(out);
   } catch (err) {
-    // 429: el free tier de Gemini son 5 req/min. Mensaje honesto al joven.
     if (isRateLimitError(err)) {
       const shape = classifyProviderError(err);
       log.warn("rate_limited", { message: (err as Error)?.message });
       log.end({ status: shape.status, extra: { code: shape.code } });
       return errorResponse(shape, {
-        // Damos una pregunta de fallback igual: la entrevista no se rompe.
         nextQuestion: shape.error,
         done: false,
         targetedSignal: null,
-        signalsCovered: [],
+        signalsCovered: detectSignals(messagesSnapshot),
       });
     }
+
     log.error("entrevista.exception", { message: (err as Error)?.message });
     log.end({ status: 200, extra: { mode: "degraded" } });
-    // Degradación elegante: seguimos la entrevista con el fallback (PRD §8.5).
-    return NextResponse.json({
-      nextQuestion: "Cuéntame más sobre eso, ¿qué hiciste exactamente?",
-      done: false,
-      targetedSignal: null,
-      signalsCovered: [],
-    });
->>>>>>> main
+    return NextResponse.json(smartFallbackResponse(messagesSnapshot));
   }
 }

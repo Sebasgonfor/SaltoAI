@@ -10,11 +10,10 @@ export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#FAFAF7] text-slate-900">
       {/* NAV */}
-      <header className="px-6 h-16 flex items-center justify-between border-b border-slate-200/60 bg-[#FAFAF7]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="flex items-center gap-2.5">
-          <SaltoLogo variant="light" size={32} />
-          <span className="font-display font-semibold text-xl tracking-tight text-slate-900">Salto</span>
-        </div>
+      <header className="px-6 h-20 flex items-center justify-between border-b border-slate-200/60 bg-[#FAFAF7]/80 backdrop-blur-md sticky top-0 z-50">
+        <Link href="/" className="flex items-center shrink-0">
+          <SaltoLogo variant="full" size={64} />
+        </Link>
         <nav className="hidden md:flex gap-1 items-center text-sm font-medium">
           <Link href="#problema" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">El problema</Link>
           <Link href="#flujo" className="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 transition-colors">Cómo funciona</Link>
@@ -349,9 +348,9 @@ export default function LandingPage() {
 
       <footer className="py-10 border-t border-slate-200 bg-[#FAFAF7]">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row gap-4 justify-between items-center text-xs text-slate-500">
-          <div className="flex items-center gap-2.5">
-            <SaltoLogo variant="light" size={24} />
-            <span>© {new Date().getFullYear()} Salto · Tu primer salto al empleo formal.</span>
+          <div className="flex items-center gap-3">
+            <SaltoLogo variant="full" size={44} />
+            <span>© {new Date().getFullYear()} · Tu primer salto al empleo formal.</span>
           </div>
           <span>Desarrollado para Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI</span>
         </div>

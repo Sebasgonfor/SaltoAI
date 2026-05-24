@@ -86,25 +86,12 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
     );
   }
 
-  const initials = perfil.name
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-14">
       {/* HERO */}
-      <header className="relative">
-        <div className="grid md:grid-cols-12 gap-8 items-start">
-          <div className="md:col-span-3 flex md:block">
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white font-display font-bold text-3xl md:text-5xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              {initials}
-            </div>
-          </div>
-          <div className="md:col-span-9 space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
+      <header className="relative space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-transparent">
                 <CheckCircle2 size={12} className="mr-1" />
                 Perfil de Evidencia · Verificado por Salto IA
@@ -143,8 +130,6 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             <div className="pt-2 max-w-2xl">
               <CvCustomizer profileId={id} />
             </div>
-          </div>
-        </div>
       </header>
 
       {/* Tu historia → Evidencia (pipeline pedagógico) */}
