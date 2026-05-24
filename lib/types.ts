@@ -119,6 +119,14 @@ export interface Profile {
   createdAt: number;
   latent?: LatentProfile;
   taskStats?: TaskOutcomeStat;
+  /**
+   * Skills extraídas por IA de los documentos del joven (diplomas,
+   * certificados). NO persistido en el documento `profiles`; se enriquece
+   * en runtime desde la colección `documents` cuando el motor de matching
+   * necesita evaluar si una skill está VERIFICADA por documento (pesa más)
+   * vs solo DECLARADA en entrevista.
+   */
+  documentSkills?: DocumentSkill[];
 }
 
 export type MicroTaskStatus =
@@ -230,6 +238,13 @@ export interface Match {
   redFlag: string;
   topSkills: string[];
   taskStats?: TaskOutcomeStat;
+  /**
+   * Skills del joven que están VERIFICADAS por documento (certificado,
+   * diploma) Y son relevantes para esta necesidad. La UI muestra un badge
+   * "✓ verificada por documento" para distinguirlas de las declaradas en
+   * entrevista — el founder confía más en estas.
+   */
+  verifiedSkills?: { skill: string; evidence: string }[];
 }
 
 /**

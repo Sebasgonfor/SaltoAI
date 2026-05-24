@@ -33,7 +33,7 @@ const SLOTS: { key: string; label: string; match: RegExp; optional?: boolean }[]
   {
     key: 'vacante',
     label: 'Rol a cubrir',
-    match: /(busc[oa]mos|necesit[oa]mos|queremos contratar|el rol es|el puesto|vacante|abrimos posición|una persona que|alguien que|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b)/i,
+    match: /(busc[oa]mos|busc[oa]ndo|busco|necesit[oa]mos|necesito|queremos|el rol es|el puesto|vacante|abrimos posición|alguien (de|que|para)|una persona (de|que|para)|estamos contratando|persona para|profesional para|junior|senior|trainee|dev|desarrollador|programad|community|content|marketing|marketplace|e-?commerce|vendedor|cajero|atenci[óo]n|administrad|operario|asistente|secretari|repartidor|disenad|qa\b|product manager|pm\b|porque no (tenemos|hay)|para (crecer|vender|aumentar))/i,
   },
   {
     key: 'tareas_del_rol',
@@ -105,7 +105,11 @@ function buildOpeningMessage(name: string): ChatMessage {
   const short = name.split(/\s+/)[0] || name;
   return {
     role: 'agent',
-    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — no me des un cargo, cuéntame el contexto real. Para arrancar: ¿quiénes son ustedes? ¿Cuántas personas hay hoy en el equipo, qué hace cada una, y en qué etapa está la empresa?`,
+    // Apertura alineada con el primer slot (vacante). Antes preguntaba por
+    // el EQUIPO primero — eso contradecía el orden del prompt y hacía que
+    // el LLM volviera al final del chat a preguntar el rol que estaba
+    // "incompleto" en su modelo interno. Ahora arrancamos por lo crítico.
+    content: `Listo ${short}, ya tenemos lo legal. Ahora vamos al rol — pero no me des un cargo genérico, cuéntame el contexto real. Para arrancar: ¿qué rol específico estás contratando, cuántas vacantes son, y qué disparó la necesidad ahora?`,
   };
 }
 

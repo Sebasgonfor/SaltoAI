@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Quote,
   AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import type { CompanyNeed, Match, ICSBreakdown } from '@/lib/types';
 import { ICS_WEIGHTS } from '@/lib/types';
@@ -301,10 +302,28 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                     {top.profileName}
                   </h2>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {top.topSkills.map((s) => (
-                      <Badge key={s} className="bg-slate-900 text-white border-transparent">{s}</Badge>
-                    ))}
+                    {top.topSkills.map((s) => {
+                      const verified = top.verifiedSkills?.find(
+                        (v) => v.skill.toLowerCase() === s.toLowerCase(),
+                      );
+                      return verified ? (
+                        <Badge
+                          key={s}
+                          className="bg-emerald-600 text-white border-transparent gap-1"
+                          title={`Verificada por documento — "${verified.evidence}"`}
+                        >
+                          <CheckCircle2 size={11} /> {s}
+                        </Badge>
+                      ) : (
+                        <Badge key={s} className="bg-slate-900 text-white border-transparent">{s}</Badge>
+                      );
+                    })}
                   </div>
+                  {top.verifiedSkills && top.verifiedSkills.length > 0 && (
+                    <p className="text-[11px] text-emerald-700 mt-2 inline-flex items-center gap-1">
+                      <CheckCircle2 size={11} /> {top.verifiedSkills.length} skill{top.verifiedSkills.length === 1 ? '' : 's'} verificada{top.verifiedSkills.length === 1 ? '' : 's'} con documento
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-baseline gap-3 pt-4">
@@ -396,9 +415,23 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 mb-5">
-                  {m.topSkills.map((s) => (
-                    <Badge key={s} variant="secondary" className="bg-slate-100 text-slate-700 border-transparent font-normal">{s}</Badge>
-                  ))}
+                  {m.topSkills.map((s) => {
+                    const verified = m.verifiedSkills?.find(
+                      (v) => v.skill.toLowerCase() === s.toLowerCase(),
+                    );
+                    return verified ? (
+                      <Badge
+                        key={s}
+                        variant="secondary"
+                        className="bg-emerald-50 text-emerald-800 border border-emerald-200 gap-1"
+                        title={`Verificada por documento — "${verified.evidence}"`}
+                      >
+                        <CheckCircle2 size={11} /> {s}
+                      </Badge>
+                    ) : (
+                      <Badge key={s} variant="secondary" className="bg-slate-100 text-slate-700 border-transparent font-normal">{s}</Badge>
+                    );
+                  })}
                 </div>
 
                 <BreakdownBars breakdown={m.breakdown} />
