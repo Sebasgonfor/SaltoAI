@@ -64,11 +64,17 @@ service cloud.firestore {
     }
 
     // FEEDBACK (PRD §6.2.6, §8.6) — data flywheel propietario.
-    // DEMO MODE: write abierto para que el server pueda registrar votos.
-    // Read cerrado del lado cliente (solo lectura via Admin SDK / scripts
-    // internos para reentrenar el ICS).
+    // DEMO MODE: read + write abiertos para que el server SDK (sin auth)
+    // pueda leer y escribir señales de feedback. Lo necesita:
+    //   - /api/feedback GET (smoke + dashboard del flywheel)
+    //   - /api/admin/flywheel (agregaciones por touchpoint)
+    //   - /api/admin/eval-summary (calibración ICS vs outcome)
+    //
+    // ANTES read=false (server SDK no podía leer; data propietaria a futuro).
+    // El control real vive en /api/admin/* (auth check del lado server)
+    // hasta migrar a firebase-admin con service account.
     match /feedback/{feedbackId} {
-      allow read: if false;
+      allow read: if true;
       allow write: if true;
     }
 
