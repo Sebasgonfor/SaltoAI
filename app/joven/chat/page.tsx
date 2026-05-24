@@ -148,6 +148,7 @@ function ChatJoven() {
     pause: pauseLive,
     resume: resumeLive,
     clearError: clearLiveError,
+    resetMessages: resetLiveMessages,
     isActive: liveActive,
   } = useLiveInterview({
     firstName: basics ? firstNameFrom(basics.name) : undefined,
@@ -251,23 +252,17 @@ function ChatJoven() {
   const resetInterview = () => {
     const confirmMsg = closing
       ? 'Todavía estamos construyendo tu perfil. ¿Cancelar y empezar la entrevista de cero?'
-      : '¿Reiniciar la entrevista? Se borra todo lo que llevás escrito y volvés al paso 1. Tus datos básicos (nombre, edad) también se vacían.';
+      : '¿Reiniciar la conversación? Se borra la entrevista actual y empiezas de nuevo.';
     if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return;
     cancelRecording('reset-interview');
     disconnectLive();
-    clearPersisted(user?.uid);
+    resetLiveMessages();
     setMessages([]);
     setInput('');
-    setBasics(null);
-    setFormName(user?.displayName ?? '');
-    setFormAge('');
-    setFormGender('');
-    setBasicsStep(0);
     setFormError(null);
     setLoading(false);
     setClosing(false);
     setInterviewMode('text');
-    setPhase('basics');
     resumeProfileBuildRef.current = false;
     profileBuildInFlightRef.current = false;
   };
