@@ -946,6 +946,44 @@ export default function ChatEmpresa() {
             </div>
           </div>
 
+          {/* Escape hatch: cuando los slots están cubiertos pero el backend
+              aún exige MIN_USER_TURNS, el agente dice "voy a estructurar..."
+              pero el flow no avanza (done=false). El founder ve el mensaje
+              de cierre del agente y se queda esperando.
+              Este botón le da control: si los slots están cubiertos, puede
+              forzar la generación manual. Aparece cuando:
+                · detected.size >= 4 (4 de 5 slots — suficiente contexto)
+                · userTurns >= 1
+                · sesión legal completa
+                · no estamos cerrando o loading. */}
+          {detected.size >= 4 && userTurns >= 1 && legal && !closing && !loading && (
+            <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-2xl p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Sparkles size={14} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-emerald-900 leading-relaxed">
+                  Ya tengo {detected.size}/{SLOTS.length} señales y{' '}
+                  <strong>{wordsCount} palabras</strong> de contexto. Si querés
+                  cerrar acá y ver candidatos, generá la necesidad ahora.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => {
+                  // Si estábamos en modo voz, desconectamos primero para
+                  // que el hook no siga capturando audio cuando la página
+                  // navegue a /empresa/matches.
+                  if (interviewMode === 'voice' && live.isActive) {
+                    disconnectLiveRef.current?.();
+                  }
+                  void finalizeNeed(displayMessages);
+                }}
+              >
+                <Sparkles size={14} /> Estructurar y ver candidatos
+              </Button>
+            </div>
+          )}
+
           <div className="bg-white border border-slate-200 rounded-2xl p-4 flex gap-3">
             <FileText size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-slate-600 leading-relaxed">
