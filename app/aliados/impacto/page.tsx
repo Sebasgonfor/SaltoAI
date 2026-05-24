@@ -329,7 +329,7 @@ export default function ImpactoDashboard() {
             <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-2">
               Historias reales
             </div>
-            <h2 className="font-display font-bold text-3xl text-slate-900 tracking-tight">
+            <h2 className="font-display font-bold text-2xl sm:text-3xl text-slate-900 tracking-tight">
               Detrás de cada número, una persona.
             </h2>
           </div>

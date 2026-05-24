@@ -212,7 +212,7 @@ export function BasicsWizard({
 
   return (
     <motion.div
-      className="max-w-2xl mx-auto px-6 py-10 lg:py-16 w-full"
+      className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10 lg:py-16 w-full"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.35 }}
@@ -269,7 +269,7 @@ export function BasicsWizard({
             <div className="text-center mb-8">
               <h1
                 id={step === 2 ? 'gender-label' : undefined}
-                className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight"
+                className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight"
               >
                 {current.title}
               </h1>

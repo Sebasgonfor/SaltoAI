@@ -497,13 +497,13 @@ function ChatJoven() {
     // Full-height layout: ocupa todo el viewport menos los 80px del topbar
     // sticky del layout (h-20). El header del chat y el grid se reparten ese
     // espacio sin generar scroll externo en el body.
-    <div className="lg:h-[calc(100dvh-80px)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
-      <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0">
+    <div className="md:h-[calc(100dvh-80px)] md:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-4 sm:py-6">
+      <header className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 flex-shrink-0">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
             Paso 2 de 2 · Entrevista
           </div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-tight">
             Cuéntame tu historia, {basics ? firstNameFrom(basics.name) : ''}.
           </h1>
           {/* `<Badge>` renderiza un `<div>`, así que el contenedor NO puede
@@ -588,8 +588,8 @@ function ChatJoven() {
       )}
 
       <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
-        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[480px] overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-5 min-h-0">
+        <section className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[360px] sm:min-h-[480px] overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 min-h-0">
             {displayMessages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
@@ -598,13 +598,13 @@ function ChatJoven() {
                   </div>
                 )}
                 <div
-                  className={`px-4 py-3 rounded-2xl max-w-[85%] leading-relaxed ${
+                  className={`px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl max-w-[92%] sm:max-w-[85%] leading-relaxed ${
                     msg.role === 'user'
                       ? 'bg-slate-900 text-white rounded-br-md'
                       : 'bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md'
                   }`}
                 >
-                  <p className={`text-[15px] whitespace-pre-wrap ${msg.role === 'agent' ? 'font-display' : ''}`}>{msg.content}</p>
+                  <p className={`text-sm sm:text-[15px] whitespace-pre-wrap ${msg.role === 'agent' ? 'font-display' : ''}`}>{msg.content}</p>
                 </div>
                 {msg.role === 'user' && (
                   user?.photoURL ? (
@@ -837,7 +837,7 @@ function ChatJoven() {
                     <Button
                       type="button"
                       variant={isRecording ? 'default' : 'outline'}
-                      className={`h-[64px] w-[64px] flex-shrink-0 p-0 ${
+                      className={`h-11 w-11 sm:h-[64px] sm:w-[64px] flex-shrink-0 p-0 ${
                         isRecording ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' : ''
                       }`}
                       onClick={() => void toggleVoice()}
@@ -858,11 +858,11 @@ function ChatJoven() {
                       }
                       aria-pressed={isRecording}
                     >
-                      {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
+                      {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
                     </Button>
                   )}
                   <Textarea
-                    className="resize-none h-[64px] min-h-[64px] bg-white text-[15px] leading-relaxed"
+                    className="resize-none h-11 sm:h-[64px] min-h-[44px] sm:min-h-[64px] bg-white text-sm sm:text-[15px] leading-relaxed"
                     value={input}
                     onChange={(e) => {
                       if (isRecording) cancelRecording('textarea-edit');
@@ -889,11 +889,12 @@ function ChatJoven() {
                     }
                   />
                   <Button
-                    className="h-[64px] px-5 gap-2"
+                    className="h-11 sm:h-[64px] px-3 sm:px-5 gap-1.5 sm:gap-2 flex-shrink-0"
                     onClick={() => void sendUserMessage()}
                     disabled={loading || closing || atTurnLimit || isRecording || isTranscribing || !input.trim()}
                   >
-                    Enviar <ArrowRight size={14} />
+                    <span className="hidden sm:inline">Enviar</span>
+                    <ArrowRight size={16} />
                   </Button>
                 </div>
                 {voiceSupported && !atTurnLimit && (
@@ -906,8 +907,8 @@ function ChatJoven() {
           </div>
         </section>
 
-        <aside className="lg:col-span-5 space-y-4 order-first lg:order-none lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
-          <div className="bg-slate-950 text-white rounded-3xl p-6 relative overflow-hidden">
+        <aside className="lg:col-span-5 space-y-3 sm:space-y-4 order-first lg:order-none lg:overflow-y-auto lg:h-full lg:min-h-0 lg:pr-1">
+          <div className="bg-slate-950 text-white rounded-3xl p-5 sm:p-6 relative overflow-hidden">
             <div className="relative">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles size={14} className="text-emerald-400" />
@@ -941,14 +942,14 @@ function ChatJoven() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Palabras</div>
-              <div className="font-display font-bold text-3xl text-slate-900 tabular-nums">{wordsCount}</div>
+              <div className="font-display font-bold text-2xl sm:text-3xl text-slate-900 tabular-nums">{wordsCount}</div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Señales</div>
-              <div className="font-display font-bold text-3xl text-emerald-600 tabular-nums">{detected.size}</div>
+              <div className="font-display font-bold text-2xl sm:text-3xl text-emerald-600 tabular-nums">{detected.size}</div>
             </div>
           </div>
 
