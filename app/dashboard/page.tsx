@@ -343,46 +343,34 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* ── MAIN CONTENT ── */}
-        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-4xl">
+        {/* max-w-4xl era angosto: con 3 cards por row la radar quedaba
+            apretada. Subo a 6xl para que los widgets respiren. */}
+        <main className="flex-1 min-w-0 px-4 md:px-8 py-8 space-y-7 max-w-6xl">
 
-          {/* WELCOME — sin avatar/foto. El producto no maneja foto de perfil. */}
-          <FadeUp>
-            <div>
-              <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
-                {getGreeting(firstName)}
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {profile ? 'Tu perfil está activo y visible para empresas.' : 'Completa tu entrevista para empezar.'}
-              </p>
-            </div>
-          </FadeUp>
-
-          {/* STAT CARDS base — skills + evidencias del perfil mismo. Las
-              métricas enriquecidas (earnings, market visibility, inbox,
-              activity) van en <JovenWidgets> más abajo. */}
-          {!dataLoading && (
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                icon={Layers}
-                value={profile?.skills.length ?? 0}
-                label="Skills"
-                color="text-emerald-600"
-                delay={0.05}
-              />
-              <StatCard
-                icon={MessageSquareQuote}
-                value={profile?.evidence.length ?? 0}
-                label="Evidencias"
-                color="text-emerald-600"
-                delay={0.1}
-              />
-            </div>
+          {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
+              ya muestra greeting (vía nombre + categoría), avatar circular,
+              status text ("Última actividad: …") y los 4 KPIs (skills,
+              evidencias, microtasks, rating). Mantenerlos arriba duplicaba
+              información y rompía la jerarquía visual. Solo dejamos el
+              greeting cuando NO hay perfil — ahí el hero no se renderiza
+              y el onboarding banner toma protagonismo. */}
+          {!dataLoading && !profile && (
+            <FadeUp>
+              <div>
+                <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 tracking-tight">
+                  {getGreeting(firstName)}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Completa tu entrevista para empezar.
+                </p>
+              </div>
+            </FadeUp>
           )}
 
-          {/* Widgets enriquecidos — pasaporte de talento visual. Solo si
-              ya hay perfil. Sin perfil el onboarding banner se ocupa. */}
+          {/* Widgets enriquecidos — pasaporte de talento visual. El hero
+              dentro del componente reemplaza el welcome header. */}
           {!dataLoading && profile && (
-            <FadeUp delay={0.12}>
+            <FadeUp>
               <JovenWidgets
                 uid={user.uid}
                 profileId={user.uid}
