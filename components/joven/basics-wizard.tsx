@@ -6,7 +6,7 @@ import { ArrowRight, Check, UserCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Gender } from '@/lib/types';
-import { jovenAgeErrorMessage, parseJovenAge } from '@/lib/input-validation';
+import { jovenAgeErrorMessage, parseJovenAge, validatePersonName } from '@/lib/input-validation';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'mujer', label: 'Mujer' },
@@ -67,9 +67,9 @@ export function BasicsWizard({
 
   const goNext = () => {
     if (step === 0) {
-      const name = formName.trim();
-      if (name.length < 2) {
-        setLocalError('Escribe tu nombre completo (mínimo 2 caracteres).');
+      const nameErr = validatePersonName(formName, { requireFullName: true, fieldLabel: 'Tu nombre' });
+      if (nameErr) {
+        setLocalError(nameErr);
         return;
       }
       setLocalError(null);
