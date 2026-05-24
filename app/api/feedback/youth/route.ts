@@ -41,6 +41,15 @@ const COMPANY_TOUCHPOINTS = new Set<FeedbackEntry["touchpoint"]>([
 export async function GET(req: NextRequest) {
   const log = startLog(req, "feedback.youth");
   const profileId = req.nextUrl.searchParams.get("profileId");
+  // `uid` opcional: si el joven está autenticado, puede pasar su user.uid
+  // ADEMÁS del profileId del URL. El endpoint busca feedback contra AMBOS
+  // (deduplicados) — soluciona el caso donde la empresa dejó feedback
+  // contra un perfil con id distinto al user.uid del joven (ej. perfiles
+  // del seed con id=seed_xxx vs uid del joven real autenticado).
+  // Sin esto, un joven que tuvo su perfil persistido bajo dos ids
+  // distintos en el tiempo (legacy local_… + uid actual) podía no ver
+  // feedback dejado contra cualquiera de los dos.
+  const uid = req.nextUrl.searchParams.get("uid");
   if (!profileId) {
     log.end({ status: 400, extra: { reason: "missing_profile_id" } });
     return NextResponse.json(
@@ -49,15 +58,19 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const targetIds = new Set<string>([profileId]);
+  if (uid && uid !== profileId) targetIds.add(uid);
+
   const all = await listFeedback();
 
-  // 1. Feedback dirigido a este joven (parent): targetType=profile + targetId=profileId
-  //    + touchpoint en el set company→youth.
+  // 1. Feedback dirigido a este joven (parent): targetType=profile + targetId
+  //    en el set de aliases del joven + touchpoint en company→youth.
   const parents = all.filter(
     (f) =>
       COMPANY_TOUCHPOINTS.has(f.touchpoint) &&
       f.targetType === "profile" &&
-      f.targetId === profileId,
+      typeof f.targetId === "string" &&
+      targetIds.has(f.targetId),
   );
 
   // 2. Replies del joven: youth_reply_to_company con parentFeedbackId
@@ -88,6 +101,7 @@ export async function GET(req: NextRequest) {
     status: 200,
     extra: {
       profileId,
+      uidAlias: uid && uid !== profileId ? uid : undefined,
       threadCount: threads.length,
       replyCount: replies.length,
     },

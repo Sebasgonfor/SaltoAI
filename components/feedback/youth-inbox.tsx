@@ -61,9 +61,15 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
 
   const fetchInbox = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/feedback/youth?profileId=${encodeURIComponent(profileId)}`,
-      );
+      // Pasamos también el user.uid del joven autenticado para cubrir el
+      // caso donde la empresa dejó feedback contra un id distinto al del
+      // URL (ej. perfiles del seed con id=seed_xxx vs el uid real). El
+      // endpoint hace OR sobre los dos targetIds para encontrar todo.
+      const params = new URLSearchParams({ profileId });
+      if (user?.uid && user.uid !== profileId) {
+        params.set('uid', user.uid);
+      }
+      const res = await fetch(`/api/feedback/youth?${params.toString()}`);
       if (!res.ok) {
         setError('No pudimos cargar tu inbox.');
         return;
@@ -76,7 +82,9 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [profileId]);
+    // user?.uid en deps para re-fetch si la sesión cambia (logout+login con
+    // distinta cuenta abre nuevos aliases de targetId).
+  }, [profileId, user?.uid]);
 
   useEffect(() => {
     void fetchInbox();
