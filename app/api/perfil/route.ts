@@ -142,8 +142,19 @@ export async function POST(req: NextRequest) {
       basics?: unknown;
       uid?: string;
       displayName?: string;
+      sourceRecruiterUid?: string;
+      sourceRecruiterSlug?: string;
     };
     const { messages, basics: basicsRaw, uid } = body;
+    // Asociación candidato ↔ reclutadora (si llegó por un link /r/[slug]).
+    const sourceRecruiterUid =
+      typeof body.sourceRecruiterUid === "string" && body.sourceRecruiterUid.trim()
+        ? body.sourceRecruiterUid.trim().slice(0, 128)
+        : undefined;
+    const sourceRecruiterSlug =
+      typeof body.sourceRecruiterSlug === "string" && body.sourceRecruiterSlug.trim()
+        ? body.sourceRecruiterSlug.trim().slice(0, 64)
+        : undefined;
     const basics = parseBasics(basicsRaw);
     if (!basics) {
       log.end({ status: 400, extra: { reason: "invalid_basics" } });
@@ -299,6 +310,13 @@ export async function POST(req: NextRequest) {
         latent: existing?.latent,
         taskStats: existing?.taskStats,
         ...(interviewTranscript && { interviewTranscript }),
+        // Conservar asociación previa si ya existía; si llega una nueva, prevalece.
+        ...((sourceRecruiterUid ?? existing?.sourceRecruiterUid) && {
+          sourceRecruiterUid: sourceRecruiterUid ?? existing?.sourceRecruiterUid,
+        }),
+        ...((sourceRecruiterSlug ?? existing?.sourceRecruiterSlug) && {
+          sourceRecruiterSlug: sourceRecruiterSlug ?? existing?.sourceRecruiterSlug,
+        }),
       });
       id = uid;
       storage = storageFromId(uid);
@@ -307,6 +325,8 @@ export async function POST(req: NextRequest) {
         ...extracted,
         embedding,
         ...(interviewTranscript && { interviewTranscript }),
+        ...(sourceRecruiterUid && { sourceRecruiterUid }),
+        ...(sourceRecruiterSlug && { sourceRecruiterSlug }),
       });
       id = created.id;
       storage = created.storage;

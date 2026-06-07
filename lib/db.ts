@@ -26,6 +26,7 @@ import type {
   MatchDecisionStatus,
   NeedMatchSnapshot,
 } from "./types";
+import type { RecruiterConfig } from "./recruiter-config";
 
 const PROFILES = "profiles";
 const NEEDS = "needs";
@@ -34,6 +35,7 @@ const MICROTASKS = "microtasks";
 const DOCUMENTS = "documents";
 const MATCH_DECISIONS = "match_decisions";
 const NEED_MATCHES = "need_matches";
+const RECRUITER_CONFIGS = "recruiter_configs";
 
 export type StorageMode = "firestore" | "memory";
 
@@ -62,6 +64,7 @@ type DbGlobals = {
   memDocuments: Map<string, ProfileDocument>;
   memMatchDecisions: Map<string, MatchDecision>;
   memNeedMatches: Map<string, NeedMatchSnapshot>;
+  memRecruiterConfigs: Map<string, RecruiterConfig>;
 };
 const g = globalThis as unknown as { __saltoDb?: DbGlobals };
 if (!g.__saltoDb) {
@@ -73,6 +76,7 @@ if (!g.__saltoDb) {
     memDocuments: new Map(),
     memMatchDecisions: new Map(),
     memNeedMatches: new Map(),
+    memRecruiterConfigs: new Map(),
   };
 }
 // Backfill por si el globalThis fue creado por una versión anterior sin
@@ -80,6 +84,7 @@ if (!g.__saltoDb) {
 if (!g.__saltoDb.memDocuments) g.__saltoDb.memDocuments = new Map();
 if (!g.__saltoDb.memMatchDecisions) g.__saltoDb.memMatchDecisions = new Map();
 if (!g.__saltoDb.memNeedMatches) g.__saltoDb.memNeedMatches = new Map();
+if (!g.__saltoDb.memRecruiterConfigs) g.__saltoDb.memRecruiterConfigs = new Map();
 const memProfiles = g.__saltoDb.memProfiles;
 const memNeeds = g.__saltoDb.memNeeds;
 const memFeedback = g.__saltoDb.memFeedback;
@@ -87,6 +92,7 @@ const memMicroTasks = g.__saltoDb.memMicroTasks;
 const memDocuments = g.__saltoDb.memDocuments;
 const memMatchDecisions = g.__saltoDb.memMatchDecisions;
 const memNeedMatches = g.__saltoDb.memNeedMatches;
+const memRecruiterConfigs = g.__saltoDb.memRecruiterConfigs;
 
 // Antes había un único flag global `firestoreDisabled` que se prendía con
 // el PRIMER error y dejaba el proceso entero en modo memoria — un permiso
@@ -184,6 +190,89 @@ export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): P
       disableFirestoreWithWarning(e, "upsertProfileWithId", PROFILES);
     }
   }
+}
+
+/**
+ * Lista los perfiles de jóvenes que entraron por el link de una reclutadora
+ * (`sourceRecruiterUid`). Alimenta la vista "Mis candidatos" de la empresa.
+ */
+export async function listProfilesBySourceRecruiter(recruiterUid: string): Promise<Profile[]> {
+  if (!recruiterUid) return [];
+  if (useFirestore(PROFILES)) {
+    try {
+      const qy = query(collection(db, PROFILES), where("sourceRecruiterUid", "==", recruiterUid));
+      const snap = await getDocs(qy);
+      const remote = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Profile, "id">) }));
+      remote.sort((a, b) => b.createdAt - a.createdAt);
+      return remote;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "listProfilesBySourceRecruiter", PROFILES);
+    }
+  }
+  const inMem = Array.from(memProfiles.values()).filter(
+    (p) => p.sourceRecruiterUid === recruiterUid
+  );
+  inMem.sort((a, b) => b.createdAt - a.createdAt);
+  return inMem;
+}
+
+// ── Configuración de reclutadora (recruiter_configs) ─────────────────────────
+// Doc id = recruiterUid (1 config por cuenta). Sigue el patrón de profiles:
+// escribe en memoria primero y luego a Firestore, con bypass por colección.
+
+export async function upsertRecruiterConfig(cfg: RecruiterConfig): Promise<void> {
+  memRecruiterConfigs.set(cfg.recruiterUid, cfg);
+  if (useFirestore(RECRUITER_CONFIGS)) {
+    try {
+      await setDoc(
+        doc(db, RECRUITER_CONFIGS, cfg.recruiterUid),
+        stripUndefined(cfg as unknown as Record<string, unknown>)
+      );
+    } catch (e) {
+      disableFirestoreWithWarning(e, "upsertRecruiterConfig", RECRUITER_CONFIGS);
+    }
+  }
+}
+
+export async function getRecruiterConfig(uid: string): Promise<RecruiterConfig | null> {
+  if (!uid) return null;
+  if (useFirestore(RECRUITER_CONFIGS)) {
+    try {
+      const snap = await getDoc(doc(db, RECRUITER_CONFIGS, uid));
+      if (!snap.exists()) return memRecruiterConfigs.get(uid) ?? null;
+      const cfg = snap.data() as RecruiterConfig;
+      memRecruiterConfigs.set(uid, cfg);
+      return cfg;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getRecruiterConfig", RECRUITER_CONFIGS);
+    }
+  }
+  return memRecruiterConfigs.get(uid) ?? null;
+}
+
+/** Busca por slug (índice de campo único; sin orderBy → sin índice compuesto). */
+export async function getRecruiterConfigBySlug(slug: string): Promise<RecruiterConfig | null> {
+  if (!slug) return null;
+  if (useFirestore(RECRUITER_CONFIGS)) {
+    try {
+      const qy = query(collection(db, RECRUITER_CONFIGS), where("slug", "==", slug));
+      const snap = await getDocs(qy);
+      const first = snap.docs[0];
+      if (!first) return Array.from(memRecruiterConfigs.values()).find((c) => c.slug === slug) ?? null;
+      const cfg = first.data() as RecruiterConfig;
+      memRecruiterConfigs.set(cfg.recruiterUid, cfg);
+      return cfg;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getRecruiterConfigBySlug", RECRUITER_CONFIGS);
+    }
+  }
+  return Array.from(memRecruiterConfigs.values()).find((c) => c.slug === slug) ?? null;
+}
+
+/** Slug disponible si nadie lo usa o ya es del propio uid. */
+export async function isSlugAvailable(slug: string, forUid: string): Promise<boolean> {
+  const existing = await getRecruiterConfigBySlug(slug);
+  return !existing || existing.recruiterUid === forUid;
 }
 
 export async function createNeed(

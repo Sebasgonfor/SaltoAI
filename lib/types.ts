@@ -151,6 +151,14 @@ export interface Profile {
    * vs solo DECLARADA en entrevista.
    */
   documentSkills?: DocumentSkill[];
+  /**
+   * Reclutadora cuyo link `/r/[slug]` usó el joven para hacer la entrevista.
+   * Asocia el candidato a esa reclutadora (vista "Mis candidatos"). Opcional:
+   * los perfiles del flujo genérico no lo tienen.
+   */
+  sourceRecruiterUid?: string;
+  /** Slug de la reclutadora al momento de la entrevista (auditoría; el slug puede cambiar). */
+  sourceRecruiterSlug?: string;
 }
 
 export type MicroTaskStatus =
