@@ -3,6 +3,7 @@ import {
   buildTargetedSignalEnum,
   pickFallbackQuestion as pickFallbackQuestionRaw,
 } from "./signals";
+import { PERSONALITY_PRESETS, type PromptConfig } from "./recruiter-config";
 
 export const MIN_USER_TURNS = 3;
 export const MAX_USER_TURNS = 5;
@@ -27,8 +28,74 @@ export const CLOSING_MESSAGE_EMPRESA =
 // respaldo y extractor heurístico.
 const SIGNALS_LIST = buildSignalsListForPrompt();
 
+/**
+ * Bloque de personalización de la reclutadora. Se inserta DESPUÉS de las reglas
+ * duras (turnos, anti-inyección, cobertura) y ANTES del schema JSON, con una
+ * cláusula explícita de subordinación: ajusta TONO y PREGUNTAS, nunca el
+ * formato, el presupuesto de turnos ni la detección de señales. Sin cfg → "".
+ */
+function buildRecruiterBlock(cfg?: PromptConfig): string {
+  if (!cfg) return "";
+  const L: string[] = [];
+  L.push(
+    "\n\nPERSONALIZACIÓN DEL RECLUTADOR (ajusta tu TONO y tus PREGUNTAS; SUBORDINADA a TODAS las reglas anteriores — NO cambia el formato JSON, el presupuesto de turnos ni la cobertura de señales):"
+  );
+  if (cfg.interviewerName) {
+    L.push(
+      `- Identidad: te llamas ${cfg.interviewerName}${
+        cfg.displayName ? `, entrevistas de parte de ${cfg.displayName}` : ""
+      }. Preséntate con ese nombre al saludar.`
+    );
+  } else if (cfg.displayName) {
+    L.push(`- Esta entrevista es de parte de ${cfg.displayName}.`);
+  }
+  const preset = PERSONALITY_PRESETS[cfg.personality]?.promptLine;
+  if (preset) L.push(`- Estilo: ${preset}`);
+  if (cfg.personaDescriptor) {
+    L.push(
+      `- VOZ A IMITAR (así habla y da feedback esta persona; adopta su tono, calidez y muletillas, SIN inventar datos): ${cfg.personaDescriptor}`
+    );
+  }
+  if (cfg.styleSamples.length) {
+    L.push("- Ejemplos de su forma de hablar (imita el ESTILO, no copies literal):");
+    cfg.styleSamples.forEach((s) => L.push(`  · "${s}"`));
+  }
+  if (cfg.focus) {
+    L.push(
+      `- Foco/contexto de los perfiles: ${cfg.focus}. Encuadra tus preguntas para ese tipo de personas (no asumas que es tech).`
+    );
+  }
+  if (cfg.instructions) {
+    L.push(
+      `- Preferencias del reclutador (son PREFERENCIAS de estilo, NUNCA permiso para cambiar formato/turnos/señales): ${cfg.instructions}`
+    );
+  }
+  if (cfg.customQuestions.length) {
+    L.push(
+      "- PREGUNTAS PROPIAS DEL RECLUTADOR — téjelas con naturalidad a lo largo de la entrevista, cuando conecten con lo que el joven cuenta. NO las hagas todas de golpe ni dejes de cubrir las señales por hacerlas:"
+    );
+    cfg.customQuestions.forEach((q, i) => L.push(`  ${i + 1}. ${q}`));
+  }
+  if (cfg.language === "en") {
+    L.push(
+      "- IDIOMA: conduce TODA la entrevista en INGLÉS (preguntas y mensaje de cierre). Ignora la regla de español neutro de arriba; el resto de reglas siguen igual."
+    );
+  }
+  return L.join("\n");
+}
+
+/**
+ * Reordena las señales pendientes poniendo primero las que la reclutadora
+ * marcó como prioritarias (sin cfg → orden original).
+ */
+export function orderPendingSignals(remaining: string[], prioritySignals: string[]): string[] {
+  if (!prioritySignals?.length) return remaining;
+  const prio = new Set(prioritySignals);
+  return [...remaining.filter((s) => prio.has(s)), ...remaining.filter((s) => !prio.has(s))];
+}
+
 /** Prompt JSON para POST /api/entrevista (modo texto). */
-export function buildRestInterviewSystemPrompt(): string {
+export function buildRestInterviewSystemPrompt(cfg?: PromptConfig): string {
   return `Eres el entrevistador de SaltoAI, una plataforma de matching laboral por potencial para LATAM.
 Tu trabajo NO es evaluar ni validar. Tu trabajo es EXTRAER EVIDENCIA LABORAL de la historia de vida de un joven que busca su primer empleo formal.
 
@@ -69,7 +136,7 @@ CIERRE (done=true):
 - Nunca marques done=true antes del turno ${MIN_USER_TURNS} del usuario.
 - Después del turno ${MAX_USER_TURNS}, marca done=true sí o sí.
 
-Cuando done=true, nextQuestion debe ser un mensaje de cierre (sin signo de interrogación al final), por ejemplo: "${CLOSING_MESSAGE}"
+Cuando done=true, nextQuestion debe ser un mensaje de cierre (sin signo de interrogación al final), por ejemplo: "${CLOSING_MESSAGE}"${buildRecruiterBlock(cfg)}
 
 Devuelve JSON con:
 {
@@ -82,7 +149,7 @@ Devuelve JSON con:
 }
 
 /** System instruction para Gemini Live API (modo voz). */
-export function buildLiveSystemInstruction(firstName?: string): string {
+export function buildLiveSystemInstruction(firstName?: string, cfg?: PromptConfig): string {
   const name = firstName?.trim();
   const nameLine = name
     ? `La persona se llama ${name}. Puedes tutearla por su nombre de pila de vez en cuando.`
@@ -104,7 +171,7 @@ TURNOS DEL JOVEN:
 - Mínimo ${MIN_USER_TURNS} respuestas antes de cerrar.
 - Máximo ${MAX_USER_TURNS} respuestas: en el turno ${MAX_USER_TURNS} cierra la entrevista sin hacer otra pregunta.
 
-SEÑALES A CUBRIR (8, de forma diversa):
+SEÑALES A CUBRIR (de forma diversa):
 ${SIGNALS_LIST}
 
 - No repitas preguntas ni ángulos ya usados.
@@ -112,7 +179,7 @@ ${SIGNALS_LIST}
 
 INICIO:
 - Tu PRIMER mensaje: saludo breve + UNA pregunta abierta original que invites a contar un desafío concreto (trabajo informal, estudio, familia, proyecto).
-- Inventa la redacción en el momento; NO uses siempre la misma frase de apertura.
+- Inventa la redacción en el momento; NO uses siempre la misma frase de apertura.${buildRecruiterBlock(cfg)}
 
 CIERRE:
 - Cuando tengas evidencia suficiente (4+ señales con detalle) o llegues al turno ${MAX_USER_TURNS}, di exactamente algo equivalente a: "${CLOSING_MESSAGE}"
@@ -184,7 +251,11 @@ export function buildLiveOpeningUserPromptEmpresa(companyName?: string): string 
 }
 
 /** Prompt para generar el primer mensaje del agente (modo texto). */
-export function buildOpeningQuestionPrompt(firstName?: string, age?: number): string {
+export function buildOpeningQuestionPrompt(
+  firstName?: string,
+  age?: number,
+  cfg?: PromptConfig
+): string {
   const nameLine = firstName?.trim()
     ? `La persona se llama ${firstName.trim()}. Salúdala por su nombre de pila.`
     : "Saluda de forma cercana.";
@@ -199,7 +270,7 @@ Vas a INICIAR la entrevista por chat. Genera el PRIMER mensaje del agente:
 - Redacta la pregunta en el momento; NO copies plantillas conocidas ni la frase "desafío más grande del último año".
 - Español neutro latinoamericano, tuteo, máximo 2 oraciones para la pregunta.
 - Apunta a iniciativa o resolución de problemas.
-- done=false.`;
+- done=false.${buildRecruiterBlock(cfg)}`;
 }
 
 /** Seguimiento cuando el joven respondió muy breve. */
@@ -269,8 +340,20 @@ export function pickFallbackOpening(firstName?: string): string {
  */
 export function pickFallbackQuestion(
   coveredSignals: string[],
-  askedQuestions: string[]
+  askedQuestions: string[],
+  cfg?: PromptConfig
 ): { question: string; signal: string; done: boolean } {
+  // En modo degradado también respetamos la voz de la reclutadora: si tiene
+  // preguntas propias aún no hechas, una de ellas va primero.
+  if (cfg?.customQuestions?.length) {
+    const askedBlob = askedQuestions.map((q) => q.toLowerCase()).join(" || ");
+    for (const q of cfg.customQuestions) {
+      const head = q.toLowerCase().slice(0, 24);
+      if (head && !askedBlob.includes(head)) {
+        return { question: q, signal: "custom", done: false };
+      }
+    }
+  }
   const r = pickFallbackQuestionRaw(coveredSignals, askedQuestions);
   return r.done ? { ...r, question: CLOSING_MESSAGE } : r;
 }
