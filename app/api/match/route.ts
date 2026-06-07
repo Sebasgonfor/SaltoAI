@@ -32,9 +32,6 @@ export async function GET(req: NextRequest) {
 
     const snapshot = await getNeedMatches(needId);
     if (!snapshot) {
-      // #region agent log
-      fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'A',location:'app/api/match/route.ts:GET',message:'cache_miss_will_compute',data:{needId},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const computed = await getOrComputeMatchesForNeed(needId);
       if (!computed) {
         log.end({ status: 404, extra: { needId } });
@@ -51,10 +48,6 @@ export async function GET(req: NextRequest) {
       });
       return NextResponse.json(snapshotToMatchResponse(computed.need, computed.snapshot));
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'A',location:'app/api/match/route.ts:GET',message:'cache_hit',data:{needId,matches:snapshot.matches.length,computedAt:snapshot.computedAt},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     log.end({
       status: 200,

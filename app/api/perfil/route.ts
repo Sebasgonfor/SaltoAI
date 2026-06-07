@@ -59,8 +59,12 @@ Formato de evidencia (CV-ready — sección "Experiencia y logros"):
   · skill: "Atención al Cliente" → quote: "Resolvió reclamos de 80 asistentes en un evento masivo sin escalamiento a la organización."
 
 Otros campos:
-- skills: 3-6 habilidades concretas con nombre estándar de mercado laboral (ej. "Atención al Cliente",
-  "Gestión de Redes Sociales", "Ventas B2C"), no descripciones largas.
+- skills: nombra TODAS las habilidades concretas que el relato justifique (normalmente 4-10, sin
+  tope rígido — cuantas más demuestre el joven, mejor). NO te limites a una lista fija de competencias:
+  nombra la habilidad REAL que demuestra cada hecho que contó, con su nombre estándar de mercado laboral
+  (ej. "Gestión de Inventario", "Edición de Video", "Manejo de Caja", "Cobranza", "Atención al Cliente",
+  "Gestión de Redes Sociales", "Ventas B2C"). Una skill por competencia distinta, sin descripciones largas
+  y sin inventar habilidades que no tengan sustento en la transcripción.
 - traits: 2-5 rasgos conductuales observados, no juicios. Buenos: "Tolerancia al caos", "Autodidacta",
   "Orientación a resultados". Malos: "Buena persona", "Trabajador", "Dedicado".
 - summary: 2-3 frases en lenguaje natural describiendo a la persona y su trayectoria informal.
@@ -259,9 +263,6 @@ export async function POST(req: NextRequest) {
       extracted.skills = [...new Set(extracted.evidence.map((e) => e.skill))];
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'A',location:'app/api/perfil/route.ts:POST',message:'perfil extraction after sanitize',data:{skills:extracted.skills.length,evidence:extracted.evidence.length,uid:!!uid},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     // Último piso: si tras la sanitización quedó vacío, usamos el heurístico
     // crudo. El perfil NUNCA debe salir sin skills/evidencias.

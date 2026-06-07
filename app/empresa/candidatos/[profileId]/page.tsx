@@ -24,26 +24,16 @@ function CandidatoContent({ profileId }: { profileId: string }) {
     if (!needId) return;
     const stored = readStoredMatchForNavigation(needId, profileId);
     if (stored) {
-      // #region agent log
-      fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'B',location:'app/empresa/candidatos/page.tsx',message:'match_from_session',data:{needId,profileId,ics:stored.ics},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setMatch(stored);
       return;
     }
 
     let cancelled = false;
-    const t0 = Date.now();
-    // #region agent log
-    fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'B',location:'app/empresa/candidatos/page.tsx',message:'match_fetch_start',data:{needId,profileId,fallback:true},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     void fetch(`/api/match?needId=${encodeURIComponent(needId)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
         const m = (data.matches as Match[] | undefined)?.find((x) => x.profileId === profileId);
-        // #region agent log
-        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'B',location:'app/empresa/candidatos/page.tsx',message:'match_fetch_done',data:{needId,profileId,ms:Date.now()-t0,found:!!m,cached:!!data.cached,fallback:true,matchCount:(data.matches as Match[]|undefined)?.length??0},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (m) {
           storeMatchForNavigation(needId, profileId, m);
           setMatch(m);

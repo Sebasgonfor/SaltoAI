@@ -11,86 +11,7 @@
  * texto del joven y los etiqueta con la skill correspondiente.
  */
 import type { ChatMessage, Profile } from "./types";
-
-interface SignalDef {
-  /** Skill con nombre de mercado laboral (CV-ready). */
-  skill: string;
-  /** Rasgo conductual asociado. */
-  trait: string;
-  /** Patrón que activa la señal. */
-  match: RegExp;
-  /** Verbo de acción para construir la quote en tercera persona pasado. */
-  actionVerb: string;
-  /** Plantilla de quote cuando no se logra extraer una cita directa. */
-  fallbackQuote: string;
-}
-
-const SIGNALS: SignalDef[] = [
-  {
-    skill: "Iniciativa",
-    trait: "Proactividad",
-    match: /(yo (mismo|sola|solo)|decid[íi]|propuse|me puse|empec[ée]|arranqu[ée]|tom[éa] la iniciativa|sin que nadie)/i,
-    actionVerb: "Arrancó",
-    fallbackQuote:
-      "Arrancó proyectos por iniciativa propia, sin esperar instrucciones, identificando lo que hacía falta y ejecutándolo.",
-  },
-  {
-    skill: "Aprendizaje Autónomo",
-    trait: "Autodidacta",
-    match: /(aprend[ií]|tutoriales?|youtube|tiktok|sol[ao]|por mi cuenta|nadie me enseñó|investigu[ée]|busqu[ée] c[óo]mo)/i,
-    actionVerb: "Aprendió",
-    fallbackQuote:
-      "Aprendió de forma autónoma habilidades clave mediante tutoriales en línea y prueba-error, sin formación formal previa.",
-  },
-  {
-    skill: "Resolución de Problemas",
-    trait: "Pensamiento Resolutivo",
-    match: /(resolv[ií]|solucion[éae]|arregl[ée]|encontr[éa] la forma|me las arregl[ée]|destrabe?|destranqu[ée])/i,
-    actionVerb: "Resolvió",
-    fallbackQuote:
-      "Resolvió problemas operativos improvisando con los recursos disponibles, sin escalamiento ni supervisión externa.",
-  },
-  {
-    skill: "Orientación a Resultados",
-    trait: "Foco en Resultados",
-    match: /(\d+\s*%|\d+\s*(ventas|clientes|seguidores|pedidos|meses|veces)|ventas?|aumen[tc][ée]|crec[íi]|triplic[óo]|dupliqu[ée]|logr[éo]|consegu[íi])/i,
-    actionVerb: "Generó",
-    fallbackQuote:
-      "Generó resultados medibles en un negocio informal, conectando acciones cotidianas con métricas concretas de impacto.",
-  },
-  {
-    skill: "Atención al Cliente",
-    trait: "Empatía Operacional",
-    match: /(client[ea]s?|reclam[oa]s?|atend[íi]|respond[íi]|usuari[oa]s?|consumidor|comprador)/i,
-    actionVerb: "Atendió",
-    fallbackQuote:
-      "Atendió clientes y manejó reclamos en un comercio informal, recuperando clientes molestos mediante respuesta rápida y trato directo.",
-  },
-  {
-    skill: "Trabajo en Equipo",
-    trait: "Colaboración",
-    match: /(equipo|colabor[ée]|junto a|compañer[oa]s?|coordin[éa]|nos pusimos de acuerdo|reparti[mr]os)/i,
-    actionVerb: "Coordinó",
-    fallbackQuote:
-      "Coordinó tareas con otras personas, dividiendo roles claros y sosteniendo rutinas conjuntas en un entorno familiar o de pequeño negocio.",
-  },
-  {
-    skill: "Adaptación al Cambio",
-    trait: "Tolerancia al Caos",
-    match: /(cambio|adaptarme|me ajust[ée]|nuevo|de repente|sin previo|imprevisto|sorpresa)/i,
-    actionVerb: "Se adaptó",
-    fallbackQuote:
-      "Se adaptó a cambios bruscos en las reglas del juego (precios, plataformas, demanda) ajustando el plan en marcha sin perder operación.",
-  },
-  {
-    skill: "Persistencia",
-    trait: "Resiliencia",
-    match: /(insist[íi]|sigu[íi]|no me rend[íi]|volv[íi] a intentar|termin[ée]|fracas[éo]|no funcion[óo].*pero|aun as[íi])/i,
-    actionVerb: "Sostuvo",
-    fallbackQuote:
-      "Sostuvo proyectos durante meses sin abandonar, aprendiendo de fracasos parciales y ajustando el rumbo en cada iteración.",
-  },
-];
+import { SIGNALS, isSignalCovered, type Signal } from "./signals";
 
 /** Devuelve los fragmentos del transcript del joven (oraciones útiles). */
 function extractSentences(messages: ChatMessage[]): string[] {
@@ -106,28 +27,80 @@ function extractSentences(messages: ChatMessage[]): string[] {
 }
 
 /**
- * Convierte una cita del joven (primera persona) en una quote CV-ready
- * (tercera persona, pasado). Heurística simple: reemplaza pronombres y
- * conjugaciones más comunes. Si no logra una transformación limpia, antepone
- * el verbo de acción + la oración tal cual (queda algo torpe pero salvable).
+ * Conjugaciones de 1ª persona singular (pasado) → 3ª persona singular (pasado).
+ * Cubre los verbos más frecuentes en relatos de trabajo informal. Se usa para
+ * convertir el verbo inicial de la cita; si queda 1ª persona sin convertir,
+ * NO arriesgamos texto roto (ver toThirdPerson).
  */
-function toThirdPerson(sentence: string, actionVerb: string): string {
-  const s = sentence
-    .replace(/\byo\b/gi, "")
-    .replace(/\bmi\s+/gi, "su ")
+const FIRST_TO_THIRD: Record<string, string> = {
+  decidí: "decidió", propuse: "propuso", empecé: "empezó", arranqué: "arrancó",
+  aprendí: "aprendió", enseñé: "enseñó", resolví: "resolvió", solucioné: "solucionó",
+  arreglé: "arregló", encontré: "encontró", vendí: "vendió", compré: "compró",
+  aumenté: "aumentó", crecí: "creció", logré: "logró", conseguí: "consiguió",
+  alcancé: "alcanzó", atendí: "atendió", respondí: "respondió", ayudé: "ayudó",
+  coordiné: "coordinó", colaboré: "colaboró", organicé: "organizó", ordené: "ordenó",
+  clasifiqué: "clasificó", detecté: "detectó", noté: "notó", revisé: "revisó",
+  verifiqué: "verificó", manejé: "manejó", administré: "administró", cuadré: "cuadró",
+  controlé: "controló", insistí: "insistió", seguí: "siguió", continué: "continuó",
+  terminé: "terminó", completé: "completó", hice: "hizo", armé: "armó", monté: "montó",
+  creé: "creó", diseñé: "diseñó", construí: "construyó", implementé: "implementó",
+  gestioné: "gestionó", lideré: "lideró", llevé: "llevó", abrí: "abrió", puse: "puso",
+  trabajé: "trabajó", estudié: "estudió", investigué: "investigó", busqué: "buscó",
+  adapté: "adaptó", ajusté: "ajustó", di: "dio", fui: "fue", tuve: "tuvo",
+  estuve: "estuvo", pude: "pudo", supe: "supo", vine: "vino", dije: "dijo",
+  quise: "quiso", vi: "vio",
+};
+
+function stripPunct(w: string): string {
+  return w.toLowerCase().replace(/[.,;:!?"'¿¡]/g, "");
+}
+
+/** ¿Queda algún rastro de 1ª persona tras intentar convertir? */
+function hasResidualFirstPerson(s: string): boolean {
+  if (/\b(yo|mí|conmigo)\b/i.test(s)) return true;
+  // Algún verbo de 1ª persona del mapa que no se convirtió (p. ej. mid-frase).
+  const words = s.match(/[a-zñáéíóú]+/gi) ?? [];
+  return words.some((w) => Object.prototype.hasOwnProperty.call(FIRST_TO_THIRD, w.toLowerCase()));
+}
+
+/**
+ * Convierte una cita del joven (primera persona) en una quote CV-ready
+ * (tercera persona, pasado). Limpia pronombres, conjuga el verbo inicial con
+ * FIRST_TO_THIRD y, si TODAVÍA queda 1ª persona, NO emite texto roto: usa la
+ * quote canónica (fallbackQuote) o, en su defecto, presenta las palabras del
+ * joven como cita textual explícita (honesto y gramaticalmente válido).
+ */
+function toThirdPerson(
+  sentence: string,
+  actionVerb: string,
+  fallbackQuote?: string
+): string {
+  // Limpieza de pronombres de 1ª persona (incluye reflexivos "me " → "se ").
+  let s = sentence
+    .replace(/^\s*yo\s+/i, "")
     .replace(/\bmis\s+/gi, "sus ")
-    .replace(/\bme\b/gi, "se")
-    .replace(/\bnosotros\b/gi, "ellos")
+    .replace(/\bmi\s+/gi, "su ")
+    .replace(/\bme\s+/gi, "se ")
+    .replace(/\bnos\s+/gi, "se ")
     .replace(/\s+/g, " ")
     .trim();
-  // Si la oración ya empieza con un verbo de acción reconocible, la usamos.
-  const startsWithVerb = /^(arranc|aprend|resol|gener|atend|coord|adapt|sost|implement|gestion|dise[ñn]|cre|hi[cz]o|prob|consigu|lev|llev|abr)/i.test(
-    s
-  );
-  if (startsWithVerb) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
+
+  // Conjuga el verbo inicial. En reflexivos ("se <verbo>") el verbo va en pos. 1.
+  const tokens = s.split(" ");
+  const idx = stripPunct(tokens[0] ?? "") === "se" && tokens[1] ? 1 : 0;
+  const verbKey = stripPunct(tokens[idx] ?? "");
+  if (Object.prototype.hasOwnProperty.call(FIRST_TO_THIRD, verbKey)) {
+    tokens[idx] = FIRST_TO_THIRD[verbKey];
+    s = tokens.join(" ");
   }
-  return `${actionVerb} en una situación que describe así: "${s}"`;
+
+  // Si la conversión no quedó limpia, preferimos calidad sobre especificidad.
+  if (hasResidualFirstPerson(s)) {
+    if (fallbackQuote) return fallbackQuote;
+    return `${actionVerb} algo que describe así: "${sentence.trim()}"`;
+  }
+
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 interface ExtractedProfileBody {
@@ -166,7 +139,7 @@ export function heuristicExtraction(
     };
   }
 
-  const matched: SignalDef[] = SIGNALS.filter((s) => s.match.test(userText));
+  const matched: Signal[] = SIGNALS.filter((s) => isSignalCovered(s, userText));
   const sentences = extractSentences(messages);
 
   // Empareja cada señal con la oración más cercana que también la dispare.
@@ -176,9 +149,9 @@ export function heuristicExtraction(
   const traitsSet = new Set<string>();
 
   for (const sig of matched) {
-    const matchingSentence = sentences.find((s) => sig.match.test(s));
+    const matchingSentence = sentences.find((s) => isSignalCovered(sig, s));
     const quote = matchingSentence
-      ? toThirdPerson(matchingSentence, sig.actionVerb)
+      ? toThirdPerson(matchingSentence, sig.actionVerb, sig.fallbackQuote)
       : sig.fallbackQuote;
     evidence.push({ skill: sig.skill, quote });
     skillsSet.add(sig.skill);
@@ -206,9 +179,9 @@ export function heuristicExtraction(
   // Garantizar mínimos sensatos (2 skills, 2 traits, 2 evidencias).
   if (traitsSet.size < 2) traitsSet.add("Curiosidad Aplicada");
 
-  const skills = Array.from(skillsSet).slice(0, 6);
-  const traits = Array.from(traitsSet).slice(0, 5);
-  const finalEvidence = evidence.slice(0, 6);
+  const skills = Array.from(skillsSet).slice(0, 10);
+  const traits = Array.from(traitsSet).slice(0, 6);
+  const finalEvidence = evidence.slice(0, 8);
 
   const summary =
     matched.length >= 2
@@ -255,12 +228,14 @@ export function mergeProfiles(
   const llmSkillSet = new Set((llm.evidence ?? []).map((e) => e.skill.toLowerCase()));
   for (const h of heuristic.evidence) {
     if (!llmSkillSet.has(h.skill.toLowerCase())) evidence.push(h);
-    if (evidence.length >= 6) break;
+    if (evidence.length >= 8) break;
   }
   return {
     summary: llm.summary?.trim() || heuristic.summary,
-    skills: Array.from(skillsSet).slice(0, 6),
-    traits: Array.from(traitsSet).slice(0, 5),
-    evidence: evidence.slice(0, 6),
+    // Tope amplio: el LLM puede nombrar muchas skills reales; el heurístico
+    // solo rellena huecos. No truncamos agresivamente.
+    skills: Array.from(skillsSet).slice(0, 12),
+    traits: Array.from(traitsSet).slice(0, 6),
+    evidence: evidence.slice(0, 8),
   };
 }
