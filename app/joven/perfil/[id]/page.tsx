@@ -101,11 +101,6 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         }
         const data = await res.json();
         if (!cancelled) {
-          // #region agent log
-          let storedId: string | null = null;
-          try { storedId = localStorage.getItem('salto_last_profile_id'); } catch { /* */ }
-          fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'app/joven/perfil/[id]/page.tsx',message:'perfil_load',data:{routeId:id,ok:res.ok,hasProfile:!!data.profile,userUid:user?.uid??null,storedId,idsMatch:id===user?.uid,routeIsLocal:id.startsWith('local_')},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           setPerfil(data.profile);
           setStorage(data.storage ?? (id.startsWith('local_') ? 'memory' : 'firestore'));
           try {

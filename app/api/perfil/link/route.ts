@@ -44,9 +44,6 @@ export async function POST(req: NextRequest) {
     await reassignMicroTasksProfileId(sourceId, uid);
 
     const saved = await getProfile(uid);
-    // #region agent log
-    fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'app/api/perfil/link/route.ts',message:'profile_linked',data:{uid,sourceId,mode:'linked'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     log.end({ status: 200, extra: { profileId: uid, sourceId, mode: "linked" } });
     return NextResponse.json({ id: uid, profile: saved, storage: storageFromId(uid) });
   } catch (err) {

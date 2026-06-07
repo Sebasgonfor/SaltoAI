@@ -19,6 +19,7 @@ import {
   MAX_USER_TURNS,
   MIN_USER_TURNS,
 } from '@/lib/interview-prompt';
+import { SIGNALS as SIGNAL_DEFS, detectSignalsInText } from '@/lib/signals';
 import {
   fetchJovenBasicsFromProfile,
   loadSavedJovenBasics,
@@ -52,20 +53,17 @@ function applyBasicsToForm(
 }
 
 interface DetectedSignal {
+  id: string;
   label: string;
-  match: RegExp;
 }
 
-const SIGNALS: DetectedSignal[] = [
-  { label: 'Iniciativa', match: /(yo (mismo|sola|solo)|decidí|propuse|me puse|empecé|arranqué)/i },
-  { label: 'Aprendizaje autónomo', match: /(aprend[ií]|tutoriales?|youtube|sol[ao]|por mi cuenta|nadie me enseñó)/i },
-  { label: 'Resolución de problemas', match: /(resolv[ií]|solucion[éae]|arreglé|encontr[éa] la forma|me las arreglé)/i },
-  { label: 'Resultados medibles', match: /(\d+\s*%|ventas?|clientes?|seguidores?|aumenté|crecí|triplicó|dupliqué)/i },
-  { label: 'Atención al cliente', match: /(client[ea]s?|reclam[oa]s?|atend[íi]|respondí)/i },
-  { label: 'Trabajo en equipo', match: /(equipo|colaboré|junto a|compañer[oa]s?|coordin[éa])/i },
-  { label: 'Adaptación al cambio', match: /(cambio|adaptarme|me ajusté|nuevo|de repente|sin previo)/i },
-  { label: 'Persistencia', match: /(insist[íi]|sigue|no me rendí|volv[íi] a intentar|terminé)/i },
-];
+// Chips de "Señales en tu historia" — derivados de la fuente única
+// lib/signals.ts para que coincidan con lo que detecta el backend (incluye
+// las señales cualitativas: confiabilidad, atención al detalle, etc.).
+const SIGNALS: DetectedSignal[] = SIGNAL_DEFS.map((s) => ({
+  id: s.id,
+  label: s.label,
+}));
 
 // Persistencia en localStorage para que la entrevista sobreviva navegación
 // (salir a otra página y volver, refresh accidental, etc.). Una key por uid
@@ -406,9 +404,7 @@ function ChatJoven() {
     const text = liveDraftText
       ? `${messageText} ${liveDraftText}`
       : messageText;
-    const set = new Set<string>();
-    for (const s of SIGNALS) if (s.match.test(text)) set.add(s.label);
-    return set;
+    return new Set<string>(detectSignalsInText(text));
   }, [displayMessages, liveDraftText]);
 
   const wordsCount = useMemo(() => {
@@ -514,12 +510,6 @@ function ChatJoven() {
           signal: controller.signal,
         });
         const closeData = await closeRes.json();
-        // #region agent log
-        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'D',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil_created',data:{ok:closeRes.ok,profileId:closeData.id??null,hadUid:!!user?.uid,uid:user?.uid??null,idMatchesUid:closeData.id===user?.uid},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        // #region agent log
-        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'C',location:'app/joven/chat/page.tsx:finishInterview',message:'perfil POST result',data:{ok:closeRes.ok,status:closeRes.status,hasId:!!closeData.id,code:closeData.code??null,msgCount:conversation.length,userTurns:conversation.filter(m=>m.role==='user').length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (closeRes.ok && closeData.id) {
           if (basics) saveJovenBasics(user?.uid, basics);
           try {
@@ -1218,10 +1208,10 @@ function ChatJoven() {
               ) : (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {SIGNALS.map((s) => {
-                    const active = detected.has(s.label);
+                    const active = detected.has(s.id);
                     return (
                       <span
-                        key={s.label}
+                        key={s.id}
                         className={`text-xs px-2.5 py-1 rounded-full border ${
                           active
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'

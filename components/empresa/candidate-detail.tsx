@@ -45,7 +45,6 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
 
   useEffect(() => {
     let cancelled = false;
-    const t0 = Date.now();
     (async () => {
       try {
         const [profileRes, docsRes, decisionRes] = await Promise.all([
@@ -70,9 +69,6 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
           (d) => d.profileId === profileId
         );
         setDecision(mine ?? null);
-        // #region agent log
-        fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'aa3c62'},body:JSON.stringify({sessionId:'aa3c62',hypothesisId:'B',location:'components/empresa/candidate-detail.tsx',message:'detail_loaded',data:{profileId,needId,ms:Date.now()-t0,hasMatchProp:!!match},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
       } catch {
         if (!cancelled) setError('Error cargando el candidato.');
       } finally {

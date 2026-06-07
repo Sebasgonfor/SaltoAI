@@ -105,9 +105,6 @@ export async function GET(req: NextRequest) {
   }
 
   let profile = await getProfile(profileId);
-  // #region agent log
-  fetch('http://127.0.0.1:7595/ingest/ff866a2f-ed10-444d-83df-559d155ce923',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7c2852'},body:JSON.stringify({sessionId:'7c2852',hypothesisId:'B',location:'app/api/cv/route.ts:GET',message:'cv getProfile',data:{profileId,found:!!profile,evidenceCount:profile?.evidence?.length??0},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!profile) {
     log.end({ status: 404, extra: { profileId } });
     return NextResponse.json({ error: "Perfil no encontrado", code: "not_found" }, { status: 404 });
