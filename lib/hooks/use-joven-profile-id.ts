@@ -5,13 +5,21 @@ import { useAuth } from "@/lib/auth-context";
 
 const LS_KEY = "salto_last_profile_id";
 
+// Caché en memoria (por sesión) uid → profileId resuelto. Evita re-fetchear la
+// resolución en cada montaje: al re-navegar dentro de la sesión es instantáneo
+// (sin parpadeo de "aún no tenés perfil" mientras resuelve). Vacío en SSR y en
+// el primer render tras recargar → sin riesgo de hydration mismatch.
+const resolvedCache = new Map<string, string>();
+
 /**
  * Id efectivo del perfil joven: uid de Firebase si tiene datos,
  * si no el último perfil en localStorage (p. ej. local_* antes de vincular).
  */
 export function useJovenProfileId(): string | null {
   const { user, account } = useAuth();
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(() =>
+    user?.uid && account?.role === "joven" ? resolvedCache.get(user.uid) ?? null : null
+  );
 
   useEffect(() => {
     if (!user?.uid || account?.role !== "joven") {
@@ -19,13 +27,24 @@ export function useJovenProfileId(): string | null {
       return;
     }
 
+    // Semilla instantánea desde el caché de sesión.
+    const cached = resolvedCache.get(user.uid);
+    if (cached) {
+      setProfileId(cached);
+      return;
+    }
+
     let cancelled = false;
+    const remember = (id: string) => {
+      resolvedCache.set(user.uid, id);
+      if (!cancelled) setProfileId(id);
+    };
     (async () => {
       const uid = user.uid;
       try {
         const uidRes = await fetch(`/api/perfil?id=${encodeURIComponent(uid)}`);
         if (uidRes.ok) {
-          if (!cancelled) setProfileId(uid);
+          remember(uid);
           return;
         }
 
@@ -52,17 +71,17 @@ export function useJovenProfileId(): string | null {
               } catch {
                 /* ignore */
               }
-              if (!cancelled) setProfileId(linkedId);
+              remember(linkedId);
               return;
             }
-            if (!cancelled) setProfileId(stored);
+            remember(stored);
             return;
           }
         }
 
-        if (!cancelled) setProfileId(uid);
+        remember(uid);
       } catch {
-        if (!cancelled) setProfileId(user.uid);
+        remember(user.uid);
       }
     })();
 

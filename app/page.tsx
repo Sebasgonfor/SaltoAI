@@ -8,14 +8,16 @@ import { UserButton } from '@/components/auth/user-button';
 import { RoleCTA } from '@/components/auth/role-cta';
 import { ArrowRight, Sparkles, MessageSquareQuote, Layers, Network } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useRedirectIfAuthed } from '@/lib/hooks/use-redirect-if-authed';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function LandingPage() {
-  // Cuando el user está logueado, los CTAs del rol OPUESTO se ocultan
-  // (eran ruido: convergían al mismo destino que el dropdown del UserButton).
-  // El header pasa a mostrar SOLO el UserButton; el hero y el CTA final
-  // mantienen el botón del rol activo y ocultan el otro.
+  // La landing es marketing: un usuario logueado no debe quedarse aquí.
+  // Lo mandamos a su home (o a elegir rol). Anónimos ven la landing al instante.
+  const holding = useRedirectIfAuthed();
   const { account } = useAuth();
   const isLoggedIn = !!account;
+  if (holding) return <LoadingSpinner variant="full" />;
   const isJoven = account?.role === 'joven';
   const isEmpresa = account?.role === 'empresa';
 
@@ -72,7 +74,7 @@ export default function LandingPage() {
                   de un CV que aún no puedes tener.
                 </h1>
                 <p className="mt-10 text-lg md:text-xl text-slate-600 max-w-2xl leading-relaxed text-pretty">
-                  SaltoAI es la plataforma de IA que <strong className="text-slate-900 font-semibold">traduce experiencia informal en evidencia laboral real</strong>, y emparenta jóvenes con empresas tempranas por <strong className="text-slate-900 font-semibold">potencial</strong>, no por años en un papel.
+                  SaltoAI es la plataforma de IA que <strong className="text-slate-900 font-semibold">traduce experiencia informal en evidencia laboral real</strong> y te conecta con empresas por <strong className="text-slate-900 font-semibold">potencial</strong>, no por años en un papel. Empiezas con <strong className="text-slate-900 font-semibold">trabajos reales pagados</strong>, antes del primer contrato.
                 </p>
 
                 {/* Hero CTAs: ambos para anónimos, solo el rol activo si hay sesión. */}

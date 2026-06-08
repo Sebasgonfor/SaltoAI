@@ -128,7 +128,10 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
   const isEmpty = data.threads.length === 0;
 
   return (
-    <section className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8">
+    <section
+      id="feedback-inbox"
+      className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 scroll-mt-24"
+    >
       <div className="flex items-start justify-between mb-5 gap-3">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1">

@@ -54,9 +54,6 @@ export function buildAtsCvText(profile: Profile): string {
     }
   }
 
-  lines.push("---");
-  lines.push("Perfil generado por SaltoAI · Evidencia extraída de entrevista conversacional");
-
   return lines.join("\n").trim();
 }
 
@@ -110,7 +107,6 @@ export function buildAtsCvHtml(profile: Profile): string {
   ${skills ? `<h2>Habilidades</h2><ul>${skills}</ul>` : ""}
   ${traits ? `<h2>Competencias conductuales</h2><ul>${traits}</ul>` : ""}
   ${evidence ? `<h2>Experiencia y logros</h2>${evidence}` : ""}
-  <footer>Perfil SaltoAI · CV optimizado para sistemas ATS (una columna, sin tablas)</footer>
 </body>
 </html>`;
 }

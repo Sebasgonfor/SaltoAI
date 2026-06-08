@@ -46,25 +46,25 @@ Reglas estrictas (anti-alucinación):
 - Cada skill DEBE estar anclada a un hecho REAL que el joven mencionó. Si no hay sustento en la transcripción, NO la incluyas.
 - NO inventes números, fechas ni resultados. Si el joven no los mencionó, no aparecen.
 
-Formato de evidencia (CV-ready — sección "Experiencia y logros"):
-- Cada entrada tiene "skill" (competencia con nombre de mercado laboral) + "quote" (logro concreto).
-- El campo "quote" se redacta en TERCERA PERSONA, tiempo PASADO, empezando con un VERBO DE ACCIÓN fuerte
-  ("Triplicó", "Diseñó", "Coordinó", "Aprendió", "Resolvió", "Atendió", "Implementó", "Gestionó").
-- Prioriza HABILIDAD DEMOSTRADA + RESULTADO. El reclutador debe entender qué sabe hacer la persona
-  y qué impacto tuvo, no el relato anecdótico.
-- Traduce contexto informal a lenguaje laboral neutro:
-  · "local de su tía" → "comercio familiar" · "negocio del barrio" → "pequeño comercio local"
-  · "aprendió sola por YouTube" → "Aprendió de forma autónoma mediante tutoriales en línea"
-  · NO copies modismos, muletillas ("tipo", "básicamente") ni tono de chat.
-- Omite detalles que no aporten valor laboral (chisme, emociones, contexto familiar innecesario).
-  Si el relato es vago o solo actitud sin hecho concreto, NO lo incluyas.
+Formato de evidencia (sección "Experiencia y logros" del CV — VOZ PROFESIONAL IMPERSONAL):
+- Cada entrada tiene "skill" (competencia con nombre de mercado laboral) + "quote" (la capacidad demostrada, con su contexto o resultado).
+- El "quote" se escribe en VOZ IMPERSONAL: SIN pronombres ("yo", "él", "ella") y SIN narrar en tercera persona pasado.
+  PROHIBIDO empezar con "Aprendió/Mejoró/Resolvió/Triplicó…" o contar una anécdota. Describe la COMPETENCIA que la
+  persona aporta, anclada a lo que realmente hizo. Frases tipo:
+  · "Aprendizaje autónomo de herramientas y procesos en entornos sin onboarding formal."
+  · "Organización y documentación de flujos de trabajo para mayor claridad del equipo."
+  · "Atención al cliente: manejo de reclamos con respuesta rápida y trato directo."
+- Prioriza COMPETENCIA + (resultado o contexto). El reclutador debe entender de qué es capaz la persona.
+- Traduce contexto informal a lenguaje laboral neutro ("local de su tía" → "comercio familiar"). Sin modismos ni muletillas.
+- PROHIBIDO lenguaje que reste profesionalismo o que sea contexto personal negativo: NUNCA menciones regaños, llamados de
+  atención, despidos, conflictos, errores personales ni emociones ("me regañaron", "tras un regaño", "me equivoqué").
+  Tradúcelo a la competencia profesional resultante (p. ej. "mejora del desempeño a partir de feedback").
+- PROHIBIDO mencionar SaltoAI, "IA", la entrevista, el chat o que el CV/perfil fue generado por una herramienta:
+  el CV debe leerse como un CV profesional normal.
+- Omite detalles que no aporten valor laboral. Si el relato es vago o solo actitud sin hecho concreto, NO lo incluyas.
 - Conserva cifras, plazos y métricas SOLO si el joven las mencionó. NO inventes números.
-- Cada quote: 1 oración, máximo 2. Sin repetir el nombre de la skill al inicio del quote.
-- PROHIBIDO redactar meta-evidencia ("Contó que...", "Dijo que...", "Mencionó...") — solo hechos.
-- Ejemplos del formato deseado:
-  · skill: "Gestión de Redes Sociales" → quote: "Triplicó las ventas de un comercio familiar en 6 meses gestionando pedidos por Instagram."
-  · skill: "Marketing de Contenidos" → quote: "Aprendió de forma autónoma a editar Reels y captó 200 clientes nuevos sin inversión en pauta."
-  · skill: "Atención al Cliente" → quote: "Resolvió reclamos de 80 asistentes en un evento masivo sin escalamiento a la organización."
+- Cada quote: 1 oración, máximo 2. Sin repetir el nombre de la skill al inicio.
+- PROHIBIDO meta-evidencia ("Contó que...", "Dijo que...", "Mencionó...").
 
 Otros campos:
 - skills: nombra TODAS las habilidades concretas que el relato justifique (normalmente 4-10, sin
@@ -75,8 +75,10 @@ Otros campos:
   y sin inventar habilidades que no tengan sustento en la transcripción.
 - traits: 2-5 rasgos conductuales observados, no juicios. Buenos: "Tolerancia al caos", "Autodidacta",
   "Orientación a resultados". Malos: "Buena persona", "Trabajador", "Dedicado".
-- summary: 2-3 frases en lenguaje natural describiendo a la persona y su trayectoria informal.
-- name: si la persona dijo su nombre, úsalo; si no, "Candidato/a SaltoAI".
+- summary: 2-3 frases de RESUMEN PROFESIONAL en voz IMPERSONAL — SIN el nombre como sujeto, SIN "es un joven que…",
+  SIN tercera persona narrativa. Enfócate en sus capacidades y a qué puede aportar.
+  Ej: "Desarrollador full-stack autodidacta con capacidad de aprendizaje autónomo, organización de procesos y mejora continua."
+- name: si la persona dijo su nombre, úsalo; si no, "Candidato/a".
 
 Idioma: español neutro latinoamericano.
 Devuelve JSON estricto con el schema indicado.`;
@@ -412,21 +414,30 @@ export async function PATCH(req: NextRequest) {
       uid?: string;
       basics?: unknown;
       contact?: unknown;
+      skills?: unknown;
+      traits?: unknown;
+      evidence?: unknown;
+      summary?: unknown;
     };
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const uid = typeof body.uid === "string" ? body.uid.trim() : "";
     const basics = body.basics != null ? parseBasics(body.basics) : null;
     const contact =
       body.contact != null ? parseProfileContact(body.contact) : null;
+    const hasContent =
+      body.skills != null ||
+      body.traits != null ||
+      body.evidence != null ||
+      body.summary != null;
 
     if (!id || !uid || id !== uid) {
       log.end({ status: 403, extra: { reason: "forbidden" } });
       return NextResponse.json({ error: "No autorizado para editar este perfil." }, { status: 403 });
     }
-    if (!basics && !contact) {
+    if (!basics && !contact && !hasContent) {
       log.end({ status: 400, extra: { reason: "nothing_to_update" } });
       return NextResponse.json(
-        { error: "Indica datos básicos o contacto para actualizar." },
+        { error: "Indica datos para actualizar." },
         { status: 400 }
       );
     }
@@ -461,10 +472,61 @@ export async function PATCH(req: NextRequest) {
       patch.contact = { ...existing.contact, ...contact };
     }
 
+    // Edición de contenido: listas saneadas (trim, sin vacíos, deduplicadas, capadas).
+    const cleanStrList = (raw: unknown, maxLen: number, maxItems: number): string[] => {
+      if (!Array.isArray(raw)) return [];
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const x of raw) {
+        if (typeof x !== "string") continue;
+        const v = x.trim().slice(0, maxLen);
+        const key = v.toLowerCase();
+        if (v && !seen.has(key)) {
+          seen.add(key);
+          out.push(v);
+        }
+        if (out.length >= maxItems) break;
+      }
+      return out;
+    };
+    let contentChanged = false;
+    if (body.skills != null) {
+      patch.skills = cleanStrList(body.skills, 60, 20);
+      contentChanged = true;
+    }
+    if (body.traits != null) {
+      patch.traits = cleanStrList(body.traits, 60, 10);
+      contentChanged = true;
+    }
+    if (body.evidence != null && Array.isArray(body.evidence)) {
+      const items = body.evidence
+        .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+        .map((e) => ({
+          skill: typeof e.skill === "string" ? e.skill.trim() : "",
+          quote: typeof e.quote === "string" ? e.quote.trim() : "",
+        }))
+        .filter((e) => e.skill && e.quote);
+      patch.evidence = sanitizeEvidenceForCv(items);
+      contentChanged = true;
+    }
+    if (typeof body.summary === "string") {
+      patch.summary = body.summary.trim().slice(0, 800);
+      contentChanged = true;
+    }
+    // Si cambió el contenido que alimenta el matching, re-embebemos. Si falla
+    // (sin clave / cuota), conservamos el embedding previo para no romper el guardado.
+    if (contentChanged) {
+      try {
+        patch.embedding = await embed(buildEmbeddingText(patch));
+      } catch (e) {
+        log.warn("perfil.patch.reembed_failed", { message: (e as Error)?.message });
+      }
+    }
+
     await upsertProfileWithId(id, patch);
 
     const saved = await getProfile(id);
-    const mode = basics && contact ? "patch_both" : basics ? "patch_basics" : "patch_contact";
+    const mode = hasContent ? "patch_content" : basics && contact ? "patch_both" : basics ? "patch_basics" : "patch_contact";
     log.end({ status: 200, extra: { profileId: id, mode } });
     return NextResponse.json({ profile: saved, storage: storageFromId(id) });
   } catch (err) {

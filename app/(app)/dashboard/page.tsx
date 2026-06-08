@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { useAuth } from '@/lib/auth-context';
 import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
-import { JovenHeader } from '@/components/joven/joven-header';
-import { AppFooter } from '@/components/layout/app-footer';
+import { useCachedResource } from '@/lib/hooks/use-cached-resource';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Profile, MicroTask } from '@/lib/types';
@@ -27,7 +26,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
-import { JovenWidgets } from '@/components/dashboard/joven-widgets';
+import { JovenWidgets, type DashboardJovenData } from '@/components/dashboard/joven-widgets';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -158,6 +157,25 @@ function getInsight(profile: Profile | null, tasks: MicroTask[]): string {
   return 'Cuanto más específico sea lo que cuentas en la entrevista, mejor ICS obtendrás frente a las empresas.';
 }
 
+// ─── skeleton ───────────────────────────────────────────────────────────────
+// Mientras cargan perfil + tareas mostramos un esqueleto del layout completo,
+// no un render parcial (antes solo aparecían las "Acciones rápidas" un instante).
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-7 animate-pulse" aria-hidden="true">
+      <div className="h-7 w-56 rounded-lg bg-slate-200/70" />
+      <div className="h-40 rounded-2xl bg-slate-200/50" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-24 rounded-xl bg-slate-200/50" />
+        ))}
+      </div>
+      <div className="h-20 rounded-2xl bg-slate-200/50" />
+    </div>
+  );
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -168,9 +186,6 @@ export default function DashboardPage() {
   const { user, account, loading, roleLoading } = useAuth();
   const jovenProfileId = useJovenProfileId();
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [tasks, setTasks] = useState<MicroTask[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
   useEffect(() => {
     if (loading || roleLoading) return;
     if (!user) {
@@ -182,41 +197,44 @@ export default function DashboardPage() {
     }
   }, [user, account, loading, roleLoading, router]);
 
-  useEffect(() => {
-    if (!user || !jovenProfileId) return;
-    (async () => {
-      try {
-        let stored: string | null = null;
-        try {
-          stored = localStorage.getItem('salto_last_profile_id');
-        } catch {
-          /* ignore */
-        }
-        const aliases =
-          stored && stored !== jovenProfileId
-            ? `&aliases=${encodeURIComponent(stored)}`
-            : '';
-        const [profRes, tasksRes] = await Promise.all([
-          fetch(`/api/perfil?id=${encodeURIComponent(jovenProfileId)}`),
-          fetch(
-            `/api/microtask/list?profileId=${encodeURIComponent(jovenProfileId)}${aliases}`,
-          ),
-        ]);
-        if (profRes.ok) {
-          const d = await profRes.json();
-          setProfile(d.profile ?? null);
-        }
-        if (tasksRes.ok) {
-          const d = await tasksRes.json();
-          setTasks(d.tasks ?? []);
-        }
-      } catch {
-        /* silent */
-      } finally {
-        setDataLoading(false);
-      }
-    })();
-  }, [user, jovenProfileId]);
+  // Perfil + tareas con caché stale-while-revalidate: instantáneo al re-entrar,
+  // revalida en segundo plano. key=null mientras auth no resuelve (el guard de
+  // abajo ya muestra el loader de sesión en ese caso).
+  const dashKey =
+    !loading && !roleLoading && !!user && account?.role === 'joven'
+      ? `dash_${jovenProfileId ?? user.uid}`
+      : null;
+  const { data: dashData, loading: dataLoading } = useCachedResource<{
+    profile: Profile | null;
+    tasks: MicroTask[];
+    widgets: DashboardJovenData | null;
+  }>(dashKey, async () => {
+    const uid = user?.uid;
+    if (!uid) return { profile: null, tasks: [], widgets: null };
+    const id = jovenProfileId ?? uid;
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem('salto_last_profile_id');
+    } catch {
+      /* ignore */
+    }
+    const aliases = stored && stored !== id ? `&aliases=${encodeURIComponent(stored)}` : '';
+    // Las 3 cargas en paralelo y bajo el MISMO caché → el dashboard aparece
+    // completo de un golpe (no escalonado: antes los widgets se fetcheaban
+    // aparte y cargaban después de la tarjeta de perfil).
+    const [profRes, tasksRes, widgetsRes] = await Promise.all([
+      fetch(`/api/perfil?id=${encodeURIComponent(id)}`),
+      fetch(`/api/microtask/list?profileId=${encodeURIComponent(id)}${aliases}`),
+      fetch(`/api/dashboard/joven?uid=${encodeURIComponent(uid)}`),
+    ]);
+    const profile = profRes.ok ? (await profRes.json()).profile ?? null : null;
+    const tasks = tasksRes.ok ? (await tasksRes.json()).tasks ?? [] : [];
+    const widgets = widgetsRes.ok ? ((await widgetsRes.json()) as DashboardJovenData) : null;
+    return { profile, tasks, widgets };
+  });
+  const profile = dashData?.profile ?? null;
+  const tasks = dashData?.tasks ?? [];
+  const widgets = dashData?.widgets ?? null;
 
   // Mientras se resuelve auth/rol, mostramos el loader. Si rol resolvió como
   // empresa, el useEffect ya disparó router.replace; igual mantenemos loader
@@ -232,11 +250,11 @@ export default function DashboardPage() {
   const insight = getInsight(profile, tasks);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col overflow-x-hidden">
-      <JovenHeader />
-
-      <main className="flex-1 min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7 max-w-7xl mx-auto w-full">
-
+    <div className="min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7 max-w-7xl mx-auto w-full">
+        {dataLoading ? (
+          <DashboardSkeleton />
+        ) : (
+          <>
           {/* WELCOME / STAT CARDS removidos: el Hero dentro de <JovenWidgets>
               ya muestra greeting (vía nombre + categoría), avatar circular,
               status text ("Última actividad: …") y los 4 KPIs (skills,
@@ -251,7 +269,7 @@ export default function DashboardPage() {
                   {getGreeting(firstName)}
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Completa tu entrevista para empezar.
+                  Completa tu entrevista y empieza con trabajos reales pagados, antes del primer contrato.
                 </p>
               </div>
             </FadeUp>
@@ -267,6 +285,8 @@ export default function DashboardPage() {
               profileId={jovenProfileId ?? user.uid}
               profile={profile}
               tasks={tasks}
+              data={widgets}
+              dataLoading={dataLoading}
             />
           )}
 
@@ -406,14 +426,8 @@ export default function DashboardPage() {
               </div>
             </FadeUp>
           )}
-
-
-      </main>
-
-      <AppFooter
-        left="SaltoAI · Tu primer salto al empleo formal"
-        right="Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI"
-      />
+          </>
+        )}
     </div>
   );
 }

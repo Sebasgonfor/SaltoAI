@@ -30,12 +30,30 @@ import {
   ThumbsDown,
   Activity,
   TrendingUp,
+  Target,
+  Clock,
+  Mic,
+  ShieldCheck,
+  Search,
+  Mail,
+  Building2,
+  GraduationCap,
+  Handshake,
+  Zap,
+  Sprout,
+  FileText,
+  ScrollText,
+  DoorOpen,
+  Check,
+  Info,
+  type LucideIcon,
 } from 'lucide-react';
 import type { Profile, MicroTask } from '@/lib/types';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // ─── Tipos del endpoint ──────────────────────────────────────────────────────
 
-interface DashboardJovenData {
+export interface DashboardJovenData {
   earnings: {
     totalCOP: number;
     averageRating: number;
@@ -80,11 +98,11 @@ interface DashboardJovenData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function useDashboardData(uid: string | undefined) {
+function useDashboardData(uid: string | undefined, skip = false) {
   const [data, setData] = useState<DashboardJovenData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!skip);
   useEffect(() => {
-    if (!uid) return;
+    if (skip || !uid) return;
     let cancelled = false;
     (async () => {
       try {
@@ -96,7 +114,7 @@ function useDashboardData(uid: string | undefined) {
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [uid]);
+  }, [uid, skip]);
   return { data, loading };
 }
 
@@ -194,10 +212,26 @@ interface Props {
   profile: Profile | null;
   tasks: MicroTask[];
   city?: string;
+  /** Datos del dashboard precargados (p. ej. desde el fetch cacheado de la
+   *  página). Si se pasan, el componente NO hace su propio fetch — así todo
+   *  el dashboard aparece a la vez y es instantáneo desde caché. */
+  data?: DashboardJovenData | null;
+  dataLoading?: boolean;
 }
 
-export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
-  const { data, loading } = useDashboardData(uid);
+export function JovenWidgets({
+  uid,
+  profileId,
+  profile,
+  tasks,
+  city,
+  data: dataProp,
+  dataLoading: loadingProp,
+}: Props) {
+  const usePassed = dataProp !== undefined;
+  const internal = useDashboardData(uid, usePassed);
+  const data = usePassed ? dataProp : internal.data;
+  const loading = usePassed ? !!loadingProp : internal.loading;
 
   const radar = useMemo(() => computeRadar(profile, data), [profile, data]);
   const pulse = useMemo(() => computePulse(profile, data), [profile, data]);
@@ -236,10 +270,10 @@ export function JovenWidgets({ uid, profileId, profile, tasks, city }: Props) {
         ringLabel="Pulso laboral"
         statusText={`Última actividad: ${data.activityTimeline[0] ? formatAgo(data.activityTimeline[0].ts) : '—'}${city ? ` · ${city}` : ''}`}
         stats={[
-          { icon: '🎯', label: 'Skills', value: String(profile.skills.length) },
-          { icon: '💬', label: 'Evidencias', value: String(profile.evidence.length) },
-          { icon: '💼', label: 'Microtasks', value: `${data.earnings.completedCount}` },
-          { icon: '⭐', label: 'Rating', value: data.earnings.averageRating > 0 ? `${data.earnings.averageRating.toFixed(1)}/5` : '—' },
+          { icon: Target, label: 'Skills', value: String(profile.skills.length) },
+          { icon: MessageSquareQuote, label: 'Evidencias', value: String(profile.evidence.length) },
+          { icon: Briefcase, label: 'Microtasks', value: `${data.earnings.completedCount}` },
+          { icon: Star, label: 'Rating', value: data.earnings.averageRating > 0 ? `${data.earnings.averageRating.toFixed(1)}/5` : '—' },
         ]}
         pendingTasks={data.earnings.pendingCount}
       />
@@ -308,7 +342,7 @@ function HeroDark({
   ringValue: number;
   ringLabel: string;
   statusText: string;
-  stats: { icon: string; label: string; value: string }[];
+  stats: { icon: LucideIcon; label: string; value: string }[];
   pendingTasks?: number;
 }) {
   // Calculo color del badge match en base al pulse
@@ -375,9 +409,11 @@ function HeroDark({
           </div>
           {/* Stat row */}
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl">
-            {stats.map((s) => (
+            {stats.map((s) => {
+              const StatIcon = s.icon;
+              return (
               <div key={s.label} className="flex items-center gap-2.5">
-                <span className="text-xl leading-none">{s.icon}</span>
+                <StatIcon size={18} strokeWidth={1.9} className="text-emerald-300 flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-wider text-emerald-200/80 font-semibold">
                     {s.label}
@@ -387,7 +423,8 @@ function HeroDark({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -399,9 +436,15 @@ function HeroDark({
           <div className="hidden md:block">
             <RingScore value={ringValue} size={108} />
           </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80 font-semibold mt-2">
-            {ringLabel}
-          </div>
+          <Tooltip
+            side="top"
+            content="Tu Pulso laboral es un puntaje de 0 a 100 que resume qué tan completo y visible está tu perfil para las empresas: combina tu evidencia citada, habilidades, verificación por documentos, rasgos y trabajos hechos. Mientras más completes, más sube."
+          >
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200/80 font-semibold mt-2 cursor-help">
+              {ringLabel}
+              <Info size={11} className="opacity-70" />
+            </span>
+          </Tooltip>
         </div>
       </div>
     </div>
@@ -698,7 +741,7 @@ function EarningsCard({
       </div>
       {pendingCount > 0 && (
         <div className="mt-5 px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200/60 flex items-center gap-2 text-xs text-emerald-900">
-          <span>⏳</span>
+          <Clock size={14} className="text-emerald-700 flex-shrink-0" />
           <span><strong>{pendingCount}</strong> tarea{pendingCount === 1 ? '' : 's'} en curso · acelerar la entrega libera más ingresos.</span>
         </div>
       )}
@@ -710,7 +753,7 @@ function EarningsCard({
 
 interface Step {
   done: boolean;
-  emoji: string;
+  icon: LucideIcon;
   title: string;
   hint: string;
   cta: { label: string; href: string };
@@ -727,7 +770,7 @@ function buildSteps(
   return [
     {
       done: hasEnoughSkills && hasEnoughEvidence,
-      emoji: '🎙️',
+      icon: Mic,
       title: 'Perfil con peso',
       hint: hasEnoughSkills && hasEnoughEvidence
         ? `Tenés ${profile.skills.length} skills y ${profile.evidence.length} evidencias.`
@@ -736,7 +779,7 @@ function buildSteps(
     },
     {
       done: verifiedPct >= 30,
-      emoji: '🛡️',
+      icon: ShieldCheck,
       title: 'Sube un certificado',
       hint: verifiedPct >= 30
         ? `${verifiedPct}% de tus skills están verificadas por documento.`
@@ -745,7 +788,7 @@ function buildSteps(
     },
     {
       done: false,
-      emoji: '🔍',
+      icon: Search,
       title: 'Conectar con una empresa',
       hint: 'Mirá quién está buscando tus skills hoy y propone conectar.',
       cta: { label: 'Ver oportunidades', href: `/joven/conectar?profileId=${encodeURIComponent(profileId)}` },
@@ -754,10 +797,10 @@ function buildSteps(
       ? [
           {
             done: false,
-            emoji: '✉️',
+            icon: Mail,
             title: 'Responder feedback recibido',
             hint: `Tenés ${inboxUnreplied} mensaje${inboxUnreplied === 1 ? '' : 's'} de empresas sin responder.`,
-            cta: { label: 'Abrir inbox', href: `/joven/perfil/${profileId}` },
+            cta: { label: 'Abrir inbox', href: `/joven/perfil/${profileId}/potencial#feedback-inbox` },
           } as Step,
         ]
       : []),
@@ -789,19 +832,27 @@ function NextStepsCard({
         </span>
       </div>
       <div className="mt-4 flex-1 space-y-2.5">
-        {steps.map((s) => (
+        {steps.map((s) => {
+          const StepIcon = s.icon;
+          return (
           <Link key={s.title} href={s.cta.href}>
             <div className={`group rounded-2xl border p-3 flex items-start gap-3 transition-colors ${
               s.done
                 ? 'border-emerald-200 bg-emerald-50/40'
                 : 'border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/30'
             }`}>
-              {/* Status indicator: check para done, emoji + dot pulse para pending */}
+              {/* Status indicator: check sobrepuesto cuando está hecho. */}
               <div className="relative flex-shrink-0">
-                <span className="text-2xl leading-none">{s.emoji}</span>
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    s.done ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                  }`}
+                >
+                  <StepIcon size={18} strokeWidth={1.8} />
+                </div>
                 {s.done && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center font-bold">
-                    ✓
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                    <Check size={10} strokeWidth={3} />
                   </span>
                 )}
               </div>
@@ -818,7 +869,8 @@ function NextStepsCard({
               </div>
             </div>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -848,7 +900,7 @@ function OpportunitiesCard({
         {topOpportunity ? (
           <>
             <FlagBarRow
-              emoji="🏢"
+              icon={Building2}
               label={topOpportunity.companyName}
               sublabel={topOpportunity.role}
               value={topOpportunity.approxIcs}
@@ -858,7 +910,7 @@ function OpportunitiesCard({
             {marketVisibility.topSkillsInDemand.slice(0, 4).map((s) => (
               <FlagBarRow
                 key={s.skill}
-                emoji={s.iHaveIt ? '✅' : '🎯'}
+                icon={s.iHaveIt ? CheckCircle2 : Target}
                 label={s.skill}
                 sublabel={`${s.demandedBy} ${s.demandedBy === 1 ? 'empresa' : 'empresas'} la piden`}
                 value={s.iHaveIt ? Math.min(99, 60 + s.demandedBy * 5) : Math.min(70, 20 + s.demandedBy * 5)}
@@ -885,14 +937,14 @@ function OpportunitiesCard({
 }
 
 function FlagBarRow({
-  emoji,
+  icon: Icon,
   label,
   sublabel,
   value,
   badgeText,
   badgeTone,
 }: {
-  emoji: string;
+  icon: LucideIcon;
   label: string;
   sublabel?: string;
   value: number;
@@ -907,7 +959,7 @@ function FlagBarRow({
     <div className="mt-3 first:mt-3">
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex items-start gap-2 min-w-0 flex-1">
-          <span className="text-lg leading-none flex-shrink-0 mt-0.5">{emoji}</span>
+          <Icon size={16} strokeWidth={1.8} className="text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="min-w-0 flex-1">
             {/* line-clamp-1 con title= como tooltip nativo. Mejor que truncate
                 porque permite que el contenedor se ajuste mejor visualmente. */}
@@ -945,7 +997,7 @@ function FlagBarRow({
 // ─── StyleGrid 2x2 ──────────────────────────────────────────────────────────
 
 interface StyleTile {
-  emoji: string;
+  icon: LucideIcon;
   label: string;
   value: string;
   hint: string;
@@ -960,28 +1012,28 @@ function inferStyleTiles(
   // si tiene 1 → "Foco en una empresa", si 0 → "Sin historial aún"
   const companies = new Set(tasks.map((t) => t.companyId).filter(Boolean));
   const compania: StyleTile = companies.size > 1
-    ? { emoji: '🤝', label: 'Compañía', value: 'Multi-empresa', hint: `Trabajado con ${companies.size} empresas` }
+    ? { icon: Handshake, label: 'Compañía', value: 'Multi-empresa', hint: `Trabajado con ${companies.size} empresas` }
     : companies.size === 1
-      ? { emoji: '🤝', label: 'Compañía', value: 'Foco actual', hint: 'En una empresa hoy' }
-      : { emoji: '🤝', label: 'Compañía', value: 'Disponible', hint: 'Listo para tu primer match' };
+      ? { icon: Handshake, label: 'Compañía', value: 'Foco actual', hint: 'En una empresa hoy' }
+      : { icon: Handshake, label: 'Compañía', value: 'Disponible', hint: 'Listo para tu primer match' };
 
   // Ritmo: si hay microtasks pendientes → "Activo", si todas completas → "Constante", si ninguna → "Arrancando"
   const ritmo: StyleTile = data.earnings.pendingCount > 0
-    ? { emoji: '⚡', label: 'Ritmo', value: 'Activo', hint: `${data.earnings.pendingCount} en curso ahora` }
+    ? { icon: Zap, label: 'Ritmo', value: 'Activo', hint: `${data.earnings.pendingCount} en curso ahora` }
     : data.earnings.completedCount > 0
-      ? { emoji: '🎯', label: 'Ritmo', value: 'Constante', hint: `${data.earnings.completedCount} tareas cerradas` }
-      : { emoji: '🌱', label: 'Ritmo', value: 'Arrancando', hint: 'Primera microtask en camino' };
+      ? { icon: Target, label: 'Ritmo', value: 'Constante', hint: `${data.earnings.completedCount} tareas cerradas` }
+      : { icon: Sprout, label: 'Ritmo', value: 'Arrancando', hint: 'Primera microtask en camino' };
 
   // Verificación: documentos subidos
   const verif: StyleTile = data.verifiedSkills.verifiedPct >= 50
-    ? { emoji: '🛡️', label: 'Verificación', value: 'Alta', hint: `${data.verifiedSkills.verifiedPct}% de tus skills con documento` }
+    ? { icon: ShieldCheck, label: 'Verificación', value: 'Alta', hint: `${data.verifiedSkills.verifiedPct}% de tus skills con documento` }
     : data.verifiedSkills.verifiedPct >= 20
-      ? { emoji: '📄', label: 'Verificación', value: 'Parcial', hint: 'Súbe más certificados para subir' }
-      : { emoji: '📄', label: 'Verificación', value: 'Por iniciar', hint: 'Súbe un diploma o certificado' };
+      ? { icon: FileText, label: 'Verificación', value: 'Parcial', hint: 'Súbe más certificados para subir' }
+      : { icon: FileText, label: 'Verificación', value: 'Por iniciar', hint: 'Súbe un diploma o certificado' };
 
   // Categoría dominante por traits
   const cat: StyleTile = {
-    emoji: '🎓',
+    icon: GraduationCap,
     label: 'Estilo',
     value: inferCategory(profile),
     hint: profile.traits.slice(0, 2).join(' · ') || 'Sin rasgos extraídos aún',
@@ -1001,12 +1053,16 @@ function StyleGrid({
     <div className={`bg-white border border-stone-200 rounded-3xl p-5 md:p-6 flex flex-col ${className}`}>
       <SectionTitle title="Estilo de talento" />
       <div className="mt-4 grid grid-cols-2 gap-3 flex-1">
-        {tiles.map((t) => (
+        {tiles.map((t) => {
+          const TileIcon = t.icon;
+          return (
           <div
             key={t.label}
             className="rounded-2xl border border-stone-200 bg-stone-50/40 p-4 flex flex-col"
           >
-            <div className="text-3xl leading-none mb-3">{t.emoji}</div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+              <TileIcon size={18} strokeWidth={1.8} />
+            </div>
             <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
               {t.label}
             </div>
@@ -1017,7 +1073,8 @@ function StyleGrid({
               {t.hint}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1067,7 +1124,9 @@ function HistoryCard({
       <div className="mt-4 flex-1">
         {!hasContent ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-3 py-6">
-            <div className="text-4xl mb-3" aria-hidden>📜</div>
+            <div className="w-12 h-12 rounded-2xl bg-stone-100 text-stone-400 flex items-center justify-center mb-3">
+              <ScrollText size={22} strokeWidth={1.6} />
+            </div>
             <p className="text-sm font-semibold text-stone-900 mb-1">
               Tu historial arranca acá
             </p>
@@ -1163,11 +1222,11 @@ function InboxCard({
         )}
       </div>
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
-        <MiniMetric emoji="⭐" label="Positivos" value={inbox.positiveFeedback} tone="emerald" />
-        <MiniMetric emoji="🚪" label="Descartes" value={inbox.passReasons} tone="slate" />
-        <MiniMetric emoji="✉️" label="Pendientes" value={inbox.unreplied} tone="slate" />
+        <MiniMetric icon={Star} label="Positivos" value={inbox.positiveFeedback} tone="emerald" />
+        <MiniMetric icon={DoorOpen} label="Descartes" value={inbox.passReasons} tone="slate" />
+        <MiniMetric icon={Mail} label="Pendientes" value={inbox.unreplied} tone="slate" />
       </div>
-      <Link href={`/joven/perfil/${profileId}`} className="mt-4">
+      <Link href={`/joven/perfil/${profileId}/potencial#feedback-inbox`} className="mt-4">
         <button className="w-full text-xs text-emerald-700 font-semibold hover:underline inline-flex items-center justify-center gap-1.5">
           Abrir inbox completo <ArrowRight size={11} />
         </button>
@@ -1177,12 +1236,12 @@ function InboxCard({
 }
 
 function MiniMetric({
-  emoji,
+  icon: Icon,
   label,
   value,
   tone,
 }: {
-  emoji: string;
+  icon: LucideIcon;
   label: string;
   value: number;
   tone: 'emerald' | 'slate';
@@ -1191,9 +1250,10 @@ function MiniMetric({
     tone === 'emerald'
       ? 'bg-emerald-50 border-emerald-200/60'
       : 'bg-stone-50 border-stone-200/60';
+  const iconColor = tone === 'emerald' ? 'text-emerald-600' : 'text-stone-500';
   return (
     <div className={`border rounded-2xl px-3 py-3 text-center ${bg}`}>
-      <div className="text-xl leading-none">{emoji}</div>
+      <Icon size={18} strokeWidth={1.8} className={`mx-auto ${iconColor}`} />
       <div className="font-display font-bold text-2xl text-stone-900 tabular-nums mt-1.5">
         {value}
       </div>
@@ -1230,9 +1290,11 @@ function MarketSkillsCard({
       <div className="mt-4 space-y-2.5 flex-1">
         {topSkills.map((s) => (
           <div key={s.skill} className="flex items-center gap-3 text-sm">
-            <span className="text-lg leading-none flex-shrink-0">
-              {s.iHaveIt ? '✅' : '🎯'}
-            </span>
+            {s.iHaveIt ? (
+              <CheckCircle2 size={16} strokeWidth={1.8} className="text-emerald-600 flex-shrink-0" />
+            ) : (
+              <Target size={16} strokeWidth={1.8} className="text-stone-400 flex-shrink-0" />
+            )}
             <div className="flex-1 min-w-0">
               <div className="text-sm text-stone-900 line-clamp-1" title={s.skill}>{s.skill}</div>
               <div className="flex items-center gap-2 mt-0.5">

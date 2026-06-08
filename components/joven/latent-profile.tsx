@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, Lightbulb, Compass, Quote, Loader2 } from 'lucide-react';
 import type { LatentProfile } from '@/lib/types';
+import { Stagger, StaggerItem } from '@/components/ui/motion';
 
 const CONFIDENCE_LABEL: Record<string, { label: string; cls: string }> = {
   high: { label: 'Evidencia fuerte', cls: 'bg-emerald-100 text-emerald-800' },
@@ -21,12 +22,25 @@ const CONFIDENCE_LABEL: Record<string, { label: string; cls: string }> = {
   low: { label: 'Indicio', cls: 'bg-slate-100 text-slate-600' },
 };
 
+// Caché en memoria por profileId: la página "Potencial" se re-monta cada vez
+// que navegás a ella, y antes eso re-disparaba el loader "Revelando tu talento
+// latente…". Con este caché, al re-entrar pinta al instante y solo revalida en
+// segundo plano (sin spinner). La generación server-side ya es idempotente.
+const latentCache = new Map<string, LatentProfile>();
+
 export default function LatentProfileSection({ profileId }: { profileId: string }) {
-  const [latent, setLatent] = useState<LatentProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [latent, setLatent] = useState<LatentProfile | null>(
+    () => latentCache.get(profileId) ?? null,
+  );
+  const [loading, setLoading] = useState(() => !latentCache.has(profileId));
 
   useEffect(() => {
     let cancelled = false;
+    // Si ya está en caché, pintamos al instante y revalidamos en silencio.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLatent(latentCache.get(profileId) ?? null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(!latentCache.has(profileId));
     (async () => {
       try {
         // POST dispara la generación (idempotente: si ya existe, la devuelve).
@@ -38,7 +52,10 @@ export default function LatentProfileSection({ profileId }: { profileId: string 
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
-          if (data?.latent) setLatent(data.latent as LatentProfile);
+          if (data?.latent) {
+            latentCache.set(profileId, data.latent as LatentProfile);
+            setLatent(data.latent as LatentProfile);
+          }
         }
       } catch {
         /* silencioso: el perfil sigue siendo útil sin esta sección */
@@ -96,11 +113,11 @@ export default function LatentProfileSection({ profileId }: { profileId: string 
           <h3 className="flex items-center gap-2 font-semibold text-slate-900 mb-4">
             <Lightbulb size={16} className="text-amber-500" /> Habilidades ocultas
           </h3>
-          <div className="grid md:grid-cols-2 gap-4">
+          <Stagger className="grid md:grid-cols-2 gap-4" stagger={0.06}>
             {latent.hiddenSkills.map((s, i) => {
               const conf = CONFIDENCE_LABEL[s.confidence] ?? CONFIDENCE_LABEL.low;
               return (
-                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5">
+                <StaggerItem key={i} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-emerald-200 transition-colors">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h4 className="font-semibold text-slate-900 leading-snug">{s.name}</h4>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${conf.cls}`}>
@@ -111,10 +128,10 @@ export default function LatentProfileSection({ profileId }: { profileId: string 
                     “{s.derivedFrom}”
                   </p>
                   <p className="text-sm text-slate-700 leading-relaxed">{s.marketContext}</p>
-                </div>
+                </StaggerItem>
               );
             })}
-          </div>
+          </Stagger>
         </div>
       )}
 
@@ -142,17 +159,17 @@ export default function LatentProfileSection({ profileId }: { profileId: string 
           <h3 className="flex items-center gap-2 font-semibold text-slate-900 mb-4">
             <Compass size={16} className="text-emerald-600" /> Roles donde encajas
           </h3>
-          <div className="space-y-3">
+          <Stagger className="space-y-3" stagger={0.06}>
             {latent.suggestedRoles.map((r, i) => (
-              <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5">
+              <StaggerItem key={i} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-emerald-200 transition-colors">
                 <h4 className="font-semibold text-slate-900 mb-1.5">{r.roleTitle}</h4>
                 <p className="text-sm text-slate-700 leading-relaxed mb-2">{r.whyFits}</p>
                 <p className="text-xs text-emerald-700 bg-emerald-50/70 rounded-lg px-3 py-2 leading-relaxed">
                   <span className="font-semibold">Para ganarte la entrevista:</span> {r.readinessHint}
                 </p>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       )}
     </section>

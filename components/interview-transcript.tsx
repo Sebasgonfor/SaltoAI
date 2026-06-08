@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, MessageSquareQuote, Sparkles, User } from 'lucide-react';
 import type { Role } from '@/lib/types';
+import { Collapse } from '@/components/ui/motion';
 
 interface TranscriptMessage {
   role: Role;
@@ -58,7 +59,7 @@ export function InterviewTranscript({
         {open ? <ChevronUp size={18} className="text-slate-400 flex-shrink-0" /> : <ChevronDown size={18} className="text-slate-400 flex-shrink-0" />}
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <div className="px-4 md:px-8 pb-6 border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-500 mb-4 italic">
             Esta es la conversación que generó tu perfil. Si querés actualizarla, andá a Entrevista y empezá una nueva.
@@ -92,7 +93,7 @@ export function InterviewTranscript({
             ))}
           </div>
         </div>
-      )}
+      </Collapse>
     </section>
   );
 }

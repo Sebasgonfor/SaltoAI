@@ -30,10 +30,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
+    // El matching usa profile.embedding + los ICS cacheados por necesidad; la
+    // página solo necesita estos datos para el encabezado. NO devolvemos el
+    // perfil completo (transcript, embedding, evidencia) — es payload de más y
+    // expone datos sin razón.
+    const profileSummary = {
+      id: profile.id,
+      name: profile.name,
+      age: profile.age,
+      gender: profile.gender,
+    };
+
     const needs = (await getAllNeeds()).filter(isNeedOpen);
     if (needs.length === 0) {
       log.end({ status: 200, extra: { profileId, note: "no_needs" } });
-      return NextResponse.json({ profile, opportunities: [], note: "no_needs" });
+      return NextResponse.json({ profile: profileSummary, opportunities: [], note: "no_needs" });
     }
 
     const decisions = await listDecisionsForProfile(profileId);
@@ -121,7 +132,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-      profile,
+      profile: profileSummary,
       opportunities: top,
       ...(degradedCount > 0 && {
         warning:

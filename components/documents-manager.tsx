@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Collapse } from '@/components/ui/motion';
 import {
   AlertCircle,
   CheckCircle2,
@@ -402,7 +403,8 @@ function DocumentRow({
         </div>
       </div>
 
-      {expanded && (doc.extractedSkills?.length ?? 0) > 0 && (
+      {(doc.extractedSkills?.length ?? 0) > 0 && (
+        <Collapse open={expanded}>
         <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/40">
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2 flex items-center gap-1.5">
             <Sparkles size={11} /> Habilidades verificadas por este documento
@@ -423,6 +425,7 @@ function DocumentRow({
             ))}
           </div>
         </div>
+        </Collapse>
       )}
 
       {doc.extractionStatus === 'failed' && (

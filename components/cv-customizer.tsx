@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapse } from '@/components/ui/motion';
 import { useAuth } from '@/lib/auth-context';
 import {
   Download,
@@ -195,6 +196,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
   const [fields, setFields] = useState<CvFields>(EMPTY);
   const [style, setStyle] = useState<CvStyle>(DEFAULT_STYLE);
   const [hydrated, setHydrated] = useState(false);
+  const [optionalOpen, setOptionalOpen] = useState(false);
   const migratedRef = useRef(false);
   // Bandera por campo: solo mostramos el error después de que el usuario lo
   // tocó (UX estándar). Evita un mar rojo al cargar la página.
@@ -357,17 +359,17 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 aria-checked={active}
                 type="button"
                 onClick={() => setStyle(s.id)}
-                className={`text-left p-3 rounded-xl border transition-all relative ${
+                className={`text-left p-3 rounded-xl border transition-all duration-200 relative will-change-transform hover:-translate-y-0.5 active:translate-y-0 ${
                   active
-                    ? 'border-emerald-500 bg-emerald-50/70 shadow-sm'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                    ? 'border-emerald-500 bg-emerald-50/70 shadow-md shadow-emerald-100/60 ring-1 ring-emerald-200'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 hover:shadow-sm'
                 }`}
                 title={`${s.description}\n\nIdeal para: ${s.bestFor}`}
               >
                 {active && (
                   <CheckCircle2
                     size={16}
-                    className="absolute top-2 right-2 text-emerald-600 fill-white"
+                    className="absolute top-2 right-2 text-emerald-600 fill-white animate-pop"
                   />
                 )}
                 <div className="text-[13px] font-semibold text-slate-900 leading-tight pr-5">
@@ -425,9 +427,12 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
                 Progreso
               </div>
-              <div className={`text-2xl font-display font-bold tabular-nums ${
-                validation.ok ? 'text-emerald-600' : 'text-slate-600'
-              }`}>
+              <div
+                key={validation.filled}
+                className={`text-2xl font-display font-bold tabular-nums animate-pop ${
+                  validation.ok ? 'text-emerald-600' : 'text-slate-600'
+                }`}
+              >
                 {validation.filled}/{validation.total}
               </div>
             </div>
@@ -497,12 +502,21 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
             </label>
           </div>
 
-          {/* Campos opcionales en un detail/summary, no en collapsable custom */}
-          <details className="group">
-            <summary className="cursor-pointer text-xs font-semibold text-slate-700 hover:text-emerald-700 inline-flex items-center gap-1.5 select-none">
-              <ChevronDown size={14} className="group-open:rotate-180 transition-transform" />
+          {/* Campos opcionales — colapsable animado (apertura y cierre). */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setOptionalOpen((o) => !o)}
+              aria-expanded={optionalOpen}
+              className="cursor-pointer text-xs font-semibold text-slate-700 hover:text-emerald-700 inline-flex items-center gap-1.5 select-none"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 ${optionalOpen ? 'rotate-180' : ''}`}
+              />
               Agregar LinkedIn, idiomas, educación y certificaciones (opcional)
-            </summary>
+            </button>
+            <Collapse open={optionalOpen}>
             <div className="mt-3 grid sm:grid-cols-2 gap-3">
               <label className="space-y-1">
                 <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">LinkedIn</span>
@@ -551,7 +565,8 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 />
               </label>
             </div>
-          </details>
+            </Collapse>
+          </div>
         </div>
       </div>
 

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { motion, useInView } from 'motion/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useRedirectIfAuthed } from '@/lib/hooks/use-redirect-if-authed';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import {
   TrendingUp,
   Users,
@@ -467,6 +469,10 @@ function FlywheelSection() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ImpactoDashboard() {
+  // Página pública de impacto, pero un usuario logueado va a su app (su home),
+  // no a marketing. Anónimos la ven normal.
+  const holding = useRedirectIfAuthed();
+  if (holding) return <LoadingSpinner variant="full" />;
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 lg:py-14 space-y-14">
 

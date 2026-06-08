@@ -33,6 +33,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { FeedbackThumbs } from '@/components/feedback/thumbs';
+import { Collapse } from '@/components/ui/motion';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 interface AggregatedGap {
@@ -408,7 +409,7 @@ export function SkillsGap({ profileId }: { profileId: string }) {
                 </div>
               </button>
 
-              {isExpanded && (
+              <Collapse open={isExpanded}>
                 <div className="border-t border-slate-100 px-4 py-4 bg-slate-50/30">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-3 flex items-center gap-1.5">
                     <Sparkles size={12} /> Cursos gratuitos recomendados
@@ -535,7 +536,7 @@ export function SkillsGap({ profileId }: { profileId: string }) {
                     </div>
                   )}
                 </div>
-              )}
+              </Collapse>
             </div>
           );
         })}
