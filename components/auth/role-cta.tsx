@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useAuth, type UserRole } from '@/lib/auth-context';
+import { ROLE_DASHBOARD } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -19,11 +20,6 @@ interface Props {
 const ROLE_LABEL: Record<UserRole, string> = {
   joven: 'joven',
   empresa: 'empresa',
-};
-
-const ROLE_DASHBOARD: Record<UserRole, string> = {
-  joven: '/dashboard',
-  empresa: '/empresa',
 };
 
 /**
