@@ -1,20 +1,14 @@
-import { JovenHeader } from '@/components/joven/joven-header';
-import { AppFooter } from '@/components/layout/app-footer';
+import { JovenAppShell } from '@/components/joven/joven-app-shell';
 
 /**
  * El layout NO aplica RoleGate global. Cada page decide:
  *  - /joven/chat, /joven/tareas/*, /joven/conectar → wrappean con RoleGate role="joven".
  *  - /joven/perfil/[id] → PÚBLICO (las empresas necesitan ver el perfil del candidato).
+ *
+ * El chrome (sidebar en escritorio + barra inferior en móvil) lo da JovenAppShell,
+ * que es rol-aware: a un viewer empresa/anónimo en el perfil público le muestra
+ * un chrome mínimo, sin la navegación del joven.
  */
 export default function JovenLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col overflow-x-hidden">
-      <JovenHeader />
-      <main className="flex-1 flex flex-col w-full min-w-0">{children}</main>
-      <AppFooter
-        left="SaltoAI · Tu primer salto al empleo formal"
-        right="Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI"
-      />
-    </div>
-  );
+  return <JovenAppShell>{children}</JovenAppShell>;
 }

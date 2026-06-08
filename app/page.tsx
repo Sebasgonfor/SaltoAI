@@ -8,14 +8,16 @@ import { UserButton } from '@/components/auth/user-button';
 import { RoleCTA } from '@/components/auth/role-cta';
 import { ArrowRight, Sparkles, MessageSquareQuote, Layers, Network } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useRedirectIfAuthed } from '@/lib/hooks/use-redirect-if-authed';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function LandingPage() {
-  // Cuando el user está logueado, los CTAs del rol OPUESTO se ocultan
-  // (eran ruido: convergían al mismo destino que el dropdown del UserButton).
-  // El header pasa a mostrar SOLO el UserButton; el hero y el CTA final
-  // mantienen el botón del rol activo y ocultan el otro.
+  // La landing es marketing: un usuario logueado no debe quedarse aquí.
+  // Lo mandamos a su home (o a elegir rol). Anónimos ven la landing al instante.
+  const holding = useRedirectIfAuthed();
   const { account } = useAuth();
   const isLoggedIn = !!account;
+  if (holding) return <LoadingSpinner variant="full" />;
   const isJoven = account?.role === 'joven';
   const isEmpresa = account?.role === 'empresa';
 
