@@ -78,6 +78,19 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // RECRUITER_CONFIGS — config de personalización por reclutadora (doc id =
+    // recruiterUid). Habilita el link público /r/[slug].
+    // DEMO MODE — mismo motivo que profiles/needs: los writes los hace el server
+    // Next.js con el WEB SDK (sin auth), así que una rule auth-scoped denegaría
+    // todo y la config caería a memoria (se pierde entre instancias serverless).
+    // El enforcement real (doc.id = uid, validación, slug único) vive en
+    // /api/recruiter-config. SIN esta regla, la colección caía al deny por
+    // defecto y el link de marca NO persistía en producción.
+    match /recruiter_configs/{recruiterUid} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Cualquier otra colección queda cerrada por defecto.
     match /{document=**} {
       allow read, write: if false;
