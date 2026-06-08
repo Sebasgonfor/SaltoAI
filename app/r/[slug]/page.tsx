@@ -1,71 +1,86 @@
-'use client';
-
 /**
  * Landing pública de marca de la reclutadora — `/r/[slug]`.
  *
- * Sin RoleGate: cualquiera con el link puede verla y arrancar la entrevista.
- * Trae la marca pública por slug; si el slug no existe, muestra una página
- * neutra con CTA al chat genérico (nunca un dead-end). Al entrar al chat
- * persiste el contexto de marca para que `/joven/chat` lo siga aplicando.
+ * Server Component: resuelve la marca server-side para (1) generar el OG/meta
+ * por reclutadora —así el preview en WhatsApp/redes muestra SU nombre, tagline
+ * y logo, no el genérico de SaltoAI— y (2) renderizar el contenido en SSR (los
+ * crawlers lo ven sin ejecutar JS). Sin RoleGate: cualquiera con el link entra.
+ *
+ * Si el slug no existe, muestra una página neutra con CTA al chat genérico
+ * (nunca un dead-end). El theming usa `--brand-primary` con default emerald.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import type { Metadata } from 'next';
+import { cache } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import { ArrowRight, Sparkles, ShieldCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { SaltoLogo } from '@/components/ui/salto-logo';
-import type { RecruiterBrandPublic } from '@/lib/recruiter-config';
+import { getRecruiterConfigBySlug } from '@/lib/db';
+import { toBrandPublic, type RecruiterBrandPublic } from '@/lib/recruiter-config';
 
 const DEFAULT_PRIMARY = '#059669'; // emerald-600
 
-export default function RecruiterLandingPage() {
-  const params = useParams<{ slug: string }>();
-  const slug = typeof params?.slug === 'string' ? params.slug : '';
-  const [state, setState] = useState<'loading' | 'found' | 'notfound'>('loading');
-  const [brand, setBrand] = useState<RecruiterBrandPublic | null>(null);
+// `cache` deduplica la lectura entre generateMetadata y el render del Page.
+const getBrand = cache(async (slug: string): Promise<RecruiterBrandPublic | null> => {
+  const s = (slug || '').trim();
+  if (!s) return null;
+  const cfg = await getRecruiterConfigBySlug(s);
+  return cfg ? toBrandPublic(cfg) : null;
+});
 
-  useEffect(() => {
-    if (!slug) {
-      setState('notfound');
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/recruiter-config?slug=${encodeURIComponent(slug)}`);
-        if (cancelled) return;
-        if (!res.ok) {
-          setState('notfound');
-          return;
-        }
-        const data = await res.json();
-        if (data?.brand?.slug) {
-          setBrand(data.brand as RecruiterBrandPublic);
-          setState('found');
-        } else {
-          setState('notfound');
-        }
-      } catch {
-        if (!cancelled) setState('notfound');
-      }
-    })();
-    return () => {
-      cancelled = true;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const brand = await getBrand(slug);
+
+  if (!brand) {
+    return {
+      title: 'Entrevista — SaltoAI',
+      description: 'Cuenta tu historia y arma tu Perfil de Evidencia con SaltoAI.',
     };
-  }, [slug]);
-
-  const primary = useMemo(
-    () => brand?.brand?.primaryColor || DEFAULT_PRIMARY,
-    [brand]
-  );
-
-  if (state === 'loading') {
-    return <LoadingSpinner variant="full" label="Cargando…" />;
   }
 
-  if (state === 'notfound' || !brand) {
+  const title = `${brand.displayName} · Entrevista`;
+  const description =
+    brand.brand?.tagline ||
+    brand.brand?.welcomeMessage ||
+    `Empieza tu entrevista${
+      brand.interviewerName ? ` con ${brand.interviewerName}` : ''
+    } y descubre tu verdadero valor profesional.`;
+  const images = brand.brand?.logoUrl ? [{ url: brand.brand.logoUrl }] : undefined;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      siteName: brand.displayName,
+      ...(images && { images }),
+    },
+    twitter: {
+      card: images ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      ...(images && { images }),
+    },
+  };
+}
+
+export default async function RecruiterLandingPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const brand = await getBrand(slug);
+
+  if (!brand) {
     return (
       <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center px-6 py-16">
         <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-8 md:p-10 text-center">
@@ -89,10 +104,11 @@ export default function RecruiterLandingPage() {
     );
   }
 
+  const primary = brand.brand?.primaryColor || DEFAULT_PRIMARY;
   const interviewer = brand.interviewerName?.trim();
   const welcome =
     brand.brand?.welcomeMessage?.trim() ||
-    `Cuéntame tu historia y descubramos juntos tu verdadero valor profesional.`;
+    'Cuéntame tu historia y descubramos juntos tu verdadero valor profesional.';
 
   return (
     <div
@@ -105,11 +121,8 @@ export default function RecruiterLandingPage() {
             {/* Hero con acento de marca */}
             <div
               className="px-8 sm:px-12 pt-12 pb-10 text-center relative"
-              style={{
-                background: `linear-gradient(180deg, ${primary}14 0%, #ffffff 100%)`,
-              }}
+              style={{ background: `linear-gradient(180deg, ${primary}14 0%, #ffffff 100%)` }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               {brand.brand?.logoUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
@@ -154,7 +167,10 @@ export default function RecruiterLandingPage() {
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4">
-                <Link href={`/joven/chat?r=${encodeURIComponent(brand.slug)}`} className="w-full sm:w-auto">
+                <Link
+                  href={`/joven/chat?r=${encodeURIComponent(brand.slug)}`}
+                  className="w-full sm:w-auto"
+                >
                   <Button
                     size="lg"
                     className="w-full sm:w-auto gap-2 text-white border-0"
