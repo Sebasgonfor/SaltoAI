@@ -16,7 +16,7 @@ import {
   Building2,
   AlertCircle,
 } from 'lucide-react';
-import type { Gender, Profile, JovenBasics } from '@/lib/types';
+import type { Gender, Profile, JovenBasics, LatentProfile } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
 import SkillsGap from '@/components/skills-gap';
@@ -62,6 +62,70 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
   const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Skills extraídas de documentos (diplomas/certificados) → key normalizado a
+  // { label original, evidencia citada }. Sirve para marcarlas como VERIFICADAS
+  // y diferenciarlas de las declaradas en la entrevista.
+  const [verifiedSkills, setVerifiedSkills] = useState<Map<string, { label: string; evidence: string }>>(
+    new Map()
+  );
+  // Perfil latente (habilidades ocultas, roles sugeridos, mensaje de cierre).
+  // Se genera tras la entrevista pero hasta ahora no se mostraba. Si ya viene
+  // en el perfil lo usamos directo; si falta, lo generamos lazy (estado aparte).
+  const [fetchedLatent, setFetchedLatent] = useState<LatentProfile | null>(null);
+  const latentFromProfile =
+    perfil?.latent && (perfil.latent.hiddenSkills?.length ?? 0) > 0 ? perfil.latent : null;
+  const latent: LatentProfile | null = latentFromProfile ?? fetchedLatent;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/documentos?profileId=${encodeURIComponent(id)}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+        const m = new Map<string, { label: string; evidence: string }>();
+        for (const doc of json.documents ?? []) {
+          for (const s of doc.extractedSkills ?? []) {
+            const label = typeof s.skill === 'string' ? s.skill.trim() : '';
+            const key = label.toLowerCase();
+            if (key && !m.has(key)) m.set(key, { label, evidence: s.evidence ?? '' });
+          }
+        }
+        setVerifiedSkills(m);
+      } catch {
+        /* silencio: la diferenciación es un extra, no debe romper el perfil */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Perfil latente: usar el del perfil si ya existe; si falta y el viewer es el
+  // dueño, generarlo de forma lazy (idempotente en el backend).
+  useEffect(() => {
+    if (!perfil || latentFromProfile) return; // ya viene en el perfil
+    if (!viewerIsOwner) return; // solo el dueño dispara la generación (write)
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/talento-latente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId: id }),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json.latent) setFetchedLatent(json.latent);
+      } catch {
+        /* extra: nunca rompe el perfil */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [perfil, latentFromProfile, viewerIsOwner, id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -437,6 +501,95 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
         <InterviewTranscript transcript={perfil.interviewTranscript} />
       )}
 
+      {/* Perfil latente — lo que descubrimos más allá de lo que dijiste */}
+      {latent &&
+        ((latent.hiddenSkills?.length ?? 0) > 0 ||
+          (latent.suggestedRoles?.length ?? 0) > 0 ||
+          (latent.transversalSkills?.length ?? 0) > 0) && (
+          <section className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 rounded-3xl p-6 md:p-8 space-y-6">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-1 flex items-center gap-1.5">
+                <Sparkles size={12} /> Talento latente
+              </div>
+              <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
+                Lo que descubrimos en ti
+              </h2>
+              {viewerIsOwner && latent.closingMessage && (
+                <p className="text-slate-700 mt-3 leading-relaxed max-w-2xl">{latent.closingMessage}</p>
+              )}
+            </div>
+
+            {(latent.hiddenSkills?.length ?? 0) > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                  Habilidades que quizá no sabías que tienes
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {latent.hiddenSkills.map((h, i) => (
+                    <div key={i} className="bg-white border border-emerald-100 rounded-xl p-4">
+                      <div className="flex items-baseline justify-between gap-2 mb-1">
+                        <span className="font-semibold text-slate-900">{h.name}</span>
+                        {h.confidence && (
+                          <span className="text-[10px] uppercase tracking-wider text-emerald-700">
+                            {h.confidence}
+                          </span>
+                        )}
+                      </div>
+                      {h.marketContext && (
+                        <p className="text-xs text-slate-600 leading-relaxed">{h.marketContext}</p>
+                      )}
+                      {h.derivedFrom && (
+                        <p className="text-[11px] text-slate-400 italic mt-1.5">De: {h.derivedFrom}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(latent.transversalSkills?.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                  Habilidades transversales
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {latent.transversalSkills.map((t, i) => (
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className="border-emerald-200 text-emerald-800"
+                      title={t.derivedFrom}
+                    >
+                      {t.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(latent.suggestedRoles?.length ?? 0) > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                  Roles donde podrías encajar
+                </h3>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  {latent.suggestedRoles.map((r, i) => (
+                    <div key={i} className="bg-white border border-emerald-100 rounded-xl p-4">
+                      <div className="font-semibold text-slate-900 mb-1">{r.roleTitle}</div>
+                      {r.whyFits && <p className="text-xs text-slate-600 leading-relaxed">{r.whyFits}</p>}
+                      {r.readinessHint && (
+                        <p className="text-[11px] text-emerald-700 mt-2 leading-relaxed">
+                          <strong>Para estar listo/a:</strong> {r.readinessHint}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
       {/* Skills + Traits */}
       <section className="grid md:grid-cols-2 gap-5">
         <div className="bg-white border border-slate-200 rounded-2xl p-6">
@@ -447,19 +600,57 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
             </div>
             <span className="text-3xl font-display font-bold text-slate-200 tabular-nums">{perfil.skills.length}</span>
           </div>
-          {perfil.skills.length === 0 ? (
+          {perfil.skills.length === 0 && verifiedSkills.size === 0 ? (
             <p className="text-sm text-slate-400">Sin habilidades extraídas. Vuelve a la entrevista.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {perfil.skills.map((skill, i) => (
-                <Badge
-                  key={i}
-                  className="bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 text-sm font-medium"
-                >
-                  {skill}
-                </Badge>
-              ))}
-            </div>
+            (() => {
+              const profileKeys = new Set(perfil.skills.map((s) => s.trim().toLowerCase()));
+              const docOnly = Array.from(verifiedSkills.values()).filter(
+                (v) => !profileKeys.has(v.label.toLowerCase())
+              );
+              const hasVerified = verifiedSkills.size > 0;
+              return (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {perfil.skills.map((skill, i) => {
+                      const v = verifiedSkills.get(skill.trim().toLowerCase());
+                      return v ? (
+                        <Badge
+                          key={`s-${i}`}
+                          title={v.evidence ? `Verificada por documento — "${v.evidence}"` : 'Verificada por documento'}
+                          className="bg-emerald-600 text-white border-transparent gap-1 px-3 py-1 text-sm font-medium"
+                        >
+                          <CheckCircle2 size={12} /> {skill}
+                        </Badge>
+                      ) : (
+                        <Badge
+                          key={`s-${i}`}
+                          className="bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 text-sm font-medium"
+                        >
+                          {skill}
+                        </Badge>
+                      );
+                    })}
+                    {/* Skills que solo aparecen en documentos (no se mencionaron en la entrevista). */}
+                    {docOnly.map((v, i) => (
+                      <Badge
+                        key={`d-${i}`}
+                        title={v.evidence ? `Verificada por documento — "${v.evidence}"` : 'Verificada por documento'}
+                        className="bg-emerald-600 text-white border-transparent gap-1 px-3 py-1 text-sm font-medium"
+                      >
+                        <CheckCircle2 size={12} /> {v.label}
+                      </Badge>
+                    ))}
+                  </div>
+                  {hasVerified && (
+                    <p className="mt-3 text-[11px] text-slate-500 flex items-center gap-1.5">
+                      <CheckCircle2 size={12} className="text-emerald-600" />
+                      Verificada por un documento que subiste
+                    </p>
+                  )}
+                </>
+              );
+            })()
           )}
         </div>
 

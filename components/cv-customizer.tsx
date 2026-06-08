@@ -27,6 +27,7 @@ import {
   Star,
   CheckCircle2,
   AlertTriangle,
+  Link2,
 } from 'lucide-react';
 
 type CvStyle = 'minimalist' | 'hybrid' | 'functional' | 'chronological' | 'creative';
@@ -299,6 +300,18 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
 
   const set = <K extends keyof CvFields>(k: K, v: CvFields[K]) =>
     setFields((prev) => ({ ...prev, [k]: v }));
+
+  const [copied, setCopied] = useState(false);
+  const handleCopyLink = useCallback(async () => {
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      await navigator.clipboard.writeText(`${origin}${buildUrl({})}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard puede fallar sin https/permiso — no rompemos la UI */
+    }
+  }, [buildUrl]);
 
   const activeStyle = STYLES.find((s) => s.id === style) ?? STYLES[0];
   const isCreative = style === 'creative';
@@ -598,6 +611,24 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
           ) : (
             <Button variant="ghost" size="sm" className="gap-2 text-slate-700" disabled>
               <FileText size={14} /> Texto plano
+            </Button>
+          )}
+          {validation.ok && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-slate-700"
+              onClick={handleCopyLink}
+            >
+              {copied ? (
+                <>
+                  <CheckCircle2 size={14} className="text-emerald-600" /> ¡Enlace copiado!
+                </>
+              ) : (
+                <>
+                  <Link2 size={14} /> Copiar enlace de mi CV
+                </>
+              )}
             </Button>
           )}
         </div>
