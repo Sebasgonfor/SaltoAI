@@ -318,13 +318,57 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">
             Skills
           </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {profile.skills.map((s) => (
-              <Badge key={s} variant="secondary">
-                {s}
-              </Badge>
-            ))}
-          </div>
+          {(() => {
+            // Skills verificadas por documentos subidos → cita textual como tooltip.
+            const verified = new Map<string, { label: string; evidence: string }>();
+            for (const doc of documents) {
+              for (const sk of doc.extractedSkills ?? []) {
+                const label = sk.skill.trim();
+                const key = label.toLowerCase();
+                if (key && !verified.has(key)) verified.set(key, { label, evidence: sk.evidence ?? '' });
+              }
+            }
+            const profileKeys = new Set(profile.skills.map((s) => s.trim().toLowerCase()));
+            const docOnly = Array.from(verified.values()).filter(
+              (v) => !profileKeys.has(v.label.toLowerCase())
+            );
+            return (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.skills.map((s) => {
+                    const v = verified.get(s.trim().toLowerCase());
+                    return v ? (
+                      <Badge
+                        key={s}
+                        className="bg-emerald-600 text-white border-transparent gap-1"
+                        title={v.evidence ? `Verificada por documento — "${v.evidence}"` : 'Verificada por documento'}
+                      >
+                        <CheckCircle2 size={11} /> {s}
+                      </Badge>
+                    ) : (
+                      <Badge key={s} variant="secondary">
+                        {s}
+                      </Badge>
+                    );
+                  })}
+                  {docOnly.map((v, i) => (
+                    <Badge
+                      key={`doc-${i}`}
+                      className="bg-emerald-600 text-white border-transparent gap-1"
+                      title={v.evidence ? `Verificada por documento — "${v.evidence}"` : 'Verificada por documento'}
+                    >
+                      <CheckCircle2 size={11} /> {v.label}
+                    </Badge>
+                  ))}
+                </div>
+                {verified.size > 0 && (
+                  <p className="mt-3 text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <CheckCircle2 size={11} className="text-emerald-600" /> Verificada por documento del candidato
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </div>
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">

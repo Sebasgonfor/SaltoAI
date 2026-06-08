@@ -14,6 +14,7 @@ import { useVoiceInput } from '@/hooks/use-voice-input';
 import { useLiveInterview } from '@/hooks/use-live-interview';
 import { jovenAgeErrorMessage, parseJovenAge } from '@/lib/input-validation';
 import { BasicsWizard } from '@/components/joven/basics-wizard';
+import { InterviewDoneStep } from '@/components/joven/interview-done-step';
 import {
   CLOSING_MESSAGE,
   MAX_USER_TURNS,
@@ -125,6 +126,9 @@ function ChatJoven() {
   const router = useRouter();
   const { user } = useAuth();
   const [phase, setPhase] = useState<'basics' | 'interview'>('basics');
+  // Perfil recién construido → mostramos el paso opcional de subir certificados
+  // antes de llevar al joven a su perfil.
+  const [doneProfileId, setDoneProfileId] = useState<string | null>(null);
   const [basics, setBasics] = useState<JovenBasics | null>(null);
   const [formName, setFormName] = useState('');
   const [formAge, setFormAge] = useState('');
@@ -519,7 +523,11 @@ function ChatJoven() {
           }
           // Limpiamos la persistencia de la entrevista: ya cumplió su rol.
           clearPersisted(user?.uid);
-          router.push(`/joven/perfil/${closeData.id}`);
+          // Paso opcional de cierre: ofrecer subir certificados antes de ir al
+          // perfil. El render de InterviewDoneStep se ocupa; el redirect lo hace
+          // el botón "Ver mi perfil".
+          setClosing(false);
+          setDoneProfileId(closeData.id);
         } else {
           // Casos borde (PRD §8.5): el agente cree que terminó pero el
           // extractor no encuentra evidencia suficiente. En vez de freezar,
@@ -741,6 +749,16 @@ function ChatJoven() {
   useEffect(() => {
     if (loading || closing || atTurnLimit) cancelRecording('effect-loading-closing');
   }, [loading, closing, atTurnLimit, cancelRecording]);
+
+  if (doneProfileId) {
+    return (
+      <InterviewDoneStep
+        profileId={doneProfileId}
+        firstName={firstNameFrom(basics?.name ?? formName ?? '')}
+        onContinue={() => router.push(`/joven/perfil/${doneProfileId}`)}
+      />
+    );
+  }
 
   if (phase === 'basics') {
     return (

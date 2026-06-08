@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getNeed, getProfile } from "@/lib/db";
+import { getNeed, getProfile, listDocumentsByProfile } from "@/lib/db";
 import { mergeCvContact } from "@/lib/profile-contact";
 import { startLog } from "@/lib/logger";
 import {
@@ -130,6 +130,53 @@ export async function GET(req: NextRequest) {
     ...mergedContact,
     autoprint: cv.autoprint,
   };
+
+  // Enriquecer el CV con los documentos del joven (diplomas/certificados):
+  //   1. Las skills verificadas se aseguran en la lista (deduplicadas).
+  //   2. Si el joven no escribió sus certificaciones, las autocompletamos con
+  //      los documentos subidos (programa — institución — fecha).
+  // Es un extra: cualquier fallo aquí NUNCA rompe la generación del CV.
+  try {
+    const docs = await listDocumentsByProfile(profileId);
+    if (docs.length) {
+      const seen = new Set(profile.skills.map((s) => s.trim().toLowerCase()));
+      const verifiedLabels: string[] = [];
+      for (const d of docs) {
+        for (const sk of d.extractedSkills ?? []) {
+          const label = sk.skill?.trim();
+          const key = label?.toLowerCase();
+          if (label && key && !seen.has(key)) {
+            seen.add(key);
+            verifiedLabels.push(label);
+          }
+        }
+      }
+      if (verifiedLabels.length) {
+        profile = { ...profile, skills: [...profile.skills, ...verifiedLabels] };
+      }
+      if (!cvWithContact.certifications?.trim()) {
+        const DOC_KINDS = new Set([
+          "diploma",
+          "titulo_universitario",
+          "certificado_curso",
+          "constancia_laboral",
+        ]);
+        const lines = docs
+          .filter((d) => !d.kind || DOC_KINDS.has(d.kind))
+          .map((d) => {
+            const title = d.programTitle?.trim() || d.originalName;
+            const parts = [title];
+            if (d.institution?.trim()) parts.push(d.institution.trim());
+            if (d.issuedAt?.trim()) parts.push(d.issuedAt.trim());
+            return parts.filter(Boolean).join(" — ");
+          })
+          .filter(Boolean);
+        if (lines.length) cvWithContact.certifications = lines.join("\n");
+      }
+    }
+  } catch {
+    /* documentos son un extra; nunca rompen el CV */
+  }
 
   if (format === "json") {
     log.end({ status: 200, extra: { profileId, needId, style: effectiveStyle, format: "json" } });
