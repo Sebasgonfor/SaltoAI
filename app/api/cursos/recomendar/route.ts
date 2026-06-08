@@ -123,10 +123,23 @@ interface ParsedCourse {
   why?: unknown;
 }
 
-async function searchCoursesWithGrounding(skill: string): Promise<RecommendationResult> {
+function buildCoursePersonaBlock(lang: string, focus: string): string {
+  const L: string[] = [];
+  if (focus) L.push(`Contexto del candidato (sector/foco): ${focus}. Prioriza cursos útiles para ese tipo de rol.`);
+  if (lang === "en") {
+    L.push('El candidato prefiere INGLÉS: prioriza cursos en inglés y devuelve los textos ("why") en inglés.');
+  }
+  return L.length ? `\n\nPERSONALIZACIÓN: ${L.join(" ")}` : "";
+}
+
+async function searchCoursesWithGrounding(
+  skill: string,
+  lang = "es",
+  focus = ""
+): Promise<RecommendationResult> {
   const response = await gemini().models.generateContent({
     model: GEMINI_MODEL, // flash regular, NO lite — el grounding necesita el modelo más capaz
-    contents: `${COURSE_PROMPT}\n\nSKILL: ${skill}`,
+    contents: `${COURSE_PROMPT}${buildCoursePersonaBlock(lang, focus)}\n\nSKILL: ${skill}`,
     config: {
       // Tools y responseSchema son mutuamente excluyentes en el SDK actual;
       // pedimos el JSON por prompt y parseamos tolerantemente.
@@ -246,7 +259,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "skill demasiado larga" }, { status: 400 });
     }
 
-    const cacheKey = normalizeSkill(skill);
+    // Personalización opcional por reclutadora (aditiva). Varía la cache key
+    // para no mezclar resultados es/en o por foco.
+    const lang = req.nextUrl.searchParams.get("lang") === "en" ? "en" : "es";
+    const focus = (req.nextUrl.searchParams.get("focus")?.trim() ?? "").slice(0, 120);
+
+    const cacheKey =
+      normalizeSkill(skill) + (lang === "en" ? "|en" : "") + (focus ? `|${normalizeSkill(focus)}` : "");
     const cached = g.__saltoCursosCache!.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       log.end({ status: 200, extra: { skill, cached: true } });
@@ -270,7 +289,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const result = await searchCoursesWithGrounding(skill);
+    const result = await searchCoursesWithGrounding(skill, lang, focus);
     if (result.courses.length === 0) {
       // No cacheamos respuestas vacías — si fue un fallo transitorio queremos
       // reintentar la próxima vez.

@@ -19,6 +19,7 @@ import {
 import type { Gender, Profile, JovenBasics } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 import CvCustomizer from '@/components/cv-customizer';
+import LatentProfileSection from '@/components/joven/latent-profile';
 import SkillsGap from '@/components/skills-gap';
 import DocumentsManager from '@/components/documents-manager';
 import { BasicsEditor } from '@/components/joven/basics-editor';
@@ -372,6 +373,11 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
           <CvCustomizer profileId={id} />
         </section>
       )}
+
+      {/* Perfil latente — la devolución que revela habilidades ocultas, roles
+          sugeridos y un cierre cercano (en la voz de la reclutadora si el
+          candidato llegó por su link). Se genera/cachea server-side. */}
+      <LatentProfileSection profileId={id} />
 
       {/* Inbox de feedback recibido — el cierre del loop bidireccional
           (PRD §8.6 v4). El joven ve los comentarios+ratings que empresas

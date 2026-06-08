@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,7 @@ import {
   loadSavedJovenBasics,
   saveJovenBasics,
 } from '@/lib/user-onboarding-storage';
+import { normalizeSlug, type RecruiterBrandPublic } from '@/lib/recruiter-config';
 
 const MIN_TURNS = MIN_USER_TURNS;
 const MAX_TURNS = MAX_USER_TURNS;
@@ -124,6 +125,58 @@ export default function ChatJovenPage() {
 function ChatJoven() {
   const router = useRouter();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  // Contexto de reclutadora: el slug viaja por `?r=` y/o localStorage (guardado
+  // al pasar por la landing /r/[slug]). Si existe, el chat aplica la marca y
+  // thread-ea el slug a /api/entrevista y /api/perfil. Sin slug → genérico.
+  const [recruiterBrand, setRecruiterBrand] = useState<RecruiterBrandPublic | null>(null);
+  const [recruiterSlug, setRecruiterSlug] = useState('');
+  const recruiterSlugRef = useRef('');
+
+  useEffect(() => {
+    // Theming + asociación a la reclutadora SOLO dentro del flujo del link
+    // /r/[slug]: el slug se deriva del query param `?r=` (que sobrevive a un
+    // refresh). NO se persiste en localStorage a propósito — así la marca no se
+    // "pega" a visitas normales a /joven/chat ni se filtra a otro candidato en
+    // el mismo navegador. Sin `?r=` → experiencia genérica (emerald).
+    const slug = normalizeSlug(searchParams?.get('r') || '');
+    if (!slug) {
+      recruiterSlugRef.current = '';
+      setRecruiterSlug('');
+      setRecruiterBrand(null);
+      return;
+    }
+    recruiterSlugRef.current = slug;
+    setRecruiterSlug(slug);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/recruiter-config?slug=${encodeURIComponent(slug)}`);
+        if (cancelled || !res.ok) return;
+        const data = await res.json();
+        if (data?.brand?.slug) setRecruiterBrand(data.brand as RecruiterBrandPublic);
+      } catch {
+        /* sin red: experiencia genérica */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  const brandPrimary = recruiterBrand?.brand?.primaryColor || undefined;
+  // Estilos derivados del color de marca para teñir los acentos del chat de
+  // forma consistente (avatar del agente, contador, botón, chips, panel).
+  // Sin marca → undefined → se conservan los emerald por defecto.
+  const brandText = brandPrimary ? { color: brandPrimary } : undefined;
+  const brandBtn = brandPrimary ? { backgroundColor: brandPrimary } : undefined;
+  const brandAvatar = brandPrimary
+    ? { backgroundColor: `${brandPrimary}1f`, color: brandPrimary }
+    : undefined;
+  const brandChipActive = brandPrimary
+    ? { backgroundColor: `${brandPrimary}33`, color: '#fff', borderColor: `${brandPrimary}99` }
+    : undefined;
+
   const [phase, setPhase] = useState<'basics' | 'interview'>('basics');
   const [basics, setBasics] = useState<JovenBasics | null>(null);
   const [formName, setFormName] = useState('');
@@ -172,6 +225,7 @@ function ChatJoven() {
     isActive: liveActive,
   } = useLiveInterview({
     firstName: basics ? firstNameFrom(basics.name) : undefined,
+    recruiterSlug: recruiterSlug || undefined,
     // Hard floor: el hook IGNORA closing keywords del agente hasta que
     // el user haya completado MIN_USER_TURNS rondas. Sin esto, Gemini
     // Live a veces decide cerrar prematuro y el perfil queda con 2 skills.
@@ -212,6 +266,7 @@ function ChatJoven() {
       opening: true,
       firstName: firstNameFrom(name),
       age,
+      ...(recruiterSlugRef.current && { recruiterSlug: recruiterSlugRef.current }),
     });
 
     const attempt = async () => {
@@ -506,6 +561,9 @@ function ChatJoven() {
             basics,
             uid: user?.uid,
             displayName: user?.displayName,
+            ...(recruiterSlugRef.current && {
+              sourceRecruiterSlug: recruiterSlugRef.current,
+            }),
           }),
           signal: controller.signal,
         });
@@ -581,6 +639,7 @@ function ChatJoven() {
     const reqBody = JSON.stringify({
       messages: history,
       firstName: firstNameFrom(basics.name),
+      ...(recruiterSlugRef.current && { recruiterSlug: recruiterSlugRef.current }),
     });
 
     // Pide al backend la siguiente pregunta. 1 reintento silencioso ante
@@ -764,10 +823,48 @@ function ChatJoven() {
     // Full-height layout: ocupa todo el viewport menos los 80px del topbar
     // sticky del layout (h-20). El header del chat y el grid se reparten ese
     // espacio sin generar scroll externo en el body.
-    <div className="lg:h-[calc(100dvh-5rem)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-5 sm:py-6 pb-8">
+    <div
+      className="lg:h-[calc(100dvh-5rem)] lg:overflow-hidden max-w-7xl mx-auto w-full flex flex-col px-4 sm:px-6 py-5 sm:py-6 pb-8"
+      style={brandPrimary ? ({ ['--brand-primary' as string]: brandPrimary }) : undefined}
+    >
+      {recruiterBrand && (
+        <div
+          className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 flex-shrink-0"
+          style={brandPrimary ? { borderColor: `${brandPrimary}55` } : undefined}
+        >
+          {recruiterBrand.brand?.logoUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={recruiterBrand.brand.logoUrl}
+              alt={recruiterBrand.displayName}
+              className="h-9 w-9 rounded-lg object-cover ring-1 ring-slate-200 flex-shrink-0"
+            />
+          ) : (
+            <div
+              className="h-9 w-9 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+              style={{ backgroundColor: brandPrimary || '#059669' }}
+            >
+              <Sparkles size={16} />
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-slate-900 truncate">
+              {recruiterBrand.displayName}
+            </div>
+            <div className="text-xs text-slate-500 truncate">
+              {recruiterBrand.interviewerName
+                ? `Entrevista con ${recruiterBrand.interviewerName}`
+                : 'Entrevista personalizada'}
+            </div>
+          </div>
+        </div>
+      )}
       <header className="mb-6 sm:mb-5 flex flex-col sm:flex-row sm:items-end justify-between gap-5 sm:gap-4 flex-shrink-0">
         <div className="space-y-3 sm:space-y-2.5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold">
+          <div
+            className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold"
+            style={brandPrimary ? { color: brandPrimary } : undefined}
+          >
             Paso 2 de 2 · Entrevista
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight leading-snug">
@@ -790,7 +887,11 @@ function ChatJoven() {
             {user?.uid && (
               <p className="text-xs text-slate-500 leading-relaxed">
                 Tus datos básicos ya están guardados.{' '}
-                <Link href={`/joven/perfil/${user.uid}#datos-personales`} className="text-emerald-700 underline">
+                <Link
+                  href={`/joven/perfil/${user.uid}#datos-personales`}
+                  className="text-emerald-700 underline"
+                  style={brandText}
+                >
                   Editar en tu perfil
                 </Link>
                 {' · '}
@@ -812,17 +913,32 @@ function ChatJoven() {
               <Keyboard size={14} />
               Texto
             </Button>
-            <Button
-              type="button"
-              variant={interviewMode === 'voice' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={() => switchInterviewMode('voice')}
-              disabled={closing || loading || liveActive || liveStatus === 'connecting' || userTurns > 0}
-            >
-              <Radio size={14} />
-              Voz
-            </Button>
+            <span className="relative inline-flex">
+              <Button
+                type="button"
+                variant={interviewMode === 'voice' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => switchInterviewMode('voice')}
+                disabled={closing || loading || liveActive || liveStatus === 'connecting' || userTurns > 0}
+                title="Prueba el modo voz: habla tu historia en vez de escribirla. Suele ser más natural, rápido y fluido."
+              >
+                <Radio size={14} />
+                Voz
+              </Button>
+              {/* Sugerencia visible del modo voz (general): punto que invita a
+                  probarlo, solo antes de empezar a responder. */}
+              {interviewMode === 'text' && userTurns === 0 && !closing && !loading && !liveActive && (
+                <span
+                  className="absolute -top-1 -right-1 flex h-2.5 w-2.5"
+                  aria-hidden
+                  title="Nuevo: prueba el modo voz"
+                >
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+              )}
+            </span>
           </div>
           <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
@@ -836,6 +952,7 @@ function ChatJoven() {
                     ? 'w-6 bg-slate-300'
                     : 'w-2 bg-slate-200'
                 }`}
+                style={i < displayTurns && brandPrimary ? { backgroundColor: brandPrimary } : undefined}
               />
             ))}
           </div>
@@ -874,7 +991,10 @@ function ChatJoven() {
             {displayMessages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
-                  <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
+                  <div
+                    className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50"
+                    style={brandAvatar}
+                  >
                     <Sparkles size={16} />
                   </div>
                 )}
@@ -928,7 +1048,10 @@ function ChatJoven() {
                 )}
                 {liveAgentText && (
                   <div className="flex gap-3 justify-start opacity-80">
-                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                    <div
+                      className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600"
+                      style={brandAvatar}
+                    >
                       <Sparkles size={16} />
                     </div>
                     <div className="px-4 py-2 rounded-2xl max-w-[85%] bg-stone-50 border border-slate-100 text-slate-700 text-sm italic font-display">
@@ -940,7 +1063,10 @@ function ChatJoven() {
             )}
             {(loading || closing) && interviewMode === 'text' && (
               <div className="flex gap-3 justify-start">
-                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
+                <div
+                  className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50"
+                  style={brandAvatar}
+                >
                   <Sparkles size={16} />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
@@ -959,7 +1085,10 @@ function ChatJoven() {
             )}
             {closing && interviewMode === 'voice' && (
               <div className="flex gap-3 justify-start">
-                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50">
+                <div
+                  className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50"
+                  style={brandAvatar}
+                >
                   <Sparkles size={16} />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-stone-50 border border-slate-100 text-slate-800 rounded-bl-md flex items-center gap-2">
@@ -1175,7 +1304,8 @@ function ChatJoven() {
                     }
                   />
                   <Button
-                    className="h-11 sm:h-[64px] px-2.5 sm:px-5 gap-1.5 sm:gap-2 flex-shrink-0 self-end sm:self-auto"
+                    className="h-11 sm:h-[64px] px-2.5 sm:px-5 gap-1.5 sm:gap-2 flex-shrink-0 self-end sm:self-auto text-white"
+                    style={brandBtn}
                     onClick={() => void sendUserMessage()}
                     disabled={loading || closing || atTurnLimit || isRecording || isTranscribing || !input.trim()}
                   >
@@ -1197,8 +1327,8 @@ function ChatJoven() {
           <div className="bg-slate-950 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 relative overflow-hidden">
             <div className="relative space-y-3">
               <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-emerald-400 shrink-0" />
-                <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold">Detectando en vivo</span>
+                <Sparkles size={14} className="text-emerald-400 shrink-0" style={brandText} />
+                <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-semibold" style={brandText}>Detectando en vivo</span>
               </div>
               <h2 className="font-display font-bold text-xl sm:text-2xl tracking-tight leading-snug">Señales en tu historia</h2>
               {detected.size === 0 ? (
@@ -1217,6 +1347,7 @@ function ChatJoven() {
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                             : 'bg-slate-900/60 text-slate-500 border-slate-800'
                         }`}
+                        style={active ? brandChipActive : undefined}
                       >
                         {active && <span className="mr-1">●</span>}
                         {s.label}
@@ -1235,7 +1366,7 @@ function ChatJoven() {
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Señales</div>
-              <div className="font-display font-bold text-2xl sm:text-3xl text-emerald-600 tabular-nums">{detected.size}</div>
+              <div className="font-display font-bold text-2xl sm:text-3xl text-emerald-600 tabular-nums" style={brandText}>{detected.size}</div>
             </div>
           </div>
 

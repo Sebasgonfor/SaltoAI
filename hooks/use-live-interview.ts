@@ -38,6 +38,8 @@ export function useLiveInterview(options: {
   mode?: 'joven' | 'empresa';
   /** Company name — only used when mode === 'empresa'. */
   companyName?: string;
+  /** Slug de reclutadora — personaliza identidad/voz/idioma en modo joven. */
+  recruiterSlug?: string;
   /** Phrases to detect in agent output to trigger onInterviewComplete. Defaults to joven keywords. */
   closingKeywords?: string[];
   /** Message sent to the model to force-close after MAX_USER_TURNS. Defaults to joven CLOSING_MESSAGE. */
@@ -398,6 +400,7 @@ export function useLiveInterview(options: {
           firstName: options.firstName,
           mode: options.mode ?? 'joven',
           companyName: options.companyName,
+          recruiterSlug: options.recruiterSlug,
         }),
       });
       const data = (await res.json()) as {

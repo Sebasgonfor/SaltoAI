@@ -6,6 +6,8 @@ import {
   buildLiveSystemInstruction,
   buildLiveSystemInstructionEmpresa,
 } from "@/lib/interview-prompt";
+import { getRecruiterConfigBySlug } from "@/lib/db";
+import { normalizeSlug, toPromptConfig, type PromptConfig } from "@/lib/recruiter-config";
 import { startLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -14,10 +16,28 @@ export async function POST(req: NextRequest) {
   const log = startLog(req, "live/token");
 
   try {
-    const body = (await req.json()) as { firstName?: string; mode?: string; companyName?: string };
+    const body = (await req.json()) as {
+      firstName?: string;
+      mode?: string;
+      companyName?: string;
+      recruiterSlug?: string;
+    };
     const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
     const mode = body.mode === "empresa" ? "empresa" : "joven";
     const companyName = typeof body.companyName === "string" ? body.companyName.trim() : "";
+
+    // Personalización por reclutadora (solo modo joven). Slug ausente/no
+    // encontrado → cfg undefined → voz genérica actual (cero regresión).
+    const recruiterSlug =
+      mode === "joven" && typeof body.recruiterSlug === "string"
+        ? normalizeSlug(body.recruiterSlug)
+        : "";
+    let promptCfg: PromptConfig | undefined;
+    if (recruiterSlug) {
+      const rc = await getRecruiterConfigBySlug(recruiterSlug);
+      if (rc) promptCfg = toPromptConfig(rc);
+      else log.info("recruiter_config_missing", { recruiterSlug });
+    }
 
     if (!hasGeminiKey()) {
       log.end({ status: 503, extra: { reason: "no_gemini_key" } });
@@ -43,7 +63,7 @@ export async function POST(req: NextRequest) {
             systemInstruction:
               mode === "empresa"
                 ? buildLiveSystemInstructionEmpresa(companyName || undefined)
-                : buildLiveSystemInstruction(firstName || undefined),
+                : buildLiveSystemInstruction(firstName || undefined, promptCfg),
             speechConfig: {
               // Native audio Live model only accepts BCP-47 codes it supports (es-CO closes the socket).
               languageCode: "es-US",
