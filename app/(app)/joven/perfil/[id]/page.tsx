@@ -92,7 +92,12 @@ export default function ResumenPage() {
   }
 
   return (
-    <>
+    // Ritmo vertical entre los bloques de nivel superior (estado, vistazo,
+    // tarjeta de matching, feedback). Sin esto el fragment no separaba nada y
+    // la tarjeta oscura quedaba pegada a los chips de arriba y al feedback
+    // de abajo. Más aire en desktop (sm:space-y-12); el grupo interno de
+    // cifras+habilidades mantiene su propio space-y-8 más compacto.
+    <div className="space-y-8 sm:space-y-12">
       {/* Estado de tu candidatura — lo primero que el dueño quiere saber:
           qué está pasando con su perfil (vistas, shortlist, tareas, mensajes). */}
       {viewerIsOwner && user?.uid && <CandidacyStatus uid={user.uid} profileId={id} />}
@@ -235,6 +240,6 @@ export default function ResumenPage() {
           targetId={id}
         />
       </div>
-    </>
+    </div>
   );
 }
