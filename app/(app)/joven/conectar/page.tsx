@@ -26,7 +26,6 @@ import {
 } from '@/lib/merge-opportunity-decisions';
 import { RoleGate } from '@/components/auth/role-gate';
 import { Collapse, CountUp, Reveal } from '@/components/ui/motion';
-import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 const DECISION_POLL_MS = 12_000;
@@ -352,7 +351,20 @@ function ConectarContent() {
   return (
     <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
       {refreshing && (
-        <MatchPulseLoader variant="overlay" label="Recalculando oportunidades…" />
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          role="status"
+          aria-live="polite"
+          className="fixed left-1/2 top-20 z-50 -translate-x-1/2"
+        >
+          <div className="flex items-center gap-2.5 rounded-full bg-slate-900/95 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-white/10 backdrop-blur">
+            <RefreshCw size={14} className="animate-spin text-emerald-400" />
+            Recalculando oportunidades…
+          </div>
+        </motion.div>
       )}
       <header>
         <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2 animate-fade-up">

@@ -17,8 +17,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * hook no carga (útil mientras auth resuelve).
  */
 const DEFAULT_TTL = 5 * 60 * 1000;
+// Ventana de "dedupe": si el caché es más nuevo que esto, NO revalidamos en
+// segundo plano al montar. Evita que cada entrada a una página (p. ej. volver a
+// Inicio) dispare otra ronda de fetches cuando los datos son casi recién
+// traídos. Pasada la ventana, sí revalida (stale-while-revalidate normal).
+const DEFAULT_REVALIDATE_AFTER = 30 * 1000;
 type Entry = { data: unknown; ts: number };
 const mem = new Map<string, Entry>();
+
+/** Edad (ms) de la entrada en memoria, o null si no existe. */
+function memAge(key: string | null): number | null {
+  if (!key) return null;
+  const e = mem.get(key);
+  return e ? Date.now() - e.ts : null;
+}
 
 function lsKey(k: string): string {
   return `salto_cache_${k}`;
@@ -67,7 +79,8 @@ export function setCachedResource<T>(key: string, data: T): void {
 export function useCachedResource<T>(
   key: string | null,
   fetcher: () => Promise<T>,
-  ttlMs: number = DEFAULT_TTL
+  ttlMs: number = DEFAULT_TTL,
+  revalidateAfterMs: number = DEFAULT_REVALIDATE_AFTER
 ): {
   data: T | null;
   loading: boolean;
@@ -124,7 +137,13 @@ export function useCachedResource<T>(
         setLoading(true);
       }
     }
-    void refresh();
+    // Revalida solo si NO hay un caché reciente (dentro de la ventana de
+    // dedupe). Volver a entrar a la página a los pocos segundos no re-dispara
+    // los fetches; pasada la ventana, sí se refresca en segundo plano.
+    const age = memAge(key);
+    if (age == null || age >= revalidateAfterMs) {
+      void refresh();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 

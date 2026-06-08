@@ -7,7 +7,6 @@ import { motion } from 'motion/react';
 import { useAuth } from '@/lib/auth-context';
 import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
 import { useCachedResource } from '@/lib/hooks/use-cached-resource';
-import { JovenAppShell } from '@/components/joven/joven-app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Profile, MicroTask } from '@/lib/types';
@@ -251,8 +250,7 @@ export default function DashboardPage() {
   const insight = getInsight(profile, tasks);
 
   return (
-    <JovenAppShell>
-      <div className="min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7 max-w-7xl mx-auto w-full">
+    <div className="min-w-0 px-4 md:px-8 lg:px-10 xl:px-12 py-8 space-y-7 max-w-7xl mx-auto w-full">
         {dataLoading ? (
           <DashboardSkeleton />
         ) : (
@@ -271,7 +269,7 @@ export default function DashboardPage() {
                   {getGreeting(firstName)}
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Completa tu entrevista para empezar.
+                  Completa tu entrevista y empieza con trabajos reales pagados, antes del primer contrato.
                 </p>
               </div>
             </FadeUp>
@@ -430,7 +428,6 @@ export default function DashboardPage() {
           )}
           </>
         )}
-      </div>
-    </JovenAppShell>
+    </div>
   );
 }

@@ -16,6 +16,8 @@ import { FeedbackInlinePrompt } from '@/components/feedback/inline-prompt';
 import { CompanyFeedbackToYouth, PassReasonButton } from '@/components/feedback/company-to-youth';
 import { CountUp, Stagger, StaggerItem } from '@/components/ui/motion';
 import { Tooltip } from '@/components/ui/tooltip';
+import { CandidacyStatus } from '@/components/joven/candidacy-status';
+import { useAuth } from '@/lib/auth-context';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 import { useProfile } from './profile-context';
 
@@ -26,7 +28,8 @@ import { useProfile } from './profile-context';
  *  - Empresa: panel de evaluación del candidato (proponer tarea, CV, descarte).
  */
 export default function ResumenPage() {
-  const { id, perfil, viewerIsEmpresa, isDemo, verifiedSkills } = useProfile();
+  const { id, perfil, viewerIsEmpresa, viewerIsOwner, isDemo, verifiedSkills } = useProfile();
+  const { user } = useAuth();
   const emit = useEmitSignal();
   const base = `/joven/perfil/${id}`;
 
@@ -90,6 +93,10 @@ export default function ResumenPage() {
 
   return (
     <>
+      {/* Estado de tu candidatura — lo primero que el dueño quiere saber:
+          qué está pasando con su perfil (vistas, shortlist, tareas, mensajes). */}
+      {viewerIsOwner && user?.uid && <CandidacyStatus uid={user.uid} profileId={id} />}
+
       {/* Un vistazo: cifras clave con separadores hairline (técnica gap-px, a
           prueba de wrap en móvil). Cada cifra entra a su módulo. */}
       <div className="space-y-8">
