@@ -403,7 +403,7 @@ function evidenceListBlock(p: Profile, heading = "Experiencia y logros"): string
   if (!items) return "";
   return `<section>
   <h2>${heading}</h2>
-  <p class="section-note">Experiencia práctica y proyectos autónomos · competencias ancladas a resultados verificados por SaltoAI.</p>
+  <p class="section-note">Experiencia práctica y proyectos autónomos.</p>
   <ul class="experience-list">
 ${items}
   </ul>
@@ -452,7 +452,7 @@ ${items}
 
   return `<section>
   <h2>Logros por competencia</h2>
-  <p class="section-note">Resultados concretos agrupados por competencia · evidencia verificada por Salto IA.</p>
+  <p class="section-note">Resultados concretos agrupados por competencia.</p>
 ${blocks}
 </section>`;
 }
@@ -485,9 +485,9 @@ ${items}
 }
 
 function docFooter(): string {
-  return `<p class="doc-footer">
-    Documento generado por <strong>Salto</strong> a partir del Perfil de Evidencia · cada habilidad listada está anclada a una cita de la entrevista conversacional · ${todayLatamLocale()}.
-  </p>`;
+  // El CV no debe revelar la herramienta con la que se generó: se lee como un
+  // CV profesional normal. Footer neutro con solo la fecha de actualización.
+  return `<p class="doc-footer">Actualizado: ${todayLatamLocale()}.</p>`;
 }
 
 function htmlShell(args: {
@@ -504,7 +504,7 @@ function htmlShell(args: {
 <head>
 <meta charset="utf-8" />
 <title>CV — ${args.name}</title>
-<meta name="generator" content="SaltoAI · Perfil de Evidencia · ${args.styleId}" />
+<meta name="generator" content="Curriculum Vitae" />
 <meta name="cv-style" content="${args.styleId}" />
 <meta name="profile-id" content="${escapeHtml(args.profileIdMeta || "")}" />
 <style>
@@ -522,7 +522,7 @@ ${autoprintScript({ autoprint: args.autoprint } as CvOptions)}
 function header(p: Profile, opts: CvOptions): string {
   const { html: contactHtml } = buildContactLine(opts);
   return `  <header>
-    <h1>${escapeHtml(p.name || "Candidato/a SaltoAI")}</h1>
+    <h1>${escapeHtml(p.name || "Candidato/a")}</h1>
     <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     ${contactHtml}
   </header>`;
@@ -562,7 +562,7 @@ function renderChronological(p: Profile, opts: CvOptions): string {
     p.evidence.length > 0
       ? `<section>
   <h2>Experiencia y trayectoria</h2>
-  <p class="section-note">Experiencia práctica y proyectos autónomos — orden por relevancia. Evidencia verificada por SaltoAI.</p>
+  <p class="section-note">Experiencia práctica y proyectos autónomos — orden por relevancia.</p>
 ${p.evidence
   .map((e) => {
     const { competency, bullet } = formatExperienceEntry(e.skill, e.quote);
@@ -758,7 +758,7 @@ function renderCreative(p: Profile, opts: CvOptions): string {
   const inner = `<main class="creative">
   <section class="creative-main" style="grid-column: 2;">
     <header>
-      <h1>${escapeHtml(p.name || "Candidato/a SaltoAI")}</h1>
+      <h1>${escapeHtml(p.name || "Candidato/a")}</h1>
       <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     </header>
     ${tailoredBadge(opts)}

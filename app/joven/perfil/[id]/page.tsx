@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Building2,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import type { Gender, Profile, JovenBasics, LatentProfile } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
@@ -63,6 +64,41 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
   const [storage, setStorage] = useState<StorageMode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+
+  // Re-genera el perfil desde la entrevista guardada con el motor actual.
+  // Útil cuando mejora la extracción: el perfil guardado NO se actualiza solo.
+  const handleRegenerate = async () => {
+    if (regenerating) return;
+    const transcript = perfil?.interviewTranscript;
+    if (!transcript || transcript.length === 0) {
+      setError('No encontramos tu entrevista guardada para actualizar el perfil.');
+      return;
+    }
+    setRegenerating(true);
+    try {
+      const res = await fetch('/api/perfil', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: transcript,
+          basics: { name: perfil!.name, age: perfil!.age, gender: perfil!.gender },
+          uid: user?.uid,
+        }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.profile) setPerfil(d.profile);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || 'No pudimos actualizar tu perfil. Intenta de nuevo.');
+      }
+    } catch {
+      setError('Error de red al actualizar tu perfil.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
   // Skills extraídas de documentos (diplomas/certificados) → key normalizado a
   // { label original, evidencia citada }. Sirve para marcarlas como VERIFICADAS
   // y diferenciarlas de las declaradas en la entrevista.
@@ -283,6 +319,20 @@ export default function PerfilPorId({ params }: { params: Promise<{ id: string }
                 setPerfil((p) => (p ? { ...p, name: basics.name, age: basics.age, gender: basics.gender } : p))
               }
             />
+          </div>
+        )}
+        {viewerIsOwner && (perfil.interviewTranscript?.length ?? 0) > 0 && (
+          <div className="pt-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-slate-600"
+              onClick={handleRegenerate}
+              disabled={regenerating}
+            >
+              <RefreshCw size={14} className={regenerating ? 'animate-spin' : ''} />
+              {regenerating ? 'Actualizando…' : 'Actualizar perfil con la última versión'}
+            </Button>
           </div>
         )}
       </header>

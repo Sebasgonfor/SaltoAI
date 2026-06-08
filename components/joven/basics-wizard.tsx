@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Check, UserCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, UserCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Gender } from '@/lib/types';
@@ -305,8 +305,8 @@ export function BasicsWizard({
                 </Button>
               )}
               {step > 0 && (
-                <Button variant="ghost" className="w-full text-slate-600" onClick={goBack}>
-                  ← Atrás
+                <Button variant="ghost" className="w-full text-slate-600 gap-2" onClick={goBack}>
+                  <ArrowLeft size={14} /> Atrás
                 </Button>
               )}
             </motion.div>
