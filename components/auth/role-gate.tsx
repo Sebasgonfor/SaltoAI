@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Lock, UserCog, Building2, GraduationCap, ArrowRight } from 'lucide-react';
@@ -30,16 +30,39 @@ interface Props {
 }
 
 export function RoleGate({ role, children }: Props) {
-  const { user, account, loading, roleLoading } = useAuth();
+  const { user, account, loading, roleLoading, chooseRole } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const assigningRef = useRef(false);
 
   useEffect(() => {
     if (loading || roleLoading) return;
     if (!user || account) return;
     if (pathname === '/onboarding/rol') return;
-    router.replace(`/onboarding/rol?next=${encodeURIComponent(pathname || '/')}`);
-  }, [user, account, loading, roleLoading, pathname, router]);
+    if (assigningRef.current) return;
+    // El usuario se autenticó en una página gateada y todavía no tiene rol: su
+    // intención es inequívoca (está intentando entrar a ESTA área), así que le
+    // asignamos el rol de la página en vez de mandarlo a /onboarding/rol. La
+    // señal es la página real, NO un ?role= de la URL — por eso no reintroduce
+    // el bug histórico de "rol contaminado por un link viejo". Si la asignación
+    // falla, caemos al onboarding como antes.
+    assigningRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        await chooseRole(role);
+      } catch {
+        if (!cancelled) {
+          router.replace(`/onboarding/rol?next=${encodeURIComponent(pathname || '/')}`);
+        }
+      } finally {
+        if (!cancelled) assigningRef.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, account, loading, roleLoading, role, chooseRole, pathname, router]);
 
   if (loading || roleLoading) {
     return <LoadingSpinner variant="full" label="Cargando tu sesión…" />;
@@ -71,7 +94,7 @@ export function RoleGate({ role, children }: Props) {
   }
 
   if (!account) {
-    return <LoadingSpinner variant="full" label="Llevándote a elegir tu rol…" />;
+    return <LoadingSpinner variant="full" label="Preparando tu cuenta…" />;
   }
 
   if (account.role !== role) {

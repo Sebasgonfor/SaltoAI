@@ -2,12 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { gemini, GEMINI_LITE_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { cosineSimilarity } from "@/lib/embeddings";
-import { getAllNeeds, getNeed, getProfile } from "@/lib/db";
+import {
+  getAllNeeds,
+  getNeed,
+  getProfile,
+  getRecruiterConfig,
+  getRecruiterConfigBySlug,
+} from "@/lib/db";
+import { toPromptConfig, type PromptConfig } from "@/lib/recruiter-config";
 import { startLog } from "@/lib/logger";
 import type { CompanyNeed, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 25;
+
+/** Resuelve la config de la reclutadora del perfil (para sesgar idioma/foco). */
+async function resolveRecruiterCfg(profile: Profile): Promise<PromptConfig | undefined> {
+  let rc = null;
+  if (profile.sourceRecruiterUid) rc = await getRecruiterConfig(profile.sourceRecruiterUid);
+  if (!rc && profile.sourceRecruiterSlug) rc = await getRecruiterConfigBySlug(profile.sourceRecruiterSlug);
+  return rc ? toPromptConfig(rc) : undefined;
+}
+
+/** Bloque aditivo: idioma + foco de la reclutadora. No cambia el schema. */
+function buildGapPersonaBlock(cfg?: PromptConfig): string {
+  if (!cfg) return "";
+  const L: string[] = [];
+  if (cfg.focus) {
+    L.push(`Sesga las sugerencias de "missing" hacia el sector/foco: ${cfg.focus} (no asumas tech).`);
+  }
+  if (cfg.language === "en") {
+    L.push("Devuelve TODOS los textos (suggestion, reason, etc.) en INGLÉS.");
+  }
+  return L.length ? `\n\nPERSONALIZACIÓN (aditiva, no cambia el formato): ${L.join(" ")}` : "";
+}
 
 /**
  * GET /api/perfil/gaps?profileId=X[&needId=Y]
@@ -162,7 +190,11 @@ function heuristicGap(profile: Profile, need: CompanyNeed): SkillGap {
   };
 }
 
-async function gapWithLLM(profile: Profile, need: CompanyNeed): Promise<SkillGap> {
+async function gapWithLLM(
+  profile: Profile,
+  need: CompanyNeed,
+  cfg?: PromptConfig
+): Promise<SkillGap> {
   const payload = {
     candidato: {
       name: profile.name,
@@ -177,7 +209,7 @@ async function gapWithLLM(profile: Profile, need: CompanyNeed): Promise<SkillGap
   };
   const response = await gemini().models.generateContent({
     model: GEMINI_LITE_MODEL,
-    contents: `${GAP_PROMPT}\n\nINPUT:\n${JSON.stringify(payload, null, 2)}`,
+    contents: `${GAP_PROMPT}${buildGapPersonaBlock(cfg)}\n\nINPUT:\n${JSON.stringify(payload, null, 2)}`,
     config: {
       responseMimeType: "application/json",
       responseSchema: gapSchema,
@@ -222,6 +254,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
+    const recruiterCfg = await resolveRecruiterCfg(profile);
+
     // Modo 1: gap específico para una necesidad concreta.
     if (needIdParam) {
       const need = await getNeed(needIdParam);
@@ -230,7 +264,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "need not found" }, { status: 404 });
       }
       const gap = hasGeminiKey()
-        ? await gapWithLLM(profile, need).catch(() => heuristicGap(profile, need))
+        ? await gapWithLLM(profile, need, recruiterCfg).catch(() => heuristicGap(profile, need))
         : heuristicGap(profile, need);
       log.end({
         status: 200,
@@ -260,7 +294,7 @@ export async function GET(req: NextRequest) {
     const gaps = await Promise.all(
       shortlist.map((need) =>
         hasGeminiKey()
-          ? gapWithLLM(profile, need).catch(() => heuristicGap(profile, need))
+          ? gapWithLLM(profile, need, recruiterCfg).catch(() => heuristicGap(profile, need))
           : Promise.resolve(heuristicGap(profile, need)),
       ),
     );

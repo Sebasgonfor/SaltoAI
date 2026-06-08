@@ -43,6 +43,22 @@ function EmpresaNav({
         onNavigate={onNavigate}
         className={isCol ? 'w-full' : undefined}
       />
+      <NavLink
+        href="/empresa/entrevistador"
+        label="Mi entrevistador"
+        shortLabel={isCol ? undefined : 'Entrevistador'}
+        hint="Personaliza la entrevista con tu marca y comparte tu link."
+        onNavigate={onNavigate}
+        className={isCol ? 'w-full' : undefined}
+      />
+      <NavLink
+        href="/empresa/candidatos"
+        label="Mis candidatos"
+        shortLabel={isCol ? undefined : 'Candidatos'}
+        hint="Jóvenes que hicieron tu entrevista personalizada."
+        onNavigate={onNavigate}
+        className={isCol ? 'w-full' : undefined}
+      />
     </nav>
   );
 }

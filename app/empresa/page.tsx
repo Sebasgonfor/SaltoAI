@@ -34,6 +34,10 @@ import {
   AlertCircle,
   ShieldCheck,
   Layers,
+  Copy,
+  Check,
+  ExternalLink,
+  Wand2,
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask } from '@/lib/types';
 import { isNeedClosed } from '@/lib/need-status';
@@ -259,6 +263,8 @@ export default function EmpresaDashboardPage() {
   const [needs, setNeeds] = useState<CompanyNeed[]>([]);
   const [tasks, setTasks] = useState<MicroTask[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [recruiterSlug, setRecruiterSlug] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/');
@@ -322,6 +328,41 @@ export default function EmpresaDashboardPage() {
     };
   }, [user]);
 
+  // Slug del entrevistador personalizado (para mostrar el link compartible).
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/recruiter-config?uid=${encodeURIComponent(user.uid)}`);
+        if (cancelled || !res.ok) return;
+        const data = await res.json();
+        if (data?.config?.slug) setRecruiterSlug(data.config.slug as string);
+      } catch {
+        /* sin config: el CTA invita a crearla */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const recruiterUrl =
+    recruiterSlug && typeof window !== 'undefined'
+      ? `${window.location.origin}/r/${recruiterSlug}`
+      : '';
+
+  const copyRecruiterLink = async () => {
+    if (!recruiterUrl) return;
+    try {
+      await navigator.clipboard.writeText(recruiterUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  };
+
   // KPIs derivados
   const kpis = useMemo(() => {
     const activeTasks = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
@@ -374,6 +415,48 @@ export default function EmpresaDashboardPage() {
       </header>
 
       {user?.uid && <LegalEditor uid={user.uid} />}
+
+      {/* Entrevistador personalizado — link de marca compartible. */}
+      <section className="bg-gradient-to-br from-emerald-50/60 via-white to-white border border-emerald-200/60 rounded-2xl p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+            <Wand2 size={20} strokeWidth={1.75} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-display font-bold text-lg text-slate-900 tracking-tight">
+              Tu entrevistador personalizado
+            </h2>
+            <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+              {recruiterSlug
+                ? 'Comparte tu link y cada candidato vive la entrevista con tu marca.'
+                : 'Crea una entrevista con tu nombre, tono y preguntas — y un link propio para compartir.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 flex-shrink-0">
+            {recruiterUrl && (
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={copyRecruiterLink}>
+                {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                {copiedLink ? 'Copiado' : 'Copiar link'}
+              </Button>
+            )}
+            {recruiterSlug && (
+              <a href={`/r/${recruiterSlug}`} target="_blank" rel="noreferrer">
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <ExternalLink size={14} /> Probar
+                </Button>
+              </a>
+            )}
+            <Link href="/empresa/entrevistador">
+              <Button size="sm" className="gap-1.5">
+                {recruiterSlug ? 'Editar' : 'Configurar'} <ArrowRight size={14} />
+              </Button>
+            </Link>
+          </div>
+        </div>
+        {recruiterUrl && (
+          <div className="mt-3 text-xs text-slate-500 font-mono truncate">{recruiterUrl}</div>
+        )}
+      </section>
 
       {/* KPIs base — operacional. Las activas/por-evaluar/cerradas son las que
           el founder mira primero para saber QUÉ está pendiente HOY. */}

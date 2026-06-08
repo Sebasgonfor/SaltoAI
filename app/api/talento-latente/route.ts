@@ -1,10 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { gemini, GEMINI_LITE_MODEL, hasGeminiKey, isQuotaError } from "@/lib/gemini";
-import { getProfile, updateProfileLatent } from "@/lib/db";
-import type { LatentProfile } from "@/lib/types";
+import {
+  getProfile,
+  updateProfileLatent,
+  getRecruiterConfig,
+  getRecruiterConfigBySlug,
+} from "@/lib/db";
+import { toPromptConfig, type PromptConfig } from "@/lib/recruiter-config";
+import type { LatentProfile, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
+
+/**
+ * Bloque de personalización de la devolución cuando el candidato llegó por una
+ * reclutadora: la voz del cierre se siente "como ella", los roles se sesgan a su
+ * foco y el idioma respeta su config. Es ADITIVO: nunca cambia las reglas
+ * anti-alucinación del LATENT_PROMPT.
+ */
+async function resolveRecruiterCfg(profile: Profile): Promise<PromptConfig | undefined> {
+  let rc = null;
+  if (profile.sourceRecruiterUid) rc = await getRecruiterConfig(profile.sourceRecruiterUid);
+  if (!rc && profile.sourceRecruiterSlug) rc = await getRecruiterConfigBySlug(profile.sourceRecruiterSlug);
+  return rc ? toPromptConfig(rc) : undefined;
+}
+
+function buildLatentPersonaBlock(cfg?: PromptConfig): string {
+  if (!cfg) return "";
+  const L: string[] = ["\n\nPERSONALIZACIÓN (devolución de parte de una reclutadora — ajusta SOLO tono e idioma, NO inventes datos):"];
+  if (cfg.personaDescriptor) {
+    L.push(`- VOZ del closingMessage (imita este tono, calidez y muletillas, sin inventar): ${cfg.personaDescriptor}`);
+  }
+  if (cfg.styleSamples.length) {
+    L.push("- Ejemplos de su forma de hablar (imita el ESTILO):");
+    cfg.styleSamples.forEach((s) => L.push(`  · "${s}"`));
+  }
+  if (cfg.focus) {
+    L.push(`- Foco/sector: ${cfg.focus}. Sesga los suggestedRoles hacia este tipo de oportunidades (no asumas tech).`);
+  }
+  if (cfg.language === "en") {
+    L.push("- IDIOMA: devuelve TODOS los textos (incluido closingMessage) en INGLÉS. Ignora la regla de español.");
+  }
+  return L.join("\n");
+}
 
 const LATENT_PROMPT = `Eres el Detector de Talento Latente de SaltoAI.
 Recibes un Perfil de Evidencia ya extraído (skills, traits, evidence citada). Tu trabajo es revelar lo que el joven HIZO pero NO sabe que tiene valor de mercado.
@@ -131,6 +169,8 @@ export async function POST(req: NextRequest) {
       degraded = true;
     } else {
       try {
+        const cfg = await resolveRecruiterCfg(profile);
+        const personaBlock = buildLatentPersonaBlock(cfg);
         const payload = {
           name: profile.name,
           summary: profile.summary,
@@ -140,7 +180,7 @@ export async function POST(req: NextRequest) {
         };
         const response = await gemini().models.generateContent({
           model: GEMINI_LITE_MODEL,
-          contents: `${LATENT_PROMPT}\n\nPERFIL DE EVIDENCIA:\n${JSON.stringify(payload, null, 2)}`,
+          contents: `${LATENT_PROMPT}${personaBlock}\n\nPERFIL DE EVIDENCIA:\n${JSON.stringify(payload, null, 2)}`,
           config: {
             responseMimeType: "application/json",
             responseSchema,

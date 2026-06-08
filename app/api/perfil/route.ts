@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "@/lib/gemini";
 import { embed } from "@/lib/embeddings";
-import { createProfile, getProfile, upsertProfileWithId, storageFromId } from "@/lib/db";
+import {
+  createProfile,
+  getProfile,
+  upsertProfileWithId,
+  storageFromId,
+  getRecruiterConfig,
+  getRecruiterConfigBySlug,
+} from "@/lib/db";
+import { normalizeSlug, toPromptConfig, type PromptConfig } from "@/lib/recruiter-config";
 import { parseProfileContact } from "@/lib/profile-contact";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
 import { validateForProfileExtraction, parseJovenAge } from "@/lib/input-validation";
@@ -147,14 +155,32 @@ export async function POST(req: NextRequest) {
     };
     const { messages, basics: basicsRaw, uid } = body;
     // Asociación candidato ↔ reclutadora (si llegó por un link /r/[slug]).
-    const sourceRecruiterUid =
+    const sourceRecruiterSlug =
+      typeof body.sourceRecruiterSlug === "string" && body.sourceRecruiterSlug.trim()
+        ? normalizeSlug(body.sourceRecruiterSlug) || undefined
+        : undefined;
+    // El uid de la reclutadora puede llegar explícito, o lo resolvemos desde el
+    // slug (la landing pública nunca expone el uid al cliente). Resolverlo aquí
+    // server-side garantiza la asociación sin filtrar el uid.
+    let sourceRecruiterUid =
       typeof body.sourceRecruiterUid === "string" && body.sourceRecruiterUid.trim()
         ? body.sourceRecruiterUid.trim().slice(0, 128)
         : undefined;
-    const sourceRecruiterSlug =
-      typeof body.sourceRecruiterSlug === "string" && body.sourceRecruiterSlug.trim()
-        ? body.sourceRecruiterSlug.trim().slice(0, 64)
-        : undefined;
+    // Resolvemos la config de la reclutadora (si la hay) tanto para asociar el
+    // perfil como para sesgar el TONO/IDIOMA del summary. Aditivo: sin config,
+    // el extractor se comporta igual que hoy.
+    let recruiterCfg: PromptConfig | undefined;
+    if (sourceRecruiterUid) {
+      const rc = await getRecruiterConfig(sourceRecruiterUid);
+      if (rc) recruiterCfg = toPromptConfig(rc);
+    }
+    if (!recruiterCfg && sourceRecruiterSlug) {
+      const rc = await getRecruiterConfigBySlug(sourceRecruiterSlug);
+      if (rc) {
+        if (!sourceRecruiterUid) sourceRecruiterUid = rc.recruiterUid;
+        recruiterCfg = toPromptConfig(rc);
+      }
+    }
     const basics = parseBasics(basicsRaw);
     if (!basics) {
       log.end({ status: 400, extra: { reason: "invalid_basics" } });
@@ -208,9 +234,26 @@ export async function POST(req: NextRequest) {
     } else {
       let llmBody = { summary: "", skills: [] as string[], traits: [] as string[], evidence: [] as { skill: string; quote: string }[] };
       try {
+        // Personalización SOLO del campo summary (tono/idioma de la
+        // reclutadora). El resto del schema y las reglas anti-alucinación NO
+        // cambian. Sin config → string vacío → extracción idéntica a hoy.
+        const summaryHint = (() => {
+          if (!recruiterCfg) return "";
+          const parts: string[] = [];
+          if (recruiterCfg.personaDescriptor) {
+            parts.push(
+              `redacta el campo "summary" imitando este tono y calidez (sin inventar datos): ${recruiterCfg.personaDescriptor}`
+            );
+          }
+          if (recruiterCfg.language === "en") {
+            parts.push('escribe el campo "summary" en INGLÉS');
+          }
+          if (!parts.length) return "";
+          return `\n\nPERSONALIZACIÓN (solo afecta el campo summary, nada más): ${parts.join("; ")}.`;
+        })();
         const response = await gemini().models.generateContent({
           model: GEMINI_MODEL,
-          contents: `${EXTRACTION_PROMPT}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
+          contents: `${EXTRACTION_PROMPT}${summaryHint}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
           config: {
             responseMimeType: "application/json",
             responseSchema: schema,
