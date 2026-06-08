@@ -16,11 +16,14 @@ import {
 } from 'lucide-react';
 import type { MicroTask } from '@/lib/types';
 import { RoleGate } from '@/components/auth/role-gate';
+import { Stagger, StaggerItem } from '@/components/ui/motion';
 import { useAuth } from '@/lib/auth-context';
 import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
+import { getCachedResource, setCachedResource } from '@/lib/hooks/use-cached-resource';
 
 const TASK_POLL_MS = 12_000;
 const LS_PROFILE_KEY = 'salto_last_profile_id';
+const tareasCacheKey = (pid: string) => `tareas_${pid}`;
 
 /**
  * Listado de micro-tareas del joven. Privado — solo el dueño debe verlo.
@@ -38,8 +41,14 @@ export default function TareasJovenPage() {
 }
 
 function TareasJoven() {
-  const { loading: authLoading } = useAuth();
+  const { user, account, loading: authLoading } = useAuth();
   const resolvedProfileId = useJovenProfileId();
+  // El profileId se resuelve async (fetch). Mientras tanto, para un joven
+  // logueado, NO mostramos el vacío "aún no tenés perfil" (parpadeo) — eso
+  // solo aplica cuando de verdad no hay perfil. Durante la resolución va el
+  // skeleton.
+  const resolvingProfile =
+    !authLoading && !!user?.uid && account?.role === 'joven' && !resolvedProfileId;
   const [tasks, setTasks] = useState<MicroTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +81,9 @@ function TareasJoven() {
         return;
       }
       const data = await res.json();
-      setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      const list = Array.isArray(data.tasks) ? data.tasks : [];
+      setTasks(list);
+      setCachedResource(tareasCacheKey(pid.trim()), list);
       setLastFetchAt(Date.now());
     } catch {
       if (!opts?.silent) {
@@ -86,7 +97,14 @@ function TareasJoven() {
 
   useEffect(() => {
     if (authLoading || !resolvedProfileId) return;
-    void loadTasks(resolvedProfileId);
+    // Semilla desde caché → instantáneo al re-entrar (sin skeleton). Si hay
+    // caché, revalidamos en silencio para no parpadear.
+    const cached = getCachedResource<MicroTask[]>(tareasCacheKey(resolvedProfileId));
+    // Seed intencional desde caché al resolver el profileId (async): pinta al
+    // instante mientras revalidamos en silencio.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (cached) setTasks(cached);
+    void loadTasks(resolvedProfileId, { silent: !!cached });
   }, [authLoading, resolvedProfileId, loadTasks]);
 
   useEffect(() => {
@@ -113,14 +131,18 @@ function TareasJoven() {
   const delivered = tasks.filter((t) => t.status === 'delivered');
   const completed = tasks.filter((t) => t.status === 'evaluated' || t.status === 'paid');
 
-  if (authLoading || (loading && tasks.length === 0 && !error)) {
+  if (authLoading || resolvingProfile || (loading && tasks.length === 0 && !error)) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
-        <div className="h-12 w-2/3 bg-slate-100 rounded animate-pulse" />
-        <div className="h-6 w-1/2 bg-slate-100 rounded animate-pulse" />
-        <div className="space-y-3 mt-8">
+      <div className="max-w-5xl mx-auto px-6 py-10 space-y-10 animate-pulse" aria-hidden>
+        <div className="space-y-3">
+          <div className="h-3 w-40 bg-emerald-100 rounded" />
+          <div className="h-11 w-3/4 bg-slate-200/70 rounded-lg" />
+          <div className="h-5 w-1/2 bg-slate-100 rounded" />
+        </div>
+        <div className="space-y-3">
+          <div className="h-6 w-28 bg-slate-100 rounded" />
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
+            <div key={i} className="h-24 bg-slate-100 rounded-2xl border border-slate-200/60" />
           ))}
         </div>
       </div>
@@ -150,13 +172,19 @@ function TareasJoven() {
       <header>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2 animate-fade-up">
               Mis micro-tareas
             </div>
-            <h1 className="text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-[1.05] mb-3">
+            <h1
+              className="text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-[1.05] mb-3 animate-fade-up"
+              style={{ animationDelay: '0.06s' }}
+            >
               Trabajos reales, pagados, antes del primer contrato.
             </h1>
-            <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
+            <p
+              className="text-lg text-slate-600 max-w-2xl leading-relaxed animate-fade-up"
+              style={{ animationDelay: '0.12s' }}
+            >
               Cada micro-tarea es ingresos reales para vos y evidencia
               verificada para tu perfil. Mejor que un CV.
               {active.length > 0 && (
@@ -220,11 +248,13 @@ function TareasJoven() {
               {active.length}
             </Badge>
           </div>
-          <div className="flex flex-col gap-4">
+          <Stagger className="flex flex-col gap-4">
             {active.map((t) => (
-              <TaskRow key={t.id} task={t} />
+              <StaggerItem key={t.id}>
+                <TaskRow task={t} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </section>
       )}
 
@@ -238,11 +268,13 @@ function TareasJoven() {
               {delivered.length}
             </Badge>
           </div>
-          <div className="flex flex-col gap-4">
+          <Stagger className="flex flex-col gap-4">
             {delivered.map((t) => (
-              <TaskRow key={t.id} task={t} />
+              <StaggerItem key={t.id}>
+                <TaskRow task={t} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </section>
       )}
 
@@ -255,11 +287,13 @@ function TareasJoven() {
               {completed.length}
             </Badge>
           </div>
-          <div className="flex flex-col gap-4">
+          <Stagger className="flex flex-col gap-4">
             {completed.map((t) => (
-              <TaskRow key={t.id} task={t} />
+              <StaggerItem key={t.id}>
+                <TaskRow task={t} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </section>
       )}
 
@@ -291,7 +325,7 @@ function TaskRow({ task }: { task: MicroTask }) {
 
   return (
     <Link href={`/joven/tareas/${task.id}`} className="block">
-      <article className="bg-white border border-slate-200 hover:border-emerald-200 hover:shadow-sm rounded-2xl p-5 transition-colors flex items-start gap-4 cursor-pointer">
+      <article className="lift bg-white border border-slate-200 hover:border-emerald-200 rounded-2xl p-5 flex items-start gap-4 cursor-pointer">
         <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
           <Briefcase size={18} />
         </div>

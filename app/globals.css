@@ -5,6 +5,9 @@ body {
   overflow-x: hidden;
   max-width: 100%;
 }
+html {
+  overflow-y: scroll;
+}
 
 /* Hide scrollbars globally while keeping scroll functionality */
 * {
@@ -28,4 +31,135 @@ body {
 
 .animate-match-glow {
   animation: match-glow-pulse 2.5s ease-in-out infinite;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Biblioteca de animación del Joven
+   Solo transform/opacity (compositor GPU, sin reflow). Cada utilidad arranca
+   desde el estado final invisible vía su keyframe con `both` para que no haya
+   flash de contenido antes de animar. El stagger se controla con
+   animation-delay inline (style={{ animationDelay }}).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes salto-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes salto-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes salto-scale-in {
+  from {
+    opacity: 0;
+    transform: scale3d(0.96, 0.96, 1);
+  }
+  to {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+/* Pop con un leve overshoot — para checks/badges que "aparecen". */
+@keyframes salto-pop {
+  0% {
+    opacity: 0;
+    transform: scale3d(0.4, 0.4, 1);
+  }
+  70% {
+    opacity: 1;
+    transform: scale3d(1.12, 1.12, 1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+/* Barrido diagonal para skeletons (reemplaza el pulse plano). */
+@keyframes salto-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-fade-up {
+  animation: salto-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade-in {
+  animation: salto-fade-in 0.5s ease-out both;
+}
+.animate-scale-in {
+  animation: salto-scale-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-pop {
+  animation: salto-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Skeleton con brillo: contenedor `.shimmer` + barra que cruza. */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  animation: salto-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Lift uniforme para tarjetas clickables (transform/shadow, sin reflow).
+   Lo aplican dashboard, tareas, oportunidades y los stat-tiles del perfil. */
+.lift {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease;
+  will-change: transform;
+}
+.lift:hover {
+  transform: translate3d(0, -3px, 0);
+  box-shadow:
+    0 12px 28px -12px rgba(15, 23, 42, 0.18),
+    0 4px 10px -6px rgba(15, 23, 42, 0.1);
+}
+.lift:active {
+  transform: translate3d(0, -1px, 0);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Accesibilidad: respeta prefers-reduced-motion. Anula toda animación/
+   transición (incluida la librería de arriba y las utilidades de Tailwind).
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .lift:hover {
+    transform: none;
+  }
 }

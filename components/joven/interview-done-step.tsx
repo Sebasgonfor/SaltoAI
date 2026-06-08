@@ -24,13 +24,19 @@ export function InterviewDoneStep({
     <div className="min-h-[calc(100vh-5rem)] overflow-y-auto bg-slate-50">
       <div className="max-w-3xl mx-auto px-4 py-10 sm:py-14 space-y-8">
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] font-semibold">
+          <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] font-semibold animate-pop">
             <CheckCircle2 size={13} /> Perfil construido
           </div>
-          <h1 className="font-display font-bold text-3xl sm:text-4xl text-slate-900 tracking-tight leading-tight">
+          <h1
+            className="font-display font-bold text-3xl sm:text-4xl text-slate-900 tracking-tight leading-tight animate-fade-up"
+            style={{ animationDelay: '0.12s' }}
+          >
             ¡Listo{hi}! Tu Perfil de Evidencia ya está armado.
           </h1>
-          <p className="text-slate-600 text-base leading-relaxed max-w-xl mx-auto">
+          <p
+            className="text-slate-600 text-base leading-relaxed max-w-xl mx-auto animate-fade-up"
+            style={{ animationDelay: '0.22s' }}
+          >
             Un último paso <strong>opcional</strong>: si tienes algún certificado, diploma o
             constancia, súbelo y esas habilidades aparecerán <strong>verificadas</strong> ante las
             empresas. Si no tienes ahora, no pasa nada — también puedes subirlos cuando quieras

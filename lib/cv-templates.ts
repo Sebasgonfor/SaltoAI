@@ -658,13 +658,6 @@ ${header(p, opts)}
  * para los ATS que sí lo intentan.
  */
 function renderCreative(p: Profile, opts: CvOptions): string {
-  const initials = (p.name || "?")
-    .split(" ")
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   const { html: contactHtml } = buildContactLine(opts);
   const langs = buildLanguagesList(opts);
 
@@ -762,9 +755,6 @@ function renderCreative(p: Profile, opts: CvOptions): string {
       <p class="headline">${escapeHtml(deriveHeadline(p, opts.headline))}</p>
     </header>
     ${tailoredBadge(opts)}
-    <p class="creative-warning screen-only">
-      <strong>Aviso:</strong> este formato es visualmente atractivo pero <strong>NO pasa todos los ATS estrictos</strong> (algunos rompen al ver layouts de 2 columnas). Usalo para roles creativos / diseño / marketing. Para postulaciones corporativas, elige "ATS minimalista" o "Híbrido".
-    </p>
     ${summaryBlock(p)}
     ${evidenceByCompetencyBlock(p)}
     ${educationBlock(opts)}
@@ -772,7 +762,6 @@ function renderCreative(p: Profile, opts: CvOptions): string {
     ${docFooter()}
   </section>
   <aside class="creative-side" style="grid-column: 1; grid-row: 1;">
-    <div class="avatar">${escapeHtml(initials)}</div>
     <h2>Contacto</h2>
     ${contactHtml}
     ${

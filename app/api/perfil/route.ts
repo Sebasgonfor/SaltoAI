@@ -414,21 +414,30 @@ export async function PATCH(req: NextRequest) {
       uid?: string;
       basics?: unknown;
       contact?: unknown;
+      skills?: unknown;
+      traits?: unknown;
+      evidence?: unknown;
+      summary?: unknown;
     };
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const uid = typeof body.uid === "string" ? body.uid.trim() : "";
     const basics = body.basics != null ? parseBasics(body.basics) : null;
     const contact =
       body.contact != null ? parseProfileContact(body.contact) : null;
+    const hasContent =
+      body.skills != null ||
+      body.traits != null ||
+      body.evidence != null ||
+      body.summary != null;
 
     if (!id || !uid || id !== uid) {
       log.end({ status: 403, extra: { reason: "forbidden" } });
       return NextResponse.json({ error: "No autorizado para editar este perfil." }, { status: 403 });
     }
-    if (!basics && !contact) {
+    if (!basics && !contact && !hasContent) {
       log.end({ status: 400, extra: { reason: "nothing_to_update" } });
       return NextResponse.json(
-        { error: "Indica datos básicos o contacto para actualizar." },
+        { error: "Indica datos para actualizar." },
         { status: 400 }
       );
     }
@@ -463,10 +472,61 @@ export async function PATCH(req: NextRequest) {
       patch.contact = { ...existing.contact, ...contact };
     }
 
+    // Edición de contenido: listas saneadas (trim, sin vacíos, deduplicadas, capadas).
+    const cleanStrList = (raw: unknown, maxLen: number, maxItems: number): string[] => {
+      if (!Array.isArray(raw)) return [];
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const x of raw) {
+        if (typeof x !== "string") continue;
+        const v = x.trim().slice(0, maxLen);
+        const key = v.toLowerCase();
+        if (v && !seen.has(key)) {
+          seen.add(key);
+          out.push(v);
+        }
+        if (out.length >= maxItems) break;
+      }
+      return out;
+    };
+    let contentChanged = false;
+    if (body.skills != null) {
+      patch.skills = cleanStrList(body.skills, 60, 20);
+      contentChanged = true;
+    }
+    if (body.traits != null) {
+      patch.traits = cleanStrList(body.traits, 60, 10);
+      contentChanged = true;
+    }
+    if (body.evidence != null && Array.isArray(body.evidence)) {
+      const items = body.evidence
+        .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+        .map((e) => ({
+          skill: typeof e.skill === "string" ? e.skill.trim() : "",
+          quote: typeof e.quote === "string" ? e.quote.trim() : "",
+        }))
+        .filter((e) => e.skill && e.quote);
+      patch.evidence = sanitizeEvidenceForCv(items);
+      contentChanged = true;
+    }
+    if (typeof body.summary === "string") {
+      patch.summary = body.summary.trim().slice(0, 800);
+      contentChanged = true;
+    }
+    // Si cambió el contenido que alimenta el matching, re-embebemos. Si falla
+    // (sin clave / cuota), conservamos el embedding previo para no romper el guardado.
+    if (contentChanged) {
+      try {
+        patch.embedding = await embed(buildEmbeddingText(patch));
+      } catch (e) {
+        log.warn("perfil.patch.reembed_failed", { message: (e as Error)?.message });
+      }
+    }
+
     await upsertProfileWithId(id, patch);
 
     const saved = await getProfile(id);
-    const mode = basics && contact ? "patch_both" : basics ? "patch_basics" : "patch_contact";
+    const mode = hasContent ? "patch_content" : basics && contact ? "patch_both" : basics ? "patch_basics" : "patch_contact";
     log.end({ status: 200, extra: { profileId: id, mode } });
     return NextResponse.json({ profile: saved, storage: storageFromId(id) });
   } catch (err) {

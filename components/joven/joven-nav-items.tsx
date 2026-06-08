@@ -4,8 +4,20 @@ import {
   UserRound,
   Network,
   ListChecks,
+  FileText,
+  FolderOpen,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
+
+/** Sub-sección de un ítem (módulo del perfil), una ruta real propia. */
+export interface JovenSubItem {
+  key: string;
+  label: string;
+  /** Segmento de ruta bajo el href del padre (p. ej. "documentos"). */
+  seg: string;
+  icon: LucideIcon;
+}
 
 export interface JovenNavItem {
   key: string;
@@ -18,6 +30,9 @@ export interface JovenNavItem {
   matchPrefix?: boolean;
   /** Realce sutil para la acción estrella (Oportunidades). */
   emphasis?: boolean;
+  /** Sub-secciones jerárquicas que se muestran indentadas cuando el ítem
+   *  está activo (escritorio). El padre lleva a la vista "Resumen". */
+  children?: JovenSubItem[];
 }
 
 /**
@@ -40,6 +55,11 @@ export const JOVEN_NAV: JovenNavItem[] = [
     icon: UserRound,
     href: '/joven/perfil',
     matchPrefix: true,
+    children: [
+      { key: 'cv', label: 'Hoja de vida', seg: 'hoja-de-vida', icon: FileText },
+      { key: 'documentos', label: 'Documentos', seg: 'documentos', icon: FolderOpen },
+      { key: 'potencial', label: 'Potencial', seg: 'potencial', icon: TrendingUp },
+    ],
   },
   {
     key: 'oportunidades',

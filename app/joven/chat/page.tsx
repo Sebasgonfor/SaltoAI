@@ -1007,7 +1007,7 @@ function ChatJoven() {
         <section className="lg:col-span-7 order-1 lg:order-none bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[min(70dvh,520px)] sm:min-h-[480px] lg:min-h-0 overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 min-h-0">
             {displayMessages.map((msg, i) => (
-              <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={i} className={`flex gap-3 animate-fade-up ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'agent' && (
                   <div
                     className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 ring-4 ring-emerald-50"
@@ -1359,10 +1359,12 @@ function ChatJoven() {
                     const active = detected.has(s.id);
                     return (
                       <span
-                        key={s.id}
-                        className={`text-xs px-2.5 py-1 rounded-full border ${
+                        // Re-montar al activarse dispara el pop; el cambio de
+                        // colores lo suaviza la transición.
+                        key={active ? `${s.id}-on` : s.id}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors duration-300 ${
                           active
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pop'
                             : 'bg-slate-900/60 text-slate-500 border-slate-800'
                         }`}
                         style={active ? brandChipActive : undefined}
@@ -1384,7 +1386,7 @@ function ChatJoven() {
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Señales</div>
-              <div className="font-display font-bold text-2xl sm:text-3xl text-emerald-600 tabular-nums" style={brandText}>{detected.size}</div>
+              <div key={detected.size} className="font-display font-bold text-2xl sm:text-3xl text-emerald-600 tabular-nums animate-pop" style={brandText}>{detected.size}</div>
             </div>
           </div>
 

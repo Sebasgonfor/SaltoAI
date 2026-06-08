@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { useAuth } from '@/lib/auth-context';
 import { useJovenProfileId } from '@/lib/hooks/use-joven-profile-id';
+import { useCachedResource } from '@/lib/hooks/use-cached-resource';
 import { JovenAppShell } from '@/components/joven/joven-app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
-import { JovenWidgets } from '@/components/dashboard/joven-widgets';
+import { JovenWidgets, type DashboardJovenData } from '@/components/dashboard/joven-widgets';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -186,9 +187,6 @@ export default function DashboardPage() {
   const { user, account, loading, roleLoading } = useAuth();
   const jovenProfileId = useJovenProfileId();
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [tasks, setTasks] = useState<MicroTask[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
   useEffect(() => {
     if (loading || roleLoading) return;
     if (!user) {
@@ -200,49 +198,44 @@ export default function DashboardPage() {
     }
   }, [user, account, loading, roleLoading, router]);
 
-  useEffect(() => {
-    // Esperamos a que auth resuelva; sin user no hay nada que cargar.
-    if (loading || roleLoading) return;
-    if (!user) {
-      setDataLoading(false);
-      return;
+  // Perfil + tareas con caché stale-while-revalidate: instantáneo al re-entrar,
+  // revalida en segundo plano. key=null mientras auth no resuelve (el guard de
+  // abajo ya muestra el loader de sesión en ese caso).
+  const dashKey =
+    !loading && !roleLoading && !!user && account?.role === 'joven'
+      ? `dash_${jovenProfileId ?? user.uid}`
+      : null;
+  const { data: dashData, loading: dataLoading } = useCachedResource<{
+    profile: Profile | null;
+    tasks: MicroTask[];
+    widgets: DashboardJovenData | null;
+  }>(dashKey, async () => {
+    const uid = user?.uid;
+    if (!uid) return { profile: null, tasks: [], widgets: null };
+    const id = jovenProfileId ?? uid;
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem('salto_last_profile_id');
+    } catch {
+      /* ignore */
     }
-    // `jovenProfileId` puede tardar en resolver; usamos el uid como id efectivo
-    // para no quedarnos colgados en `dataLoading` cuando el joven aún no tiene
-    // perfil (antes el efecto hacía `return` y nunca apagaba el loading).
-    const id = jovenProfileId ?? user.uid;
-    let cancelled = false;
-    (async () => {
-      try {
-        let stored: string | null = null;
-        try {
-          stored = localStorage.getItem('salto_last_profile_id');
-        } catch {
-          /* ignore */
-        }
-        const aliases = stored && stored !== id ? `&aliases=${encodeURIComponent(stored)}` : '';
-        const [profRes, tasksRes] = await Promise.all([
-          fetch(`/api/perfil?id=${encodeURIComponent(id)}`),
-          fetch(`/api/microtask/list?profileId=${encodeURIComponent(id)}${aliases}`),
-        ]);
-        if (!cancelled && profRes.ok) {
-          const d = await profRes.json();
-          setProfile(d.profile ?? null);
-        }
-        if (!cancelled && tasksRes.ok) {
-          const d = await tasksRes.json();
-          setTasks(d.tasks ?? []);
-        }
-      } catch {
-        /* silent */
-      } finally {
-        if (!cancelled) setDataLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, roleLoading, user, jovenProfileId]);
+    const aliases = stored && stored !== id ? `&aliases=${encodeURIComponent(stored)}` : '';
+    // Las 3 cargas en paralelo y bajo el MISMO caché → el dashboard aparece
+    // completo de un golpe (no escalonado: antes los widgets se fetcheaban
+    // aparte y cargaban después de la tarjeta de perfil).
+    const [profRes, tasksRes, widgetsRes] = await Promise.all([
+      fetch(`/api/perfil?id=${encodeURIComponent(id)}`),
+      fetch(`/api/microtask/list?profileId=${encodeURIComponent(id)}${aliases}`),
+      fetch(`/api/dashboard/joven?uid=${encodeURIComponent(uid)}`),
+    ]);
+    const profile = profRes.ok ? (await profRes.json()).profile ?? null : null;
+    const tasks = tasksRes.ok ? (await tasksRes.json()).tasks ?? [] : [];
+    const widgets = widgetsRes.ok ? ((await widgetsRes.json()) as DashboardJovenData) : null;
+    return { profile, tasks, widgets };
+  });
+  const profile = dashData?.profile ?? null;
+  const tasks = dashData?.tasks ?? [];
+  const widgets = dashData?.widgets ?? null;
 
   // Mientras se resuelve auth/rol, mostramos el loader. Si rol resolvió como
   // empresa, el useEffect ya disparó router.replace; igual mantenemos loader
@@ -294,6 +287,8 @@ export default function DashboardPage() {
               profileId={jovenProfileId ?? user.uid}
               profile={profile}
               tasks={tasks}
+              data={widgets}
+              dataLoading={dataLoading}
             />
           )}
 

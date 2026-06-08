@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, useReducedMotion } from 'motion/react';
 import { JOVEN_NAV, isItemActive, type JovenNavItem } from './joven-nav-items';
 
 /**
@@ -10,6 +11,7 @@ import { JOVEN_NAV, isItemActive, type JovenNavItem } from './joven-nav-items';
  */
 export function JovenBottomNav({ resolveHref }: { resolveHref: (item: JovenNavItem) => string }) {
   const pathname = usePathname() ?? '';
+  const reduce = useReducedMotion();
 
   return (
     <nav
@@ -28,17 +30,24 @@ export function JovenBottomNav({ resolveHref }: { resolveHref: (item: JovenNavIt
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex flex-col items-center justify-center gap-0.5 h-16 text-[10px] font-medium transition-colors duration-150',
+                  'flex flex-col items-center justify-center gap-0.5 h-16 text-[10px] font-medium transition-colors duration-150 active:scale-90 active:transition-transform',
                   active ? 'text-emerald-700' : 'text-slate-500 hover:text-slate-800',
                 ].join(' ')}
               >
-                <span
-                  className={[
-                    'flex items-center justify-center rounded-full px-3 py-1 transition-colors duration-150',
-                    active ? 'bg-emerald-50' : 'bg-transparent',
-                  ].join(' ')}
-                >
-                  <Icon size={20} strokeWidth={active ? 2.1 : 1.8} />
+                <span className="relative flex items-center justify-center px-3 py-1">
+                  {active && (
+                    <motion.span
+                      layoutId={reduce ? undefined : 'joven-bottomnav-active'}
+                      className="absolute inset-0 rounded-full bg-emerald-50"
+                      transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+                      aria-hidden
+                    />
+                  )}
+                  <Icon
+                    size={20}
+                    strokeWidth={active ? 2.1 : 1.8}
+                    className="relative z-10"
+                  />
                 </span>
                 {item.shortLabel}
               </Link>

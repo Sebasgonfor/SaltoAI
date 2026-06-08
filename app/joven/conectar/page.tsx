@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { motion } from 'motion/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,8 +25,8 @@ import {
   type EnrichedDecision,
 } from '@/lib/merge-opportunity-decisions';
 import { RoleGate } from '@/components/auth/role-gate';
+import { Collapse, CountUp, Reveal } from '@/components/ui/motion';
 import { MatchPulseLoader } from '@/components/ui/match-pulse-loader';
-import MatchingAnimation from '@/components/matching-animation';
 import { useEmitSignal } from '@/hooks/use-emit-signal';
 
 const DECISION_POLL_MS = 12_000;
@@ -333,7 +334,7 @@ function ConectarContent() {
   }
 
   if (loading) {
-    return <MatchingAnimation variant="opportunities" />;
+    return <ConectarSkeleton />;
   }
 
   if (error) {
@@ -354,14 +355,20 @@ function ConectarContent() {
         <MatchPulseLoader variant="overlay" label="Recalculando oportunidades…" />
       )}
       <header>
-        <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2 animate-fade-up">
           Conectar con empresas
         </div>
-        <h1 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight">
+        <h1
+          className="text-2xl sm:text-3xl md:text-5xl font-display font-bold text-slate-900 tracking-tight leading-tight animate-fade-up"
+          style={{ animationDelay: '0.06s' }}
+        >
           Así te ven las empresas en SaltoAI.
         </h1>
         {profile && (
-          <p className="mt-4 text-slate-600 max-w-2xl leading-relaxed">
+          <p
+            className="mt-4 text-slate-600 max-w-2xl leading-relaxed animate-fade-up"
+            style={{ animationDelay: '0.12s' }}
+          >
             <strong className="text-slate-900">{profile.name}</strong>, {profile.age} años
             {profile.gender && profile.gender !== 'prefiero_no_decir'
               ? ` · ${GENDER_LABEL[profile.gender]}`
@@ -437,8 +444,8 @@ function ConectarContent() {
           {opportunities.map((opp, i) => {
             const isExpanded = expandedId === opp.needId;
             return (
+              <Reveal key={opp.needId} delay={Math.min(i, 5) * 0.06}>
               <article
-                key={opp.needId}
                 className={`bg-white border rounded-2xl p-4 sm:p-6 md:p-8 transition-all ${
                   opp.companyStatus === 'interested'
                     ? 'border-emerald-300 shadow-md shadow-emerald-100/50 ring-1 ring-emerald-200'
@@ -470,7 +477,10 @@ function ConectarContent() {
                     <p className="text-sm text-slate-600 italic border-l-2 border-emerald-200 pl-3 mt-3">{opp.reason}</p>
                   </div>
                   <div className="flex items-baseline gap-1 md:text-right flex-shrink-0">
-                    <span className="font-display font-bold text-4xl sm:text-5xl text-emerald-600 tabular-nums">{opp.ics}</span>
+                    <CountUp
+                      value={opp.ics}
+                      className="font-display font-bold text-4xl sm:text-5xl text-emerald-600 tabular-nums"
+                    />
                     <span className="text-xl text-emerald-600 font-bold">%</span>
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold ml-2 self-end pb-2">
                       ICS
@@ -482,7 +492,8 @@ function ConectarContent() {
                     (esa página requiere rol empresa). Acá el joven ve POR QUÉ
                     le dieron ese score, en su propia vista, sin atravesar el
                     RoleGate. */}
-                {isExpanded && opp.breakdown && (
+                {opp.breakdown && (
+                  <Collapse open={isExpanded}>
                   <div className="mt-5 pt-5 border-t border-slate-100 space-y-4">
                     <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">
                       Desglose del ICS
@@ -518,6 +529,7 @@ function ConectarContent() {
                       </div>
                     )}
                   </div>
+                  </Collapse>
                 )}
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-3">
@@ -584,6 +596,7 @@ function ConectarContent() {
                   ) : null}
                 </div>
               </article>
+              </Reveal>
             );
           })}
         </section>
@@ -624,10 +637,68 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
         </span>
       </div>
       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${tone.bar} transition-all`}
-          style={{ width: `${clamped}%` }}
+        <motion.div
+          className={`h-full ${tone.bar} rounded-full`}
+          initial={{ width: 0 }}
+          whileInView={{ width: `${clamped}%` }}
+          viewport={{ once: true, margin: '-30px' }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Loader de oportunidades: esqueleto que refleja el layout real (encabezado +
+ * tarjetas) con brillo `shimmer`, más una línea de estado que comunica que la
+ * IA está calculando. Reemplaza la animación orbital anterior por algo más
+ * sobrio y "apropiado" — el usuario ve la forma de lo que viene.
+ */
+function ConectarSkeleton() {
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8" aria-hidden>
+      {/* Encabezado */}
+      <div className="space-y-3">
+        <div className="h-3 w-44 rounded bg-emerald-100" />
+        <div className="shimmer h-9 sm:h-12 w-4/5 rounded-lg bg-slate-200/70" />
+        <div className="shimmer h-9 sm:h-12 w-3/5 rounded-lg bg-slate-200/70" />
+        <div className="h-4 w-2/3 rounded bg-slate-100 mt-2" />
+      </div>
+
+      {/* Estado: la IA está trabajando */}
+      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/50 px-4 py-3">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+        </span>
+        <span className="text-sm font-medium text-emerald-800">
+          Analizando empresas compatibles con tu perfil…
+        </span>
+      </div>
+
+      {/* Tarjetas */}
+      <div className="space-y-4">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="shimmer rounded-2xl border border-slate-200 bg-white p-6 md:p-8"
+            style={{ opacity: 1 - i * 0.18 }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-3">
+                <div className="h-5 w-2/3 rounded bg-slate-200/80" />
+                <div className="h-4 w-1/3 rounded bg-slate-100" />
+                <div className="h-4 w-5/6 rounded bg-slate-100" />
+              </div>
+              <div className="h-12 w-20 rounded-lg bg-emerald-100/70" />
+            </div>
+            <div className="mt-6 flex gap-3 border-t border-slate-100 pt-4">
+              <div className="h-9 w-36 rounded-lg bg-slate-200/70" />
+              <div className="h-9 w-32 rounded-lg bg-slate-100" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
