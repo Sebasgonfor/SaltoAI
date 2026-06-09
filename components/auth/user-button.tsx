@@ -12,9 +12,20 @@ import { cn } from '@/lib/utils';
 interface UserButtonProps {
   variant?: 'light' | 'dark';
   className?: string;
+  /**
+   * Dónde se abre el menú respecto al botón.
+   * - 'bottom-right' (default): hacia abajo, alineado a la derecha — headers.
+   * - 'top-left': hacia ARRIBA, alineado a la izquierda — para el botón al pie
+   *   del sidebar (si abre hacia abajo queda fuera de pantalla → "no sirve").
+   */
+  menuPlacement?: 'bottom-right' | 'top-left';
 }
 
-export function UserButton({ variant = 'light', className }: UserButtonProps) {
+export function UserButton({
+  variant = 'light',
+  className,
+  menuPlacement = 'bottom-right',
+}: UserButtonProps) {
   const { user, account, loading, signOut } = useAuth();
   const jovenProfileId = useJovenProfileId();
   const pathname = usePathname();
@@ -74,7 +85,12 @@ export function UserButton({ variant = 'light', className }: UserButtonProps) {
 
       {open && (
         <div
-          className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50"
+          className={cn(
+            'absolute w-64 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50',
+            menuPlacement === 'top-left'
+              ? 'left-0 bottom-full mb-2'
+              : 'right-0 top-full mt-2'
+          )}
           role="menu"
         >
           <div className="px-4 py-3 border-b border-slate-100">
