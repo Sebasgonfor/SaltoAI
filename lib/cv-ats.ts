@@ -1,24 +1,11 @@
 import { formatExperienceEntry } from "./cv-evidence";
-import type { Gender, Profile } from "./types";
-
-const GENDER_LABEL: Record<Gender, string> = {
-  mujer: "Mujer",
-  hombre: "Hombre",
-  otro: "Otro",
-  prefiero_no_decir: "Prefiere no indicar",
-};
+import type { Profile } from "./types";
 
 /** CV en una sola columna, texto plano: parseable por ATS (sin tablas ni columnas). */
 export function buildAtsCvText(profile: Profile): string {
   const lines: string[] = [];
 
   lines.push(profile.name.toUpperCase());
-  if (profile.age) {
-    lines.push(`Edad: ${profile.age} años`);
-  }
-  if (profile.gender && profile.gender !== "prefiero_no_decir") {
-    lines.push(GENDER_LABEL[profile.gender]);
-  }
   lines.push("");
 
   if (profile.summary) {
@@ -77,11 +64,6 @@ export function buildAtsCvHtml(profile: Profile): string {
     .filter(Boolean)
     .join("");
 
-  const genderLine =
-    profile.gender && profile.gender !== "prefiero_no_decir"
-      ? `<p class="meta">${esc(GENDER_LABEL[profile.gender])}</p>`
-      : "";
-
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -100,8 +82,6 @@ export function buildAtsCvHtml(profile: Profile): string {
 </head>
 <body>
   <h1>${esc(profile.name)}</h1>
-  ${profile.age ? `<p class="meta">Edad: ${profile.age} años</p>` : ""}
-  ${genderLine}
   <h2>Resumen profesional</h2>
   <p>${esc(profile.summary || "Profesional en etapa temprana con experiencia informal demostrable.")}</p>
   ${skills ? `<h2>Habilidades</h2><ul>${skills}</ul>` : ""}

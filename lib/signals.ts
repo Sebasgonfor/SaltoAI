@@ -170,7 +170,9 @@ export const SIGNALS: Signal[] = [
   },
   {
     id: "atención al detalle",
-    label: "Atención al detalle",
+    // Label de chip distinto a "Atención al cliente" para que no se lean como
+    // redundantes ("2 veces atención…"). El id/skill/pattern no cambian.
+    label: "Detección de errores",
     category: "cualitativa",
     promptLine:
       'notó cosas que otros no veían, evitó errores ("detecté que faltaban pedidos", "encontré la diferencia en el inventario").',

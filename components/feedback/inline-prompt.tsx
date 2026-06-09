@@ -13,12 +13,13 @@
  * Pensado para flexibilidad: el caller decide variant + textos.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X, MessageSquareQuote } from 'lucide-react';
 import { hasEmittedExplicit } from '@/lib/feedback';
 import { FeedbackThumbs } from './thumbs';
 import { FeedbackRating } from './rating';
 import type { EmitSignalInput } from '@/lib/feedback';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 interface Props extends Omit<EmitSignalInput, 'rating' | 'binary' | 'text' | 'kind'> {
   /** Headline visible (oración corta). */
@@ -35,6 +36,15 @@ function lsDismissKey(touchpoint: string, targetId: string): string {
   return `salto.feedback.dismiss.${touchpoint}.${targetId}`;
 }
 
+function wasDismissed(touchpoint: string, targetId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(lsDismissKey(touchpoint, targetId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function FeedbackInlinePrompt({
   question,
   hint,
@@ -42,25 +52,21 @@ export function FeedbackInlinePrompt({
   dismissible = true,
   ...input
 }: Props) {
-  const [show, setShow] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const hydrated = useHydrated();
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    // No mostrar si ya votó O si cerró el prompt antes.
-    if (hasEmittedExplicit(input.touchpoint, input.targetId)) return;
-    try {
-      if (window.localStorage.getItem(lsDismissKey(input.touchpoint, input.targetId))) return;
-    } catch {
-      /* ignore */
-    }
-    setShow(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.touchpoint, input.targetId]);
+  // Solo montamos en cliente (hydrated) y si no votó ni cerró antes. Diferir a
+  // hidratación evita leer localStorage en SSR y el hydration mismatch.
+  const show =
+    hydrated &&
+    !dismissed &&
+    !hasEmittedExplicit(input.touchpoint, input.targetId) &&
+    !wasDismissed(input.touchpoint, input.targetId);
 
   if (!show) return null;
 
   const dismiss = () => {
-    setShow(false);
+    setDismissed(true);
     try {
       window.localStorage.setItem(
         lsDismissKey(input.touchpoint, input.targetId),

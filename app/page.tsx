@@ -159,7 +159,7 @@ export default function LandingPage() {
                     ))}
                   </div>
                   <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-600 italic leading-relaxed">
-                    "Triplicó las ventas del local de su tía manejando pedidos por Instagram y resolvió reclamos sin protocolos definidos."
+                    &quot;Triplicó las ventas del local de su tía manejando pedidos por Instagram y resolvió reclamos sin protocolos definidos.&quot;
                   </div>
                 </div>
               </aside>
@@ -189,7 +189,7 @@ export default function LandingPage() {
                   <span className="text-xs uppercase tracking-wider font-semibold text-rose-700">Soy joven</span>
                 </div>
                 <blockquote className="font-display text-xl sm:text-2xl md:text-3xl text-slate-900 font-medium leading-snug mb-6">
-                  "No me contratan porque no tengo experiencia, y no tengo experiencia porque no me contratan."
+                  &quot;No me contratan porque no tengo experiencia, y no tengo experiencia porque no me contratan.&quot;
                 </blockquote>
                 <p className="text-slate-600 leading-relaxed">
                   Camila, 21. Le manejó las redes y triplicó las ventas del negocio de su tía durante 2 años. Su CV está vacío. Los filtros ATS la descartan antes de que un humano la vea. <strong className="text-slate-900">Su experiencia más valiosa es invisible para el mercado.</strong>
@@ -203,7 +203,7 @@ export default function LandingPage() {
                   <span className="text-xs uppercase tracking-wider font-semibold text-amber-700">Soy empresa</span>
                 </div>
                 <blockquote className="font-display text-xl sm:text-2xl md:text-3xl text-slate-900 font-medium leading-snug mb-6">
-                  "Necesito contratar, pero un junior es un riesgo carísimo."
+                  &quot;Necesito contratar, pero un junior es un riesgo carísimo.&quot;
                 </blockquote>
                 <p className="text-slate-600 leading-relaxed">
                   Andrés, founder de un local que recién abre. Equipo de 3. Sin RRHH. Publica en LinkedIn y le llegan 200 CVs sin señal. <strong className="text-slate-900">Una mala contratación lo retrasa semanas y plata que no tiene.</strong>
@@ -305,7 +305,7 @@ export default function LandingPage() {
               <div className="lg:col-span-7">
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8">
                   <div className="font-mono text-sm text-slate-500 mb-6 leading-relaxed">
-                    <span className="text-slate-400">// Índice de Compatibilidad Salto</span><br />
+                    <span className="text-slate-400">{'// Índice de Compatibilidad Salto'}</span><br />
                     <span className="text-emerald-600 font-semibold">ICS</span> = <span className="text-amber-700">w₁</span>·skillsFit + <span className="text-amber-700">w₂</span>·conducta + <span className="text-amber-700">w₃</span>·aprendizaje + <span className="text-amber-700">w₄</span>·contexto − penalizaciones
                   </div>
                   <div className="space-y-3">

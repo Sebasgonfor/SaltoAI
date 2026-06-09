@@ -56,13 +56,14 @@ export interface ProfileDocument {
   createdAt: number;
 }
 
-/** Género declarado por la persona (no se infiere del nombre). */
+/**
+ * @deprecated Ya no se captura ni se muestra. Se conserva solo para leer
+ * perfiles antiguos sin romper tipos. No escribir nuevos valores.
+ */
 export type Gender = "mujer" | "hombre" | "otro" | "prefiero_no_decir";
 
 export interface JovenBasics {
   name: string;
-  age: number;
-  gender: Gender;
 }
 
 export interface ChatMessage {
@@ -73,6 +74,14 @@ export interface ChatMessage {
 export interface EvidenceItem {
   skill: string;
   quote: string;
+}
+
+/** Entrada de historial laboral formal extraída de la entrevista. */
+export interface WorkEntry {
+  role: string;            // cargo / rol
+  organization?: string;   // empresa / lugar de trabajo
+  period?: string;         // ej. "2021–2023", "6 meses", "2 años"
+  description?: string;    // 1 frase de responsabilidad o logro
 }
 
 export interface HiddenSkill {
@@ -112,6 +121,8 @@ export interface ProfileContact {
   city?: string;
   linkedin?: string;
   languages?: string;
+  /** Herramientas / tecnologías que domina (Power BI, Excel, Figma, ATS…). */
+  tools?: string;
   education?: string;
   certifications?: string;
   headline?: string;
@@ -121,13 +132,16 @@ export interface ProfileContact {
 export interface Profile {
   id?: string;
   name: string;
-  /** Perfiles antiguos pueden no tener edad. */
+  /** @deprecated Ya no se captura ni se muestra (sesgo). Solo perfiles antiguos lo tienen. */
   age?: number;
+  /** @deprecated Ya no se captura ni se muestra (sesgo). Solo perfiles antiguos lo tienen. */
   gender?: Gender;
   summary: string;
   skills: string[];
   traits: string[];
   evidence: EvidenceItem[];
+  /** Historial laboral formal mencionado en la entrevista (opcional). */
+  workHistory?: WorkEntry[];
   embedding: number[];
   createdAt: number;
   latent?: LatentProfile;

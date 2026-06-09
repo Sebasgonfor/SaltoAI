@@ -16,13 +16,14 @@
  * voto sigue siendo válido y se reintenta en el próximo localStorage flush.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 import {
   emitSignal,
   hasEmittedExplicit,
   type EmitSignalInput,
 } from '@/lib/feedback';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 interface Props extends Omit<EmitSignalInput, 'binary' | 'rating' | 'text' | 'kind'> {
   /** Texto antes del voto. Default: "¿Te sirvió?" */
@@ -44,13 +45,12 @@ export function FeedbackThumbs({
 }: Props) {
   const [vote, setVote] = useState<'yes' | 'no' | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const hydrated = useHydrated();
 
-  useEffect(() => {
-    if (hasEmittedExplicit(input.touchpoint, input.targetId)) {
-      setVote('done' as 'yes'); // marcador genérico — solo importa que no se vuelva a mostrar
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.touchpoint, input.targetId]);
+  // Ya votó antes (localStorage, diferido hasta hidratar) o acaba de votar.
+  const done =
+    vote !== null ||
+    (hydrated && hasEmittedExplicit(input.touchpoint, input.targetId));
 
   const submit = async (yes: boolean) => {
     if (submitting) return;
@@ -60,7 +60,7 @@ export function FeedbackThumbs({
     setSubmitting(false);
   };
 
-  if (vote) {
+  if (done) {
     if (silent) return null;
     return (
       <div

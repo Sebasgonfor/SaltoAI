@@ -419,7 +419,7 @@ function DocumentRow({
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 italic border-l-2 border-emerald-200 pl-2.5">
-                  "{s.evidence}"
+                  &quot;{s.evidence}&quot;
                 </p>
               </div>
             ))}

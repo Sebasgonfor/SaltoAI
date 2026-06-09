@@ -234,7 +234,7 @@ export default function HojaDeVidaPage() {
                         fill="currentColor"
                       />
                       <blockquote className="font-display text-lg sm:text-xl md:text-2xl text-slate-800 leading-snug italic">
-                        "{ev.quote}"
+                        &quot;{ev.quote}&quot;
                       </blockquote>
                     </div>
                   </div>

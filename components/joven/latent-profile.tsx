@@ -39,7 +39,6 @@ export default function LatentProfileSection({ profileId }: { profileId: string 
     // Si ya está en caché, pintamos al instante y revalidamos en silencio.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLatent(latentCache.get(profileId) ?? null);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(!latentCache.has(profileId));
     (async () => {
       try {
@@ -153,19 +152,25 @@ export default function LatentProfileSection({ profileId }: { profileId: string 
         </div>
       )}
 
-      {/* Roles sugeridos */}
+      {/* Orientación de mercado — antes "Roles donde encajas". Reencuadrado para
+          NO prometer un encaje (no son vacantes reales): es orientación sobre
+          familias de roles afines a tu evidencia. */}
       {latent.suggestedRoles?.length > 0 && (
         <div>
-          <h3 className="flex items-center gap-2 font-semibold text-slate-900 mb-4">
-            <Compass size={16} className="text-emerald-600" /> Roles donde encajas
+          <h3 className="flex items-center gap-2 font-semibold text-slate-900 mb-1">
+            <Compass size={16} className="text-emerald-600" /> Orientación de mercado
           </h3>
+          <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+            Roles afines a tu evidencia que vale la pena explorar. Es una guía de
+            mercado, no una oferta ni una garantía de contratación.
+          </p>
           <Stagger className="space-y-3" stagger={0.06}>
             {latent.suggestedRoles.map((r, i) => (
               <StaggerItem key={i} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-emerald-200 transition-colors">
                 <h4 className="font-semibold text-slate-900 mb-1.5">{r.roleTitle}</h4>
                 <p className="text-sm text-slate-700 leading-relaxed mb-2">{r.whyFits}</p>
                 <p className="text-xs text-emerald-700 bg-emerald-50/70 rounded-lg px-3 py-2 leading-relaxed">
-                  <span className="font-semibold">Para ganarte la entrevista:</span> {r.readinessHint}
+                  <span className="font-semibold">Cómo fortalecer tu perfil:</span> {r.readinessHint}
                 </p>
               </StaggerItem>
             ))}

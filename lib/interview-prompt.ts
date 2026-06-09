@@ -114,6 +114,7 @@ REGLAS DE COBERTURA:
 - En cada turno, mira explícitamente qué señales YA salieron en lo que dijo el joven, y elige preguntar por una señal AÚN NO CUBIERTA, idealmente conectada a lo que el joven acaba de mencionar.
 - Si una respuesta del joven cubre dos señales a la vez, perfecto: la siguiente pregunta apunta a una tercera señal.
 - Profundiza UNA VEZ en la señal recién mencionada si vino vaga — después salta a otra señal.
+- Si todavía no surgieron, intenta captar (cuando encaje naturalmente, sin forzar ni gastar todos los turnos): experiencia laboral FORMAL (dónde trabajó, qué cargo, cuánto tiempo), HERRAMIENTAS o tecnologías que use (Excel, Power BI, Figma, etc.) e IDIOMAS que hable. Una sola pregunta puede cubrir varias.
 
 Anti-bucle (CRÍTICO):
 - NUNCA repitas la misma pregunta ni frases casi idénticas del historial.
@@ -256,16 +257,13 @@ export function buildLiveOpeningUserPromptEmpresa(companyName?: string): string 
 /** Prompt para generar el primer mensaje del agente (modo texto). */
 export function buildOpeningQuestionPrompt(
   firstName?: string,
-  age?: number,
   cfg?: PromptConfig
 ): string {
   const nameLine = firstName?.trim()
     ? `La persona se llama ${firstName.trim()}. Salúdala por su nombre de pila.`
     : "Saluda de forma cercana.";
-  const ageLine =
-    typeof age === "number" && age >= 14 && age <= 35 ? `Tiene ${age} años.` : "";
 
-  return `${nameLine} ${ageLine}
+  return `${nameLine}
 
 Vas a INICIAR la entrevista por chat. Genera el PRIMER mensaje del agente:
 - Saludo breve y cálido (1 frase) + UNA pregunta abierta original.

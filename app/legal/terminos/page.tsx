@@ -156,7 +156,7 @@ export default function TerminosPage() {
             <strong className="text-slate-900">Tu contenido es tuyo.</strong> Tu perfil, historial, respuestas a la entrevista y datos personales te pertenecen. Al subirlos, nos otorgas una licencia limitada, no exclusiva y revocable para procesarlos con el único fin de operar el servicio (matching, generación de CV, mejora del motor de IA). No vendemos tu contenido a terceros.
           </P>
           <P>
-            <strong className="text-slate-900">Propiedad de Salto.</strong> El nombre "Salto", el logo, la metodología del ICS, el código fuente de la plataforma y todos los modelos de IA desarrollados internamente son propiedad exclusiva de Salto SAS. No puedes copiar, modificar, distribuir o hacer ingeniería inversa de ningún componente de la plataforma sin autorización escrita.
+            <strong className="text-slate-900">Propiedad de Salto.</strong> El nombre &quot;Salto&quot;, el logo, la metodología del ICS, el código fuente de la plataforma y todos los modelos de IA desarrollados internamente son propiedad exclusiva de Salto SAS. No puedes copiar, modificar, distribuir o hacer ingeniería inversa de ningún componente de la plataforma sin autorización escrita.
           </P>
 
           <SectionHeader n={6} id="ia">Motor de IA y limitaciones</SectionHeader>

@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Star,
   MessageCircle,
@@ -27,6 +28,7 @@ import {
   Reply,
   Check,
   RefreshCw,
+  Compass,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -138,12 +140,20 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
             Tu inbox
           </div>
           <h2 className="font-display font-bold text-2xl md:text-3xl text-slate-900 tracking-tight leading-tight">
-            Feedback de empresas que te vieron.
+            Mensajes de empresas.
           </h2>
           <p className="text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">
-            Esto es lo que LinkedIn nunca te da: comentarios reales de empresas que
-            abrieron tu perfil — incluso cuando no avanzaron. Podés responder.
+            Cuando una empresa abre tu perfil, a veces deja un comentario o el motivo por
+            el que no avanzó — y puedes responderle. No todas lo hacen. El{' '}
+            <strong className="text-slate-800">porqué de cada match</strong> (por qué encajaste
+            o qué te faltó) lo tienes siempre, sin esperar a nadie, en tus Oportunidades.
           </p>
+          <Link
+            href={`/joven/conectar?profileId=${encodeURIComponent(profileId)}`}
+            className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            <Compass size={13} /> Ver por qué encajaste en cada oportunidad →
+          </Link>
           {lastFetchAt && (
             <p className="text-[11px] text-slate-400 mt-2">
               Actualizado {formatAgo(lastFetchAt)}.
@@ -185,10 +195,16 @@ export function YouthFeedbackInbox({ profileId }: { profileId: string }) {
         <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
           <Inbox size={28} className="text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-            Cuando una empresa abra tu perfil, vas a ver acá su feedback —
-            sea bueno, sea regular o sea un &ldquo;no avanzo porque…&rdquo;.
-            Es data accionable para crecer.
+            Aún no hay mensajes directos de empresas. Es normal: muchas no dejan
+            comentarios. Mientras tanto, tu <strong className="text-slate-800">por qué
+            encajaste</strong> en cada oportunidad ya está disponible.
           </p>
+          <Link
+            href={`/joven/conectar?profileId=${encodeURIComponent(profileId)}`}
+            className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            <Compass size={14} /> Ver mis oportunidades →
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">

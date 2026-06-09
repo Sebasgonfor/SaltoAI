@@ -623,7 +623,7 @@ export default function ImpactoDashboard() {
                 </div>
 
                 <blockquote className="font-display text-lg text-slate-800 leading-snug italic mb-6 flex-1 border-l-2 border-emerald-200 pl-4">
-                  "{story.quote}"
+                  &quot;{story.quote}&quot;
                 </blockquote>
 
                 <div className="space-y-2 pt-4 border-t border-slate-100">
@@ -650,7 +650,7 @@ export default function ImpactoDashboard() {
           </div>
           <div className="grid md:grid-cols-3 gap-6 text-sm text-slate-600">
             <div>
-              <div className="font-semibold text-slate-900 mb-2">¿Qué es "colocado"?</div>
+              <div className="font-semibold text-slate-900 mb-2">¿Qué es &quot;colocado&quot;?</div>
               <p className="leading-relaxed">
                 Un joven que completa la entrevista, obtiene ICS ≥ 70 contra al menos una necesidad publicada, y la empresa confirma el contacto.
               </p>

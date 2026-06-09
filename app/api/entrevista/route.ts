@@ -232,14 +232,12 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       messages?: ChatMessage[];
       firstName?: string;
-      age?: number;
       opening?: boolean;
       recruiterSlug?: string;
     };
 
     const opening = body.opening === true;
     const firstName = typeof body.firstName === "string" ? body.firstName.trim().slice(0, 60) : "";
-    const age = typeof body.age === "number" ? body.age : undefined;
     const messages = Array.isArray(body.messages) ? body.messages : [];
     messagesSnapshot = messages;
 
@@ -283,7 +281,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const userPrompt = `${systemPrompt}\n\n${buildOpeningQuestionPrompt(firstName || undefined, age, promptCfg)}`;
+      const userPrompt = `${systemPrompt}\n\n${buildOpeningQuestionPrompt(firstName || undefined, promptCfg)}`;
       try {
         const result = await generateInterviewTurn(userPrompt);
         log.end({ status: 200, extra: { mode: "opening", done: false } });

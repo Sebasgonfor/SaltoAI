@@ -19,15 +19,9 @@ import {
   Printer,
   AlertCircle,
 } from 'lucide-react';
-import type { Gender, Match, MatchDecision, Profile, ProfileDocument } from '@/lib/types';
+import type { Match, MatchDecision, Profile, ProfileDocument } from '@/lib/types';
+import { isNotASkill } from '@/lib/skill-classification';
 import { MatchDecisionBar } from '@/components/empresa/match-decision-bar';
-
-const GENDER_LABEL: Record<Gender, string> = {
-  mujer: 'Mujer',
-  hombre: 'Hombre',
-  otro: 'Otro',
-  prefiero_no_decir: '',
-};
 
 interface CandidateDetailProps {
   profileId: string;
@@ -171,19 +165,13 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
         <h1 className="text-3xl sm:text-4xl font-display font-bold text-slate-900 tracking-tight">
           {profile.name}
         </h1>
-        <div className="flex flex-wrap items-center gap-3 text-slate-600">
-          <span>
-            {profile.age ?? '—'} años
-            {profile.gender && profile.gender !== 'prefiero_no_decir' && GENDER_LABEL[profile.gender]
-              ? ` · ${GENDER_LABEL[profile.gender]}`
-              : ''}
-          </span>
-          {match && (
+        {match && (
+          <div className="flex flex-wrap items-center gap-3 text-slate-600">
             <Badge className="bg-emerald-600 text-white border-transparent text-base px-3 py-1">
               ICS {match.ics}%
             </Badge>
-          )}
-        </div>
+          </div>
+        )}
         {match && (
           <div className="flex flex-wrap gap-1.5">
             {match.topSkills.map((s) => {
@@ -325,7 +313,10 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
               for (const sk of doc.extractedSkills ?? []) {
                 const label = sk.skill.trim();
                 const key = label.toLowerCase();
-                if (key && !verified.has(key)) verified.set(key, { label, evidence: sk.evidence ?? '' });
+                // Carrera/título ≠ habilidad (filtra docs antiguos con el grado como skill).
+                if (key && !isNotASkill(label) && !verified.has(key)) {
+                  verified.set(key, { label, evidence: sk.evidence ?? '' });
+                }
               }
             }
             const profileKeys = new Set(profile.skills.map((s) => s.trim().toLowerCase()));

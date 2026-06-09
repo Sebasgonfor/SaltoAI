@@ -13,30 +13,25 @@ import {
 import { normalizeSlug, toPromptConfig, type PromptConfig } from "@/lib/recruiter-config";
 import { parseProfileContact } from "@/lib/profile-contact";
 import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/api-errors";
-import { validateForProfileExtraction, parseJovenAge } from "@/lib/input-validation";
+import { validateForProfileExtraction } from "@/lib/input-validation";
 import { sanitizeEvidenceForCv } from "@/lib/cv-evidence";
+import { filterRealSkills } from "@/lib/skill-classification";
 import {
   heuristicExtraction,
   isProfileTooThin,
   mergeProfiles,
 } from "@/lib/heuristic-profile";
 import { startLog } from "@/lib/logger";
-import type { ChatMessage, Gender, JovenBasics, Profile } from "@/lib/types";
+import type { ChatMessage, JovenBasics, Profile, ProfileContact, WorkEntry } from "@/lib/types";
 
 export const runtime = "nodejs";
-
-const VALID_GENDERS: Gender[] = ["mujer", "hombre", "otro", "prefiero_no_decir"];
 
 function parseBasics(raw: unknown): JovenBasics | null {
   if (!raw || typeof raw !== "object") return null;
   const b = raw as Record<string, unknown>;
   const name = typeof b.name === "string" ? b.name.trim() : "";
-  const age = parseJovenAge(typeof b.age === "number" ? b.age : String(b.age ?? ""));
-  const gender = b.gender as Gender;
   if (!name || name.length < 2) return null;
-  if (age == null) return null;
-  if (!VALID_GENDERS.includes(gender)) return null;
-  return { name, age, gender };
+  return { name };
 }
 
 const EXTRACTION_PROMPT = `Eres el extractor de Perfil de Evidencia de SaltoAI.
@@ -45,6 +40,14 @@ A partir de la transcripción de la entrevista, extrae SOLO lo que el joven dijo
 Reglas estrictas (anti-alucinación):
 - Cada skill DEBE estar anclada a un hecho REAL que el joven mencionó. Si no hay sustento en la transcripción, NO la incluyas.
 - NO inventes números, fechas ni resultados. Si el joven no los mencionó, no aparecen.
+
+VENDER EL TALENTO (redacción, NO invención):
+- NUNCA copies la frase del joven palabra por palabra. Tu trabajo es REESCRIBIR lo que dijo a lenguaje
+  profesional que "venda" la competencia ante un reclutador — sin inventar hechos ni cifras.
+- Si el joven solo se autodescribió ("soy bueno en ventas", "sé de reclutamiento"), conviértelo en una
+  competencia concreta usando el contexto que haya dado; si no dio contexto, redáctala como capacidad
+  profesional clara, nunca como cita literal de su autodescripción.
+- Usa verbos de acción y enfoque de impacto/resultado SOLO con lo que realmente ocurrió.
 
 Formato de evidencia (sección "Experiencia y logros" del CV — VOZ PROFESIONAL IMPERSONAL):
 - Cada entrada tiene "skill" (competencia con nombre de mercado laboral) + "quote" (la capacidad demostrada, con su contexto o resultado).
@@ -79,8 +82,11 @@ Otros campos:
   SIN tercera persona narrativa. Enfócate en sus capacidades y a qué puede aportar.
   Ej: "Desarrollador full-stack autodidacta con capacidad de aprendizaje autónomo, organización de procesos y mejora continua."
 - name: si la persona dijo su nombre, úsalo; si no, "Candidato/a".
+- workHistory: SOLO empleos/roles formales o semiformales que la persona mencione explícitamente (cargo, y si lo dijo: organización, periodo, una frase de logro/responsabilidad). NO inventes empleos ni fechas. Si no mencionó trabajos formales, devuelve [].
+- tools: herramientas o tecnologías concretas que mencione dominar (ej. "Excel", "Power BI", "Figma", "Canva", "Photoshop", "ATS", "Notion"). Solo las que dijo. Si ninguna, [].
+- languages: idiomas que mencione, con nivel si lo dio (ej. "Inglés (B2)", "Portugués (básico)"). NO asumas idiomas; solo los que dijo. Si ninguno, [].
 
-Idioma: español neutro latinoamericano.
+Idioma de salida: español neutro latinoamericano.
 Devuelve JSON estricto con el schema indicado.`;
 
 const schema = {
@@ -107,6 +113,21 @@ const schema = {
         required: ["skill", "quote"],
       },
     },
+    workHistory: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          role: { type: Type.STRING },
+          organization: { type: Type.STRING },
+          period: { type: Type.STRING },
+          description: { type: Type.STRING },
+        },
+        required: ["role"],
+      },
+    },
+    tools: { type: Type.ARRAY, items: { type: Type.STRING } },
+    languages: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
   required: ["name", "summary", "skills", "traits", "evidence"],
 };
@@ -120,8 +141,6 @@ function mockExtraction(
 ): Omit<Profile, "id" | "createdAt" | "embedding"> {
   return {
     name: basics.name,
-    age: basics.age,
-    gender: basics.gender,
     summary:
       "Perfil generado en modo demo (sin clave de IA). Las habilidades y rasgos se infirieron con heurística simple sobre la conversación.",
     skills: ["Comunicación", "Iniciativa"],
@@ -141,6 +160,9 @@ function buildEmbeddingText(p: Omit<Profile, "id" | "createdAt" | "embedding">):
     "Habilidades: " + p.skills.join(", "),
     "Rasgos: " + p.traits.join(", "),
     "Evidencia: " + p.evidence.map((e) => `${e.skill} — ${e.quote}`).join(" | "),
+    ...(p.workHistory?.length
+      ? ["Experiencia: " + p.workHistory.map((w) => [w.role, w.organization].filter(Boolean).join(" en ")).join(" | ")]
+      : []),
   ].join("\n");
 }
 
@@ -217,6 +239,11 @@ export async function POST(req: NextRequest) {
 
     let extracted: Omit<Profile, "id" | "createdAt" | "embedding">;
     let extractionMode: "llm" | "llm+heuristic" | "heuristic_only" | "mock" = "llm";
+    // Capturados por el LLM (no van al body base; workHistory va al perfil,
+    // tools/languages al contact para el CV). Solo lo que la persona dijo.
+    let capturedWorkHistory: WorkEntry[] = [];
+    let capturedTools: string[] = [];
+    let capturedLanguages: string[] = [];
 
     // Piso heurístico — se computa siempre. Usa regex sobre el transcript
     // para producir 2-5 skills/evidencias ancladas a citas reales. Es nuestra
@@ -227,8 +254,6 @@ export async function POST(req: NextRequest) {
       // Sin LLM, usamos heurístico real (más rico que el mock canónico).
       extracted = {
         name: basics.name,
-        age: basics.age,
-        gender: basics.gender,
         ...heuristic,
       };
       extractionMode = "heuristic_only";
@@ -255,7 +280,7 @@ export async function POST(req: NextRequest) {
         })();
         const response = await gemini().models.generateContent({
           model: GEMINI_MODEL,
-          contents: `${EXTRACTION_PROMPT}${summaryHint}\n\nDatos confirmados por la persona (NO cambiar nombre, edad ni género): nombre="${basics.name}", edad=${basics.age}, género=${basics.gender}.\n\nTranscripción:\n${transcript}`,
+          contents: `${EXTRACTION_PROMPT}${summaryHint}\n\nDato confirmado por la persona (NO cambiar el nombre): nombre="${basics.name}".\n\nTranscripción:\n${transcript}`,
           config: {
             responseMimeType: "application/json",
             responseSchema: schema,
@@ -268,6 +293,27 @@ export async function POST(req: NextRequest) {
           traits: Array.isArray(parsed.traits) ? parsed.traits : [],
           evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
         };
+        capturedWorkHistory = Array.isArray(parsed.workHistory)
+          ? (parsed.workHistory as WorkEntry[])
+              .filter((w) => w && typeof w.role === "string" && w.role.trim())
+              .map((w) => ({
+                role: String(w.role).trim(),
+                organization: w.organization?.toString().trim() || undefined,
+                period: w.period?.toString().trim() || undefined,
+                description: w.description?.toString().trim() || undefined,
+              }))
+              .slice(0, 8)
+          : [];
+        const cleanList = (raw: unknown): string[] =>
+          Array.isArray(raw)
+            ? [...new Set(
+                (raw as unknown[])
+                  .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+                  .map((x) => x.trim()),
+              )].slice(0, 12)
+            : [];
+        capturedTools = cleanList(parsed.tools);
+        capturedLanguages = cleanList(parsed.languages);
       } catch (llmErr) {
         // Si el LLM cae aquí (timeout, JSON mal formado, etc.) y NO es rate
         // limit, seguimos con heurístico — la entrevista no muere. Los rate
@@ -288,8 +334,6 @@ export async function POST(req: NextRequest) {
           : llmBody;
         extracted = {
           name: basics.name,
-          age: basics.age,
-          gender: basics.gender,
           ...merged,
         };
         extractionMode = llmBody.skills.length === 0 && llmBody.evidence.length === 0
@@ -302,8 +346,6 @@ export async function POST(req: NextRequest) {
       } else {
         extracted = {
           name: basics.name,
-          age: basics.age,
-          gender: basics.gender,
           ...llmBody,
         };
         extractionMode = "llm";
@@ -313,12 +355,17 @@ export async function POST(req: NextRequest) {
     extracted = {
       ...extracted,
       evidence: sanitizeEvidenceForCv(extracted.evidence),
+      ...(capturedWorkHistory.length > 0 && { workHistory: capturedWorkHistory }),
     };
 
     if (extracted.skills.length === 0 && extracted.evidence.length > 0) {
       extracted.skills = [...new Set(extracted.evidence.map((e) => e.skill))];
     }
 
+    // Carrera/título/cargo ≠ habilidad: "Ingeniería Industrial" no es una skill.
+    // Se filtra acá (antes del piso heurístico) para que, si queda vacío, caiga
+    // al fallback en vez de mostrar una carrera como habilidad.
+    extracted.skills = filterRealSkills(extracted.skills);
 
     // Último piso: si tras la sanitización quedó vacío, usamos el heurístico
     // crudo. El perfil NUNCA debe salir sin skills/evidencias.
@@ -346,14 +393,33 @@ export async function POST(req: NextRequest) {
           .map((m) => ({ role: m.role, content: m.content }))
       : undefined;
 
+    // Herramientas / idiomas detectados en la entrevista → contact (para el CV).
+    const capturedContact: Partial<ProfileContact> = {};
+    if (capturedTools.length > 0) capturedContact.tools = capturedTools.join(", ");
+    if (capturedLanguages.length > 0) capturedContact.languages = capturedLanguages.join(", ");
+
+    // Mezcla con el contact existente SIN pisar lo que el usuario ya editó a mano
+    // (también preserva el contact al re-extraer; setDoc reemplaza el documento).
+    const mergeContact = (base?: ProfileContact): ProfileContact | undefined => {
+      const out: ProfileContact = { ...base };
+      for (const [k, v] of Object.entries(capturedContact)) {
+        if (v && !(out as Record<string, unknown>)[k]) {
+          (out as Record<string, string>)[k] = v;
+        }
+      }
+      return Object.keys(out).length > 0 ? out : undefined;
+    };
+
     if (uid) {
       const existing = await getProfile(uid);
+      const mergedContact = mergeContact(existing?.contact);
       await upsertProfileWithId(uid, {
         ...extracted,
         embedding,
         createdAt: existing?.createdAt ?? Date.now(),
         latent: existing?.latent,
         taskStats: existing?.taskStats,
+        ...(mergedContact && { contact: mergedContact }),
         ...(interviewTranscript && { interviewTranscript }),
         // Conservar asociación previa si ya existía; si llega una nueva, prevalece.
         ...((sourceRecruiterUid ?? existing?.sourceRecruiterUid) && {
@@ -366,9 +432,11 @@ export async function POST(req: NextRequest) {
       id = uid;
       storage = storageFromId(uid);
     } else {
+      const newContact = mergeContact(undefined);
       const created = await createProfile({
         ...extracted,
         embedding,
+        ...(newContact && { contact: newContact }),
         ...(interviewTranscript && { interviewTranscript }),
         ...(sourceRecruiterUid && { sourceRecruiterUid }),
         ...(sourceRecruiterSlug && { sourceRecruiterSlug }),
@@ -465,8 +533,6 @@ export async function PATCH(req: NextRequest) {
     const patch: Profile = { ...existing };
     if (basics) {
       patch.name = basics.name;
-      patch.age = basics.age;
-      patch.gender = basics.gender;
     }
     if (contact) {
       patch.contact = { ...existing.contact, ...contact };

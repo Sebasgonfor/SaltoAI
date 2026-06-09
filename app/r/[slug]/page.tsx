@@ -109,7 +109,6 @@ export default function RecruiterLandingPage() {
                 background: `linear-gradient(180deg, ${primary}14 0%, #ffffff 100%)`,
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               {brand.brand?.logoUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img

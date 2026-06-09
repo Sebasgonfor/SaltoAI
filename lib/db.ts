@@ -109,7 +109,7 @@ function disableFirestoreWithWarning(err: unknown, op: string, collection: strin
   }
 }
 
-function useFirestore(collection?: string): boolean {
+function firestoreEnabled(collection?: string): boolean {
   if (!isFirestoreConfigured()) return false;
   if (collection && firestoreDisabledFor.has(collection)) return false;
   return true;
@@ -133,7 +133,7 @@ export async function createProfile(
   p: Omit<Profile, "id" | "createdAt">
 ): Promise<{ id: string; storage: StorageMode }> {
   const data: Profile = { ...p, createdAt: Date.now() };
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       const ref = await addDoc(
         collection(db, PROFILES),
@@ -152,7 +152,7 @@ export async function createProfile(
 }
 
 export async function getProfile(id: string): Promise<Profile | null> {
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       const snap = await getDoc(doc(db, PROFILES, id));
       if (!snap.exists()) return memProfiles.get(id) ?? null;
@@ -167,7 +167,7 @@ export async function getProfile(id: string): Promise<Profile | null> {
 }
 
 export async function getAllProfiles(): Promise<Profile[]> {
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       const snap = await getDocs(collection(db, PROFILES));
       const remote = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Profile, "id">) }));
@@ -182,7 +182,7 @@ export async function getAllProfiles(): Promise<Profile[]> {
 export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): Promise<void> {
   const profile = { ...p, id };
   memProfiles.set(id, profile);
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       await setDoc(doc(db, PROFILES, id), stripUndefined(p as unknown as Record<string, unknown>));
       return;
@@ -198,7 +198,7 @@ export async function upsertProfileWithId(id: string, p: Omit<Profile, "id">): P
  */
 export async function listProfilesBySourceRecruiter(recruiterUid: string): Promise<Profile[]> {
   if (!recruiterUid) return [];
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       const qy = query(collection(db, PROFILES), where("sourceRecruiterUid", "==", recruiterUid));
       const snap = await getDocs(qy);
@@ -222,7 +222,7 @@ export async function listProfilesBySourceRecruiter(recruiterUid: string): Promi
 
 export async function upsertRecruiterConfig(cfg: RecruiterConfig): Promise<void> {
   memRecruiterConfigs.set(cfg.recruiterUid, cfg);
-  if (useFirestore(RECRUITER_CONFIGS)) {
+  if (firestoreEnabled(RECRUITER_CONFIGS)) {
     try {
       await setDoc(
         doc(db, RECRUITER_CONFIGS, cfg.recruiterUid),
@@ -236,7 +236,7 @@ export async function upsertRecruiterConfig(cfg: RecruiterConfig): Promise<void>
 
 export async function getRecruiterConfig(uid: string): Promise<RecruiterConfig | null> {
   if (!uid) return null;
-  if (useFirestore(RECRUITER_CONFIGS)) {
+  if (firestoreEnabled(RECRUITER_CONFIGS)) {
     try {
       const snap = await getDoc(doc(db, RECRUITER_CONFIGS, uid));
       if (!snap.exists()) return memRecruiterConfigs.get(uid) ?? null;
@@ -253,7 +253,7 @@ export async function getRecruiterConfig(uid: string): Promise<RecruiterConfig |
 /** Busca por slug (índice de campo único; sin orderBy → sin índice compuesto). */
 export async function getRecruiterConfigBySlug(slug: string): Promise<RecruiterConfig | null> {
   if (!slug) return null;
-  if (useFirestore(RECRUITER_CONFIGS)) {
+  if (firestoreEnabled(RECRUITER_CONFIGS)) {
     try {
       const qy = query(collection(db, RECRUITER_CONFIGS), where("slug", "==", slug));
       const snap = await getDocs(qy);
@@ -279,7 +279,7 @@ export async function createNeed(
   n: Omit<CompanyNeed, "id" | "createdAt">
 ): Promise<{ id: string; storage: StorageMode }> {
   const data: CompanyNeed = { ...n, createdAt: Date.now() };
-  if (useFirestore(NEEDS)) {
+  if (firestoreEnabled(NEEDS)) {
     try {
       const ref = await addDoc(
         collection(db, NEEDS),
@@ -305,7 +305,7 @@ export async function createNeed(
  */
 export async function listNeedsByOwner(ownerUid: string): Promise<CompanyNeed[]> {
   if (!ownerUid) return [];
-  if (useFirestore(NEEDS)) {
+  if (firestoreEnabled(NEEDS)) {
     try {
       const q = query(collection(db, NEEDS), where("ownerUid", "==", ownerUid));
       const snap = await getDocs(q);
@@ -329,7 +329,7 @@ export async function listNeedsByOwner(ownerUid: string): Promise<CompanyNeed[]>
 }
 
 export async function getAllNeeds(): Promise<CompanyNeed[]> {
-  if (useFirestore()) {
+  if (firestoreEnabled()) {
     try {
       const snap = await getDocs(collection(db, NEEDS));
       const remote = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CompanyNeed, "id">) }));
@@ -343,7 +343,7 @@ export async function getAllNeeds(): Promise<CompanyNeed[]> {
 
 export async function deleteNeed(id: string): Promise<boolean> {
   let deleted = false;
-  if (useFirestore(NEEDS)) {
+  if (firestoreEnabled(NEEDS)) {
     try {
       await deleteDoc(doc(db, NEEDS, id));
       deleted = true;
@@ -363,7 +363,7 @@ export async function deleteNeed(id: string): Promise<boolean> {
  */
 export async function deleteProfile(id: string): Promise<boolean> {
   let deleted = false;
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       await deleteDoc(doc(db, PROFILES, id));
       deleted = true;
@@ -378,7 +378,7 @@ export async function deleteProfile(id: string): Promise<boolean> {
 /** Borra una microtask por id. */
 export async function deleteMicroTask(id: string): Promise<boolean> {
   let deleted = false;
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       await deleteDoc(doc(db, MICROTASKS, id));
       deleted = true;
@@ -393,7 +393,7 @@ export async function deleteMicroTask(id: string): Promise<boolean> {
 /** Borra un feedback por id. */
 export async function deleteFeedback(id: string): Promise<boolean> {
   let deleted = false;
-  if (useFirestore(FEEDBACK)) {
+  if (firestoreEnabled(FEEDBACK)) {
     try {
       await deleteDoc(doc(db, FEEDBACK, id));
       deleted = true;
@@ -410,7 +410,7 @@ export async function deleteFeedback(id: string): Promise<boolean> {
 }
 
 export async function getNeed(id: string): Promise<CompanyNeed | null> {
-  if (useFirestore(NEEDS)) {
+  if (firestoreEnabled(NEEDS)) {
     try {
       const snap = await getDoc(doc(db, NEEDS, id));
       if (!snap.exists()) return memNeeds.get(id) ?? null;
@@ -430,7 +430,7 @@ export async function updateNeed(
   if (!existing) return null;
   const next: CompanyNeed = { ...existing, ...patch, id };
   memNeeds.set(id, next);
-  if (useFirestore(NEEDS)) {
+  if (firestoreEnabled(NEEDS)) {
     try {
       const { id: _id, ...data } = next;
       await updateDoc(
@@ -449,7 +449,7 @@ export async function recordFeedback(
   entry: Omit<FeedbackEntry, "id" | "timestamp">
 ): Promise<string> {
   const data: FeedbackEntry = { ...entry, timestamp: Date.now() };
-  if (useFirestore(FEEDBACK)) {
+  if (firestoreEnabled(FEEDBACK)) {
     try {
       // stripUndefined es clave aquí: `note`, `needId`, `profileId` y
       // `source` son opcionales. Sin esto, Firestore rechaza el addDoc
@@ -471,7 +471,7 @@ export async function recordFeedback(
 }
 
 export async function listFeedback(): Promise<FeedbackEntry[]> {
-  if (useFirestore(FEEDBACK)) {
+  if (firestoreEnabled(FEEDBACK)) {
     try {
       const snap = await getDocs(collection(db, FEEDBACK));
       const remote = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FeedbackEntry, "id">) }));
@@ -484,7 +484,7 @@ export async function listFeedback(): Promise<FeedbackEntry[]> {
 }
 
 export async function updateProfileLatent(id: string, latent: LatentProfile): Promise<void> {
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       await updateDoc(doc(db, PROFILES, id), { latent });
       return;
@@ -500,7 +500,7 @@ export async function updateProfileTaskStats(
   id: string,
   taskStats: TaskOutcomeStat
 ): Promise<void> {
-  if (useFirestore(PROFILES)) {
+  if (firestoreEnabled(PROFILES)) {
     try {
       await updateDoc(doc(db, PROFILES, id), { taskStats });
       return;
@@ -516,7 +516,7 @@ export async function createMicroTask(
   t: Omit<MicroTask, "id" | "createdAt">
 ): Promise<string> {
   const data: MicroTask = { ...t, createdAt: Date.now() };
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       const ref = await addDoc(
         collection(db, MICROTASKS),
@@ -533,7 +533,7 @@ export async function createMicroTask(
 }
 
 export async function getMicroTask(id: string): Promise<MicroTask | null> {
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       const snap = await getDoc(doc(db, MICROTASKS, id));
       if (!snap.exists()) return memMicroTasks.get(id) ?? null;
@@ -546,7 +546,7 @@ export async function getMicroTask(id: string): Promise<MicroTask | null> {
 }
 
 export async function updateMicroTask(id: string, patch: Partial<MicroTask>): Promise<void> {
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       await updateDoc(
         doc(db, MICROTASKS, id),
@@ -573,7 +573,7 @@ export async function listMicroTasksByProfile(profileId: string): Promise<MicroT
   // Fix: NO usar orderBy en Firestore. Ordenamos in-memory post-fetch.
   // Una tarea por joven raramente excede 50 docs → sort O(n log n) en
   // cliente es despreciable y evita necesitar índices compuestos.
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       const q = query(
         collection(db, MICROTASKS),
@@ -623,7 +623,7 @@ export async function reassignMicroTasksProfileId(fromId: string, toId: string):
 export async function listMicroTasksByCompany(companyId: string): Promise<MicroTask[]> {
   // Mismo razonamiento que listMicroTasksByProfile: sin orderBy para no
   // requerir compound index. Sort post-fetch.
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       const q = query(
         collection(db, MICROTASKS),
@@ -648,7 +648,7 @@ export async function countMicroTasksBetween(
   companyId: string,
   profileId: string
 ): Promise<number> {
-  if (useFirestore(MICROTASKS)) {
+  if (firestoreEnabled(MICROTASKS)) {
     try {
       const q = query(
         collection(db, MICROTASKS),
@@ -672,7 +672,7 @@ export async function createDocument(
   d: Omit<ProfileDocument, "id" | "createdAt">,
 ): Promise<{ id: string; storage: StorageMode }> {
   const data: ProfileDocument = { ...d, createdAt: Date.now() };
-  if (useFirestore(DOCUMENTS)) {
+  if (firestoreEnabled(DOCUMENTS)) {
     try {
       const ref = await addDoc(
         collection(db, DOCUMENTS),
@@ -689,7 +689,7 @@ export async function createDocument(
 }
 
 export async function getDocument(id: string): Promise<ProfileDocument | null> {
-  if (useFirestore(DOCUMENTS)) {
+  if (firestoreEnabled(DOCUMENTS)) {
     try {
       const snap = await getDoc(doc(db, DOCUMENTS, id));
       if (!snap.exists()) return memDocuments.get(id) ?? null;
@@ -705,7 +705,7 @@ export async function listDocumentsByProfile(
   profileId: string,
 ): Promise<ProfileDocument[]> {
   if (!profileId) return [];
-  if (useFirestore(DOCUMENTS)) {
+  if (firestoreEnabled(DOCUMENTS)) {
     try {
       const q = query(collection(db, DOCUMENTS), where("profileId", "==", profileId));
       const snap = await getDocs(q);
@@ -728,7 +728,7 @@ export async function updateDocument(
   id: string,
   patch: Partial<ProfileDocument>,
 ): Promise<void> {
-  if (useFirestore(DOCUMENTS)) {
+  if (firestoreEnabled(DOCUMENTS)) {
     try {
       await updateDoc(
         doc(db, DOCUMENTS, id),
@@ -745,7 +745,7 @@ export async function updateDocument(
 
 export async function deleteDocument(id: string): Promise<boolean> {
   let deleted = false;
-  if (useFirestore(DOCUMENTS)) {
+  if (firestoreEnabled(DOCUMENTS)) {
     try {
       await deleteDoc(doc(db, DOCUMENTS, id));
       deleted = true;
@@ -770,7 +770,7 @@ export async function upsertMatchDecision(
     id,
     updatedAt: Date.now(),
   };
-  if (useFirestore(MATCH_DECISIONS)) {
+  if (firestoreEnabled(MATCH_DECISIONS)) {
     try {
       await setDoc(
         doc(db, MATCH_DECISIONS, id),
@@ -791,7 +791,7 @@ export async function getMatchDecision(
   profileId: string
 ): Promise<MatchDecision | null> {
   const id = matchDecisionId(needId, profileId);
-  if (useFirestore(MATCH_DECISIONS)) {
+  if (firestoreEnabled(MATCH_DECISIONS)) {
     try {
       const snap = await getDoc(doc(db, MATCH_DECISIONS, id));
       if (!snap.exists()) return memMatchDecisions.get(id) ?? null;
@@ -806,7 +806,7 @@ export async function getMatchDecision(
 }
 
 export async function listDecisionsByNeed(needId: string): Promise<MatchDecision[]> {
-  if (useFirestore(MATCH_DECISIONS)) {
+  if (firestoreEnabled(MATCH_DECISIONS)) {
     try {
       const q = query(collection(db, MATCH_DECISIONS), where("needId", "==", needId));
       const snap = await getDocs(q);
@@ -826,7 +826,7 @@ export async function listDecisionsByNeed(needId: string): Promise<MatchDecision
 }
 
 export async function listDecisionsForProfile(profileId: string): Promise<MatchDecision[]> {
-  if (useFirestore(MATCH_DECISIONS)) {
+  if (firestoreEnabled(MATCH_DECISIONS)) {
     try {
       const q = query(collection(db, MATCH_DECISIONS), where("profileId", "==", profileId));
       const snap = await getDocs(q);
@@ -847,7 +847,7 @@ export async function listDecisionsForProfile(profileId: string): Promise<MatchD
 
 export async function saveNeedMatches(snapshot: NeedMatchSnapshot): Promise<void> {
   const id = snapshot.needId;
-  if (useFirestore(NEED_MATCHES)) {
+  if (firestoreEnabled(NEED_MATCHES)) {
     try {
       await setDoc(
         doc(db, NEED_MATCHES, id),
@@ -863,7 +863,7 @@ export async function saveNeedMatches(snapshot: NeedMatchSnapshot): Promise<void
 }
 
 export async function getNeedMatches(needId: string): Promise<NeedMatchSnapshot | null> {
-  if (useFirestore(NEED_MATCHES)) {
+  if (firestoreEnabled(NEED_MATCHES)) {
     try {
       const snap = await getDoc(doc(db, NEED_MATCHES, needId));
       if (snap.exists()) {
@@ -880,7 +880,7 @@ export async function getNeedMatches(needId: string): Promise<NeedMatchSnapshot 
 }
 
 export async function getAllNeedMatches(): Promise<NeedMatchSnapshot[]> {
-  if (useFirestore(NEED_MATCHES)) {
+  if (firestoreEnabled(NEED_MATCHES)) {
     try {
       const snap = await getDocs(collection(db, NEED_MATCHES));
       const remote = snap.docs.map((d) => ({

@@ -98,6 +98,7 @@ interface CvFields {
   city: string;
   linkedin: string;
   languages: string;
+  tools: string;
   education: string;
   certifications: string;
   headline: string;
@@ -109,6 +110,7 @@ const EMPTY: CvFields = {
   city: '',
   linkedin: '',
   languages: 'Español (nativo)',
+  tools: '',
   education: '',
   certifications: '',
   headline: '',
@@ -119,6 +121,21 @@ function lsKeyFields(profileId: string) {
 }
 function lsKeyStyle(profileId: string) {
   return `salto.cv.style.${profileId}`;
+}
+function lsKeySections(profileId: string) {
+  return `salto.cv.sections.${profileId}`;
+}
+
+function loadSections(profileId: string): { traits: boolean; languages: boolean } {
+  const fallback = { traits: false, languages: true };
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(lsKeySections(profileId));
+    if (!raw) return fallback;
+    return { ...fallback, ...(JSON.parse(raw) as Partial<{ traits: boolean; languages: boolean }>) };
+  } catch {
+    return fallback;
+  }
 }
 
 function loadFields(profileId: string): CvFields {
@@ -181,6 +198,7 @@ function fieldsFromContact(c: Record<string, string | undefined>): CvFields {
     city: c.city ?? '',
     linkedin: c.linkedin ?? '',
     languages: c.languages ?? EMPTY.languages,
+    tools: c.tools ?? '',
     education: c.education ?? '',
     certifications: c.certifications ?? '',
     headline: c.headline ?? '',
@@ -197,6 +215,12 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
   const [style, setStyle] = useState<CvStyle>(DEFAULT_STYLE);
   const [hydrated, setHydrated] = useState(false);
   const [optionalOpen, setOptionalOpen] = useState(false);
+  // Secciones opcionales del CV. Rasgos OFF por defecto: feedback de usuaria
+  // ("para llenar un CV no es necesario rasgos profesionales").
+  const [sections, setSections] = useState<{ traits: boolean; languages: boolean }>({
+    traits: false,
+    languages: true,
+  });
   const migratedRef = useRef(false);
   // Bandera por campo: solo mostramos el error después de que el usuario lo
   // tocó (UX estándar). Evita un mar rojo al cargar la página.
@@ -209,9 +233,19 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
   useEffect(() => {
     setFields(loadFields(profileId));
     setStyle(loadStyle(profileId));
+    setSections(loadSections(profileId));
     setHydrated(true);
     migratedRef.current = false;
   }, [profileId]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(lsKeySections(profileId), JSON.stringify(sections));
+    } catch {
+      /* quota */
+    }
+  }, [sections, profileId, hydrated]);
 
   const pushContactToServer = useCallback(
     async (f: CvFields, s: CvStyle) => {
@@ -295,10 +329,12 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
       (Object.entries(fields) as [keyof CvFields, string][]).forEach(([k, v]) => {
         if (v && v.trim()) sp.set(k, v.trim());
       });
+      if (!sections.traits) sp.set('hideTraits', '1');
+      if (!sections.languages) sp.set('hideLanguages', '1');
       for (const [k, v] of Object.entries(extra)) sp.set(k, v);
       return `/api/cv?${sp.toString()}`;
     };
-  }, [fields, profileId, style]);
+  }, [fields, profileId, style, sections]);
 
   const set = <K extends keyof CvFields>(k: K, v: CvFields[K]) =>
     setFields((prev) => ({ ...prev, [k]: v }));
@@ -514,7 +550,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 size={14}
                 className={`transition-transform duration-200 ${optionalOpen ? 'rotate-180' : ''}`}
               />
-              Agregar LinkedIn, idiomas, educación y certificaciones (opcional)
+              Agregar LinkedIn, idiomas, herramientas, educación y certificaciones (opcional)
             </button>
             <Collapse open={optionalOpen}>
             <div className="mt-3 grid sm:grid-cols-2 gap-3">
@@ -545,6 +581,16 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
                 />
               </label>
               <label className="space-y-1 sm:col-span-2">
+                <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  Herramientas y tecnologías
+                </span>
+                <Input
+                  placeholder="Power BI, Excel avanzado, Figma, ATS (Greenhouse)…"
+                  value={fields.tools}
+                  onChange={(e) => set('tools', e.target.value)}
+                />
+              </label>
+              <label className="space-y-1 sm:col-span-2">
                 <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Educación</span>
                 <Textarea
                   rows={2}
@@ -566,6 +612,35 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
               </label>
             </div>
             </Collapse>
+          </div>
+
+          {/* Secciones del CV: el joven decide qué incluir. Rasgos viene
+              desactivado por defecto (no aporta a un CV de postulación). */}
+          <div className="border-t border-slate-100 pt-4">
+            <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-2">
+              Secciones del CV
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sections.traits}
+                  onChange={(e) => setSections((s) => ({ ...s, traits: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+                />
+                Rasgos profesionales
+                <span className="text-[11px] text-slate-400">(opcional)</span>
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sections.languages}
+                  onChange={(e) => setSections((s) => ({ ...s, languages: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+                />
+                Idiomas
+              </label>
+            </div>
           </div>
         </div>
       </div>

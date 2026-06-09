@@ -467,7 +467,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
         {fromCache && !refreshing && !needClosed && (
           <p className="text-[11px] text-slate-400 italic flex items-center gap-1">
             <CheckCircle2 size={11} className="text-emerald-500" />
-            Resultados cacheados (15 min). Si publicaste cambios o subieron nuevos perfiles, dale a "Recalcular".
+            Resultados cacheados (15 min). Si publicaste cambios o subieron nuevos perfiles, dale a &quot;Recalcular&quot;.
           </p>
         )}
 
@@ -767,7 +767,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
                 <BreakdownBars breakdown={m.breakdown} />
 
                 <div className="mt-5 mb-4 pl-3 border-l-2 border-emerald-200">
-                  <p className="text-sm text-slate-700 leading-relaxed italic">"{m.reason}"</p>
+                  <p className="text-sm text-slate-700 leading-relaxed italic">&quot;{m.reason}&quot;</p>
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-slate-100 flex items-start justify-between gap-3 flex-wrap">

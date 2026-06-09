@@ -61,8 +61,9 @@ interface InboxSummary {
 
 interface VerifiedSkills {
   declared: number;
-  verified: number;             // intersect declared ∩ document.extractedSkills
-  verifiedPct: number;
+  verified: number;             // declaradas con respaldo documental (match por token)
+  verifiedPct: number;          // max(ratio skills verificadas, crédito por credenciales)
+  documents: number;            // documentos válidos subidos (credenciales)
 }
 
 interface TopOpportunityPreview {
@@ -208,24 +209,48 @@ function computeVerifiedSkills(
 ): VerifiedSkills {
   const norm = (s: string) => s.toLowerCase().trim();
   const declared = declaredSkills.length;
-  if (declared === 0) {
-    return { declared: 0, verified: 0, verifiedPct: 0 };
-  }
-  const docSet = new Set<string>();
-  for (const d of documents) {
-    for (const e of d.extractedSkills ?? []) docSet.add(norm(e.skill));
+
+  // Documentos "válidos" = subidos y procesados con info real (skills extraídas,
+  // título de programa o tipo reconocido). Un diploma SIN skills igual cuenta:
+  // es una credencial verificable en sí misma (caso reportado: "subí mi diploma
+  // y no lo marca").
+  const validDocs = documents.filter(
+    (d) =>
+      (d.extractedSkills?.length ?? 0) > 0 ||
+      !!d.programTitle?.trim() ||
+      (!!d.kind && d.kind !== "otro"),
+  );
+  const docsCount = validDocs.length;
+
+  // Skills declaradas con respaldo documental. Match por token (no solo exacto):
+  // "Reclutamiento" respalda "Reclutamiento IT", etc.
+  const docSkillKeys = new Set<string>();
+  const docTokens = new Set<string>();
+  for (const d of validDocs) {
+    for (const e of d.extractedSkills ?? []) {
+      const k = norm(e.skill);
+      if (!k) continue;
+      docSkillKeys.add(k);
+      for (const tok of k.split(/\s+/)) if (tok.length >= 4) docTokens.add(tok);
+    }
   }
   let verified = 0;
   for (const s of declaredSkills) {
     const k = norm(s);
-    const hit = Array.from(docSet).some((x) => x.includes(k) || k.includes(x));
-    if (hit) verified += 1;
+    if (!k) continue;
+    const direct = [...docSkillKeys].some((x) => x.includes(k) || k.includes(x));
+    const byToken = k.split(/\s+/).some((tok) => tok.length >= 4 && docTokens.has(tok));
+    if (direct || byToken) verified += 1;
   }
-  return {
-    declared,
-    verified,
-    verifiedPct: Math.round((verified / declared) * 100),
-  };
+
+  // verifiedPct = el MAYOR entre (a) ratio de skills verificadas y (b) crédito
+  // por credenciales subidas (1 doc ≈ 50%, 2+ ≈ 100%). Así subir un diploma
+  // —aunque no calce con las skills declaradas— SÍ mueve el indicador.
+  const skillPart = declared > 0 ? verified / declared : 0;
+  const docPart = docsCount > 0 ? Math.min(1, docsCount / 2) : 0;
+  const verifiedPct = Math.round(Math.max(skillPart, docPart) * 100);
+
+  return { declared, verified, verifiedPct, documents: docsCount };
 }
 
 /**

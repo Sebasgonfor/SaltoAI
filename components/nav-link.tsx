@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 interface Props {
   href: string;
@@ -43,8 +43,7 @@ export function NavLink({
   className,
 }: Props) {
   const pathname = usePathname() || '';
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
+  const hydrated = useHydrated();
 
   const isActive =
     hydrated &&
