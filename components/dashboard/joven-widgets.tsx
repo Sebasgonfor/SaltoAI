@@ -75,6 +75,7 @@ export interface DashboardJovenData {
     declared: number;
     verified: number;
     verifiedPct: number;
+    documents?: number;
   };
   topOpportunity: {
     needId: string;
@@ -184,7 +185,7 @@ function computeRadar(
   return [
     { axis: 'Evidencia', value: cap(evidence, 10), raw: evidence, help: 'Citas textuales en tu perfil' },
     { axis: 'Skills', value: cap(skills, 15), raw: skills, help: 'Habilidades declaradas' },
-    { axis: 'Verificado', value: data?.verifiedSkills.verifiedPct ?? 0, raw: verified, help: 'Skills con documento' },
+    { axis: 'Verificado', value: data?.verifiedSkills.verifiedPct ?? 0, raw: verified, help: 'Credenciales y skills respaldadas por documentos' },
     { axis: 'Rasgos', value: cap(traits, 10), raw: traits, help: 'Cómo trabajas' },
     { axis: 'Trabajos', value: cap(microtasks, 5), raw: microtasks, help: 'Microtasks completadas' },
   ];
@@ -287,6 +288,7 @@ export function JovenWidgets({
           title="ADN de talento"
           subtitle="Tu perfil en 5 ejes"
           axes={radar}
+          profileId={profileId}
         />
         <EarningsCard
           totalCOP={data.earnings.totalCOP}
@@ -500,15 +502,34 @@ function RingScore({ value, size = 96 }: { value: number; size?: number }) {
 
 // ─── RadarCard SVG ───────────────────────────────────────────────────────────
 
+/** Acción contextual por eje del radar (la "guía" que pedía el feedback). */
+function axisAction(axis: string, profileId: string): { label: string; href: string } | null {
+  switch (axis) {
+    case 'Evidencia':
+    case 'Skills':
+    case 'Rasgos':
+      return { label: 'Sumar en la entrevista', href: '/joven/chat' };
+    case 'Verificado':
+      return { label: 'Subir un documento', href: `/joven/perfil/${profileId}/documentos` };
+    case 'Trabajos':
+      return { label: 'Ver oportunidades', href: `/joven/conectar?profileId=${encodeURIComponent(profileId)}` };
+    default:
+      return null;
+  }
+}
+
 function RadarCard({
   title,
   subtitle,
   axes,
+  profileId,
 }: {
   title: string;
   subtitle: string;
   axes: { axis: string; value: number; raw: number; help: string }[];
+  profileId: string;
 }) {
+  const [openAxis, setOpenAxis] = useState<string | null>(null);
   if (axes.length === 0) {
     return (
       <div className="bg-white border border-stone-200 rounded-3xl p-5 md:p-6">
@@ -631,18 +652,49 @@ function RadarCard({
           })}
         </svg>
       </div>
-      {/* Leyenda compacta con valores raw para contexto. Aporta la métrica
-          honesta detrás del número: "Skills 47/100 = 7 declaradas". */}
-      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[10px] text-stone-500 border-t border-stone-100 pt-3">
-        {axes.map((a) => (
-          <div key={a.axis} className="flex items-center gap-1.5 min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-            <span className="truncate">
-              <strong className="text-stone-700 font-semibold">{a.axis}</strong> · {a.raw}
-            </span>
-          </div>
-        ))}
+      {/* Leyenda INTERACTIVA: cada eje se puede abrir para ver qué significa y
+          qué hacer para subirlo (la "guía" que pedía el feedback). */}
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[10px] border-t border-stone-100 pt-3">
+        {axes.map((a) => {
+          const open = openAxis === a.axis;
+          return (
+            <button
+              key={a.axis}
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpenAxis(open ? null : a.axis)}
+              className={`flex items-center gap-1.5 min-w-0 text-left rounded-md px-1 py-0.5 transition-colors ${
+                open ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-50'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+              <span className="truncate">
+                <strong className="text-stone-700 font-semibold">{a.axis}</strong> · {a.raw}
+              </span>
+            </button>
+          );
+        })}
       </div>
+      {openAxis && (() => {
+        const a = axes.find((x) => x.axis === openAxis);
+        if (!a) return null;
+        const action = axisAction(a.axis, profileId);
+        return (
+          <div className="mt-2 rounded-xl bg-stone-50 border border-stone-100 px-3 py-2.5">
+            <p className="text-xs text-stone-600 leading-relaxed">
+              <strong className="text-stone-800">{a.axis} · {a.value}/100.</strong> {a.help}
+            </p>
+            {action && (
+              <Link
+                href={action.href}
+                className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+              >
+                {action.label} →
+              </Link>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -782,8 +834,8 @@ function buildSteps(
       icon: ShieldCheck,
       title: 'Sube un certificado',
       hint: verifiedPct >= 30
-        ? `${verifiedPct}% de tus skills están verificadas por documento.`
-        : 'Un diploma o constancia eleva el valor de tus skills.',
+        ? 'Tus documentos respaldan tu perfil. Subí más para reforzarlo.'
+        : 'Un diploma o constancia eleva el valor de tu perfil.',
       cta: { label: 'Mis documentos', href: `/joven/perfil/${profileId}` },
     },
     {
@@ -1026,7 +1078,7 @@ function inferStyleTiles(
 
   // Verificación: documentos subidos
   const verif: StyleTile = data.verifiedSkills.verifiedPct >= 50
-    ? { icon: ShieldCheck, label: 'Verificación', value: 'Alta', hint: `${data.verifiedSkills.verifiedPct}% de tus skills con documento` }
+    ? { icon: ShieldCheck, label: 'Verificación', value: 'Alta', hint: 'Tu perfil está respaldado por documentos' }
     : data.verifiedSkills.verifiedPct >= 20
       ? { icon: FileText, label: 'Verificación', value: 'Parcial', hint: 'Súbe más certificados para subir' }
       : { icon: FileText, label: 'Verificación', value: 'Por iniciar', hint: 'Súbe un diploma o certificado' };

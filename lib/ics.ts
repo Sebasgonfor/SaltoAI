@@ -377,18 +377,8 @@ export function checkHardConstraints(
     };
   }
 
-  // 2. Edad mínima: si el constraint pide "mayor de 18" / "18 años mínimo"
-  // y el perfil tiene `age` declarada por debajo.
-  const ageMatch = constraintsText.match(/(?:mayor de|m[íi]nimo|al menos)\s*(\d{2})\s*años?/);
-  if (ageMatch && typeof profile.age === "number") {
-    const minAge = parseInt(ageMatch[1], 10);
-    if (Number.isFinite(minAge) && profile.age < minAge) {
-      return {
-        passes: false,
-        reason: `Edad mínima del rol: ${minAge}; el candidato declara ${profile.age}.`,
-      };
-    }
-  }
+  // Nota: NO filtramos por edad. SaltoAI no captura ni usa edad/género —
+  // evaluamos solo evidencia y skills para evitar sesgo etario o de género.
 
   // Cualquier otra restricción (idioma, jornada, herramientas) la decide el LLM
   // vía `penalties`. No bloqueamos sin evidencia clara — sería peor descartar a

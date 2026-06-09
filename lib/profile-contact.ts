@@ -24,6 +24,7 @@ export function parseProfileContact(raw: unknown): ProfileContact | null {
   const city = trimStr(o.city);
   const linkedin = trimStr(o.linkedin);
   const languages = trimStr(o.languages);
+  const tools = trimStr(o.tools);
   const education = trimStr(o.education);
   const certifications = trimStr(o.certifications);
   const headline = trimStr(o.headline);
@@ -34,6 +35,7 @@ export function parseProfileContact(raw: unknown): ProfileContact | null {
   if (city) contact.city = city;
   if (linkedin) contact.linkedin = linkedin;
   if (languages) contact.languages = languages;
+  if (tools) contact.tools = tools;
   if (education) contact.education = education;
   if (certifications) contact.certifications = certifications;
   if (headline) contact.headline = headline;

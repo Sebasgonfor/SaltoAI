@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNeed, getProfile, listDocumentsByProfile } from "@/lib/db";
 import { mergeCvContact } from "@/lib/profile-contact";
+import { isNotASkill } from "@/lib/skill-classification";
 import { startLog } from "@/lib/logger";
 import {
   CV_STYLES,
@@ -21,6 +22,7 @@ function spHasContact(cv: CvOptions): boolean {
     cv.city?.trim() ||
     cv.linkedin?.trim() ||
     cv.languages?.trim() ||
+    cv.tools?.trim() ||
     cv.education?.trim() ||
     cv.certifications?.trim() ||
     cv.headline?.trim()
@@ -75,6 +77,9 @@ async function readOpts(req: NextRequest): Promise<{
       city: sp.get("city") ?? undefined,
       linkedin: sp.get("linkedin") ?? undefined,
       languages: sp.get("languages") ?? undefined,
+      tools: sp.get("tools") ?? undefined,
+      hideTraits: sp.get("hideTraits") === "1",
+      hideLanguages: sp.get("hideLanguages") === "1",
       education: sp.get("education") ?? undefined,
       certifications: sp.get("certifications") ?? undefined,
       headline: sp.get("headline") ?? undefined,
@@ -145,7 +150,8 @@ export async function GET(req: NextRequest) {
         for (const sk of d.extractedSkills ?? []) {
           const label = sk.skill?.trim();
           const key = label?.toLowerCase();
-          if (label && key && !seen.has(key)) {
+          // Carrera/título ≠ habilidad: el grado va a certificaciones, no a skills.
+          if (label && key && !isNotASkill(label) && !seen.has(key)) {
             seen.add(key);
             verifiedLabels.push(label);
           }

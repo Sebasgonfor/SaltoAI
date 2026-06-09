@@ -20,15 +20,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { BasicsEditor } from '@/components/joven/basics-editor';
 import { profileToJovenBasics } from '@/lib/user-onboarding-storage';
-import type { Gender, JovenBasics } from '@/lib/types';
+import type { JovenBasics } from '@/lib/types';
 import { ProfileProvider, useProfile } from './profile-context';
-
-const GENDER_LABEL: Record<Gender, string> = {
-  mujer: 'Mujer',
-  hombre: 'Hombre',
-  otro: 'Otro',
-  prefiero_no_decir: '',
-};
 
 interface ModuleDef {
   seg: string; // '' = Resumen
@@ -119,12 +112,6 @@ function ProfileChrome({ children }: { children: ReactNode }) {
         >
           {perfil.name}
         </h1>
-        <p className="text-slate-600">
-          {perfil.age ?? '—'} años
-          {perfil.gender && perfil.gender !== 'prefiero_no_decir' && GENDER_LABEL[perfil.gender]
-            ? ` · ${GENDER_LABEL[perfil.gender]}`
-            : ''}
-        </p>
         {perfil.summary && (
           <p
             className="text-base sm:text-lg md:text-xl text-slate-700 leading-relaxed max-w-3xl animate-fade-up"
@@ -136,12 +123,12 @@ function ProfileChrome({ children }: { children: ReactNode }) {
         {viewerIsOwner && profileToJovenBasics(perfil) && (
           <div className="pt-2">
             <BasicsEditor
-              key={`${perfil.name}-${perfil.age}-${perfil.gender}`}
+              key={perfil.name}
               profileId={id}
               uid={user!.uid}
               initial={profileToJovenBasics(perfil)!}
               onSaved={(basics: JovenBasics) =>
-                setPerfil((p) => (p ? { ...p, name: basics.name, age: basics.age, gender: basics.gender } : p))
+                setPerfil((p) => (p ? { ...p, name: basics.name } : p))
               }
             />
           </div>

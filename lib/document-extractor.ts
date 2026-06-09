@@ -14,6 +14,7 @@
  */
 import { Type } from "@google/genai";
 import { gemini, GEMINI_MODEL, hasGeminiKey } from "./gemini";
+import { isNotASkill } from "./skill-classification";
 import type { DocumentKind, DocumentSkill } from "./types";
 
 export const EXTRACT_DOCUMENT_PROMPT = `Eres el extractor de habilidades de documentos de SaltoAI.
@@ -31,6 +32,12 @@ Tu trabajo:
 3. Inferir HABILIDADES con CITA TEXTUAL del documento. SIN CITA, NO LA AGREGAS.
    Ej: "Curso: Marketing Digital con énfasis en SEO" → skill="SEO", evidence="énfasis en SEO".
 4. Para cada skill devolvé una confidence 0-100 (cuán segura estás).
+
+CRÍTICO — CARRERA/TÍTULO ≠ HABILIDAD:
+- El NOMBRE de una carrera, grado o título NO es una habilidad. Va en "programTitle", NUNCA en extractedSkills.
+  Ej: un diploma de "Ingeniería Industrial" → programTitle="Ingeniería Industrial", y NO agregues "Ingeniería Industrial" como skill.
+- De un título/diploma, las skills SOLO salen de competencias, materias, énfasis o menciones CONCRETAS que el documento liste (ej. "énfasis en logística" → skill="Logística"). Si el documento solo dice el nombre del grado sin detalle, devolvé extractedSkills vacío (el grado ya queda en programTitle).
+- Tampoco conviertas CARGOS/PUESTOS en skills (ej. "Coordinador de RRHH" es un rol, no una habilidad).
 
 CRÍTICO — ANTI-ALUCINACIÓN:
 - NO inventes habilidades que no estén respaldadas por texto literal del documento.
@@ -284,10 +291,18 @@ export async function extractDocumentSkills(
   }
 
   // 4. Filtros anti-alucinación: confidence >= 60 + evidence requerida.
-  const skills = (parsed.extractedSkills ?? []).filter(
-    (s) =>
-      s && s.skill && s.evidence && typeof s.confidence === "number" && s.confidence >= 60,
-  );
+  //    + carrera/título/cargo ≠ habilidad (red de seguridad si el LLM ignora
+  //    la regla): el nombre del grado nunca entra como skill, y si coincide con
+  //    el programTitle de un título, también se descarta. El grado queda en
+  //    `programTitle` (lo muestra Documentos y la sección de credenciales).
+  const programTitleNorm = parsed.programTitle?.trim().toLowerCase() ?? "";
+  const skills = (parsed.extractedSkills ?? []).filter((s) => {
+    if (!s || !s.skill || !s.evidence) return false;
+    if (typeof s.confidence !== "number" || s.confidence < 60) return false;
+    if (isNotASkill(s.skill)) return false;
+    if (programTitleNorm && s.skill.trim().toLowerCase() === programTitleNorm) return false;
+    return true;
+  });
 
   return {
     ok: true,

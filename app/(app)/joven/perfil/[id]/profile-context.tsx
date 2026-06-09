@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { isDemoProfile } from '@/lib/profile-source';
+import { isNotASkill } from '@/lib/skill-classification';
 import type { Profile } from '@/lib/types';
 import type { StorageMode } from '@/lib/db';
 
@@ -118,7 +119,7 @@ export function ProfileProvider({ id, children }: { id: string; children: ReactN
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: transcript,
-          basics: { name: perfil!.name, age: perfil!.age, gender: perfil!.gender },
+          basics: { name: perfil!.name },
           uid: user?.uid,
         }),
       });
@@ -150,7 +151,11 @@ export function ProfileProvider({ id, children }: { id: string; children: ReactN
           for (const s of doc.extractedSkills ?? []) {
             const label = typeof s.skill === 'string' ? s.skill.trim() : '';
             const key = label.toLowerCase();
-            if (key && !m.has(key)) m.set(key, { label, evidence: s.evidence ?? '' });
+            // Carrera/título ≠ habilidad: filtra docs antiguos donde el grado se
+            // guardó como skill (ej. "Ingeniería Industrial").
+            if (key && !isNotASkill(label) && !m.has(key)) {
+              m.set(key, { label, evidence: s.evidence ?? '' });
+            }
           }
         }
         setVerifiedSkills(m);

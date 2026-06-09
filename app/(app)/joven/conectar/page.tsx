@@ -19,7 +19,7 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react';
-import type { Gender, OpportunityMatch, Profile } from '@/lib/types';
+import type { OpportunityMatch, Profile } from '@/lib/types';
 import {
   mergeDecisionsIntoOpportunities,
   type EnrichedDecision,
@@ -88,13 +88,6 @@ function clearCacheFor(profileId: string) {
     /* ignore */
   }
 }
-
-const GENDER_LABEL: Record<Gender, string> = {
-  mujer: 'Mujer',
-  hombre: 'Hombre',
-  otro: 'Otro',
-  prefiero_no_decir: '',
-};
 
 function ConectarContent() {
   const searchParams = useSearchParams();
@@ -381,11 +374,7 @@ function ConectarContent() {
             className="mt-4 text-slate-600 max-w-2xl leading-relaxed animate-fade-up"
             style={{ animationDelay: '0.12s' }}
           >
-            <strong className="text-slate-900">{profile.name}</strong>, {profile.age} años
-            {profile.gender && profile.gender !== 'prefiero_no_decir'
-              ? ` · ${GENDER_LABEL[profile.gender]}`
-              : ''}
-            . Estas son las necesidades publicadas que más encajan con tu Perfil de Evidencia (ICS estimado).
+            <strong className="text-slate-900">{profile.name}</strong>. Estas son las necesidades publicadas que más encajan con tu Perfil de Evidencia (ICS estimado).
           </p>
         )}
       </header>
@@ -616,7 +605,7 @@ function ConectarContent() {
 
       <section className="bg-slate-950 text-white rounded-2xl p-6 sm:p-8 text-center">
         <p className="text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
-          El ICS es una señal de priorización, no un veredicto. Cuando una empresa te contacte, sabrás por qué encajaste — algo que LinkedIn casi nunca te dice.
+          El ICS es una señal de priorización, no un veredicto. Cada match incluye el porqué — por qué encajaste o qué te faltó — disponible siempre, sin esperar a que una empresa responda.
         </p>
         <Link href={`/joven/perfil/${profileId}`} className="inline-block mt-6">
           <Button variant="outline" className="bg-transparent border-slate-600 text-white hover:bg-slate-800">

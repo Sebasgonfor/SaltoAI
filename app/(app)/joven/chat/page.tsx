@@ -7,12 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { User, Sparkles, Layers, ArrowRight, RotateCcw, Mic, MicOff, Phone, PhoneOff, Keyboard, Radio, Pause, Play } from 'lucide-react';
-import type { ChatMessage, Gender, JovenBasics } from '@/lib/types';
+import type { ChatMessage, JovenBasics } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
 import { RoleGate } from '@/components/auth/role-gate';
 import { useVoiceInput } from '@/hooks/use-voice-input';
 import { useLiveInterview } from '@/hooks/use-live-interview';
-import { jovenAgeErrorMessage, parseJovenAge } from '@/lib/input-validation';
 import { BasicsWizard } from '@/components/joven/basics-wizard';
 import { InterviewDoneStep } from '@/components/joven/interview-done-step';
 import {
@@ -43,15 +42,9 @@ function applyBasicsToForm(
   basics: JovenBasics,
   setters: {
     setFormName: (v: string) => void;
-    setFormAge: (v: string) => void;
-    setFormGender: (v: Gender | '') => void;
-    setBasicsStep: (v: 0 | 1 | 2) => void;
   }
 ) {
   setters.setFormName(basics.name);
-  setters.setFormAge(String(basics.age));
-  setters.setFormGender(basics.gender);
-  setters.setBasicsStep(2);
 }
 
 interface DetectedSignal {
@@ -75,9 +68,6 @@ interface ChatPersistedState {
   phase: 'basics' | 'interview';
   basics: JovenBasics | null;
   formName: string;
-  formAge: string;
-  formGender: Gender | '';
-  basicsStep?: 0 | 1 | 2;
   messages: ChatMessage[];
   input: string;
   interviewMode?: InterviewMode;
@@ -184,9 +174,6 @@ function ChatJoven() {
   const [doneProfileId, setDoneProfileId] = useState<string | null>(null);
   const [basics, setBasics] = useState<JovenBasics | null>(null);
   const [formName, setFormName] = useState('');
-  const [formAge, setFormAge] = useState('');
-  const [formGender, setFormGender] = useState<Gender | ''>('');
-  const [basicsStep, setBasicsStep] = useState<0 | 1 | 2>(0);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -241,7 +228,6 @@ function ChatJoven() {
       // que generar un perfil pobre.
       const userTurnsInConv = conversation.filter((m) => m.role === 'user').length;
       if (userTurnsInConv < MIN_USER_TURNS) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[chat] onInterviewComplete con userTurns=${userTurnsInConv} < MIN=${MIN_USER_TURNS}; ignorando cierre.`,
         );
@@ -262,14 +248,13 @@ function ChatJoven() {
     inputRef.current = input;
   }, [input]);
 
-  const fetchOpeningQuestion = useCallback(async (name: string, age: number) => {
+  const fetchOpeningQuestion = useCallback(async (name: string) => {
     // Intento principal + 1 reintento silencioso (500ms) ante errores de red
     // o respuesta sin pregunta. Si el segundo intento también falla,
     // propagamos el error — el caller decide cómo mostrarlo.
     const body = JSON.stringify({
       opening: true,
       firstName: firstNameFrom(name),
-      age,
       ...(recruiterSlugRef.current && { recruiterSlug: recruiterSlugRef.current }),
     });
 
@@ -312,7 +297,7 @@ function ChatJoven() {
     async (b: JovenBasics, opts?: { keepMessages?: boolean }) => {
       saveJovenBasics(user?.uid, b);
       setBasics(b);
-      applyBasicsToForm(b, { setFormName, setFormAge, setFormGender, setBasicsStep });
+      applyBasicsToForm(b, { setFormName });
       setFormError(null);
       setPhase('interview');
 
@@ -320,7 +305,7 @@ function ChatJoven() {
         setMessages([]);
         setLoading(true);
         try {
-          const opening = await fetchOpeningQuestion(b.name, b.age);
+          const opening = await fetchOpeningQuestion(b.name);
           setMessages([{ role: 'agent', content: opening }]);
         } catch (err) {
           setFormError(
@@ -368,7 +353,7 @@ function ChatJoven() {
 
       if (resolvedBasics) {
         setBasics(resolvedBasics);
-        applyBasicsToForm(resolvedBasics, { setFormName, setFormAge, setFormGender, setBasicsStep });
+        applyBasicsToForm(resolvedBasics, { setFormName });
         if (hasInterviewProgress) {
           setPhase('interview');
         } else {
@@ -379,14 +364,6 @@ function ChatJoven() {
         if (saved.phase) setPhase(saved.phase);
         if (saved.basics) setBasics(saved.basics);
         if (typeof saved.formName === 'string') setFormName(saved.formName);
-        if (typeof saved.formAge === 'string') setFormAge(saved.formAge);
-        else if (typeof saved.formAge === 'number' && Number.isFinite(saved.formAge)) {
-          setFormAge(String(saved.formAge));
-        }
-        if (typeof saved.formGender === 'string') setFormGender(saved.formGender as Gender | '');
-        if (saved.basicsStep === 0 || saved.basicsStep === 1 || saved.basicsStep === 2) {
-          setBasicsStep(saved.basicsStep);
-        }
       }
 
       setRestored(true);
@@ -397,7 +374,6 @@ function ChatJoven() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   // Guardar cada vez que cambie algo relevante. Esperamos a `restored` para
@@ -408,9 +384,6 @@ function ChatJoven() {
       phase,
       basics,
       formName,
-      formAge,
-      formGender,
-      basicsStep,
       messages: interviewMode === 'voice' && liveActive ? liveMessages : messages,
       input,
       interviewMode,
@@ -420,7 +393,7 @@ function ChatJoven() {
     } catch {
       /* localStorage puede fallar en modo privado; ignoramos. */
     }
-  }, [restored, phase, basics, formName, formAge, formGender, basicsStep, messages, input, interviewMode, liveMessages, liveActive, user?.uid]);
+  }, [restored, phase, basics, formName, messages, input, interviewMode, liveMessages, liveActive, user?.uid]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -502,29 +475,17 @@ function ChatJoven() {
 
     setBasics(null);
     setFormName(user?.displayName ?? '');
-    setFormAge('');
-    setFormGender('');
-    setBasicsStep(0);
     setPhase('basics');
   };
 
   const startInterview = async () => {
     const name = formName.trim();
-    const age = parseJovenAge(formAge);
     if (name.length < 2) {
       setFormError('Escribe tu nombre completo (mínimo 2 caracteres).');
       return;
     }
-    if (age == null) {
-      setFormError(jovenAgeErrorMessage());
-      return;
-    }
-    if (!formGender) {
-      setFormError('Selecciona cómo te identificas.');
-      return;
-    }
     skipAutoOpeningRef.current = true;
-    await beginInterview({ name, age, gender: formGender });
+    await beginInterview({ name });
   };
 
   // Datos básicos ya guardados: abrir entrevista en texto sin repetir el wizard.
@@ -537,7 +498,7 @@ function ChatJoven() {
     }
     skipAutoOpeningRef.current = true;
     setLoading(true);
-    void fetchOpeningQuestion(basics.name, basics.age)
+    void fetchOpeningQuestion(basics.name)
       .then((opening) => setMessages([{ role: 'agent', content: opening }]))
       .catch((err) =>
         setFormError(
@@ -774,7 +735,7 @@ function ChatJoven() {
     if (mode === 'text' && basics) {
       setMessages([]);
       setLoading(true);
-      void fetchOpeningQuestion(basics.name, basics.age)
+      void fetchOpeningQuestion(basics.name)
         .then((opening) => setMessages([{ role: 'agent', content: opening }]))
         .catch((err) =>
           setFormError(
@@ -823,14 +784,8 @@ function ChatJoven() {
     return (
       <BasicsWizard
         formName={formName}
-        formAge={formAge}
-        formGender={formGender}
         formError={formError}
-        step={basicsStep}
-        onStepChange={setBasicsStep}
         onNameChange={setFormName}
-        onAgeChange={setFormAge}
-        onGenderChange={setFormGender}
         onClearError={() => setFormError(null)}
         onComplete={startInterview}
       />
@@ -896,9 +851,6 @@ function ChatJoven() {
               <span className="inline-flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="font-normal border-slate-200">
                   {basics.name}
-                </Badge>
-                <Badge variant="outline" className="font-normal border-slate-200">
-                  {basics.age} años
                 </Badge>
               </span>
             )}

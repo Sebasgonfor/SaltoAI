@@ -33,9 +33,14 @@ export interface CvOptions {
   city?: string;
   linkedin?: string;
   languages?: string;
+  /** Herramientas / tecnologías (Power BI, Excel, Figma, ATS…), separadas por coma. */
+  tools?: string;
   education?: string;
   certifications?: string;
   headline?: string;
+  /** Ocultar secciones opcionales del CV (el joven las desactiva en el customizer). */
+  hideTraits?: boolean;
+  hideLanguages?: boolean;
   /** Si vino un needId, mostramos un badge tailored y reordenamos skills. */
   needRole?: string;
   /** Inyecta script de window.print() al cargar. */
@@ -376,8 +381,8 @@ ${items}
 </section>`;
 }
 
-function traitsBlock(p: Profile): string {
-  if (p.traits.length === 0) return "";
+function traitsBlock(p: Profile, opts: CvOptions): string {
+  if (opts.hideTraits || p.traits.length === 0) return "";
   const items = p.traits.map((t) => `    <li>${escapeHtml(t)}</li>`).join("\n");
   return `<section>
   <h2>Rasgos profesionales</h2>
@@ -465,6 +470,42 @@ function educationBlock(opts: CvOptions): string {
 </section>`;
 }
 
+function workHistoryBlock(p: Profile): string {
+  const entries = (p.workHistory ?? []).filter((w) => w && w.role?.trim());
+  if (entries.length === 0) return "";
+  const items = entries
+    .map((w) => {
+      const heading = [escapeHtml(w.role.trim()), w.organization?.trim() ? escapeHtml(w.organization.trim()) : ""]
+        .filter(Boolean)
+        .join(" — ");
+      const period = w.period?.trim() ? `<span class="wh-period"> · ${escapeHtml(w.period.trim())}</span>` : "";
+      const desc = w.description?.trim() ? `<br />${escapeHtml(w.description.trim())}` : "";
+      return `    <p><strong>${heading}</strong>${period}${desc}</p>`;
+    })
+    .join("\n");
+  return `<section>
+  <h2>Experiencia laboral</h2>
+${items}
+</section>`;
+}
+
+function toolsBlock(opts: CvOptions): string {
+  if (!opts.tools?.trim()) return "";
+  const items = opts.tools
+    .split(/[,\n;]/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => `    <li>${escapeHtml(t)}</li>`)
+    .join("\n");
+  if (!items) return "";
+  return `<section>
+  <h2>Herramientas y tecnologías</h2>
+  <ul class="skills-list">
+${items}
+  </ul>
+</section>`;
+}
+
 function certificationsBlock(opts: CvOptions): string {
   if (!opts.certifications?.trim()) return "";
   return `<section>
@@ -474,6 +515,7 @@ function certificationsBlock(opts: CvOptions): string {
 }
 
 function languagesBlock(opts: CvOptions): string {
+  if (opts.hideLanguages) return "";
   const langs = buildLanguagesList(opts);
   const items = langs.map((l) => `    <li>${escapeHtml(l)}</li>`).join("\n");
   return `<section>
@@ -537,7 +579,9 @@ ${header(p, opts)}
   ${summaryBlock(p)}
   ${skillsBlock(p)}
   ${evidenceListBlock(p)}
-  ${traitsBlock(p)}
+  ${traitsBlock(p, opts)}
+  ${workHistoryBlock(p)}
+  ${toolsBlock(opts)}
   ${educationBlock(opts)}
   ${certificationsBlock(opts)}
   ${languagesBlock(opts)}
@@ -582,10 +626,12 @@ ${header(p, opts)}
   ${tailoredBadge(opts)}
   ${summaryBlock(p)}
   ${evidenceEntries}
+  ${workHistoryBlock(p)}
+  ${toolsBlock(opts)}
   ${educationBlock(opts)}
   ${certificationsBlock(opts)}
   ${skillsBlock(p, "Habilidades")}
-  ${traitsBlock(p)}
+  ${traitsBlock(p, opts)}
   ${languagesBlock(opts)}
   ${docFooter()}
 </main>`;
@@ -606,7 +652,9 @@ ${header(p, opts)}
   ${tailoredBadge(opts)}
   ${summaryBlock(p)}
   ${evidenceByCompetencyBlock(p)}
-  ${traitsBlock(p)}
+  ${traitsBlock(p, opts)}
+  ${workHistoryBlock(p)}
+  ${toolsBlock(opts)}
   ${educationBlock(opts)}
   ${certificationsBlock(opts)}
   ${languagesBlock(opts)}
@@ -630,7 +678,9 @@ ${header(p, opts)}
   ${summaryBlock(p)}
   ${skillsBlock(p, "Competencias destacadas")}
   ${evidenceByCompetencyBlock(p)}
-  ${traitsBlock(p)}
+  ${traitsBlock(p, opts)}
+  ${workHistoryBlock(p)}
+  ${toolsBlock(opts)}
   ${educationBlock(opts)}
   ${certificationsBlock(opts)}
   ${languagesBlock(opts)}
@@ -757,7 +807,9 @@ function renderCreative(p: Profile, opts: CvOptions): string {
     ${tailoredBadge(opts)}
     ${summaryBlock(p)}
     ${evidenceByCompetencyBlock(p)}
-    ${educationBlock(opts)}
+    ${workHistoryBlock(p)}
+  ${toolsBlock(opts)}
+  ${educationBlock(opts)}
     ${certificationsBlock(opts)}
     ${docFooter()}
   </section>
@@ -874,9 +926,33 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
     lines.push("");
   };
   const pushTraits = () => {
-    if (profile.traits.length > 0) {
+    if (!opts.hideTraits && profile.traits.length > 0) {
       lines.push("RASGOS PROFESIONALES");
       profile.traits.forEach((t) => lines.push(`- ${t}`));
+      lines.push("");
+    }
+  };
+  const pushWorkHistory = () => {
+    const entries = (profile.workHistory ?? []).filter((w) => w && w.role?.trim());
+    if (entries.length === 0) return;
+    lines.push("EXPERIENCIA LABORAL");
+    entries.forEach((w) => {
+      const heading = [w.role.trim(), w.organization?.trim(), w.period?.trim()]
+        .filter(Boolean)
+        .join(" — ");
+      lines.push(`- ${heading}`);
+      if (w.description?.trim()) lines.push(`   ${w.description.trim()}`);
+    });
+    lines.push("");
+  };
+  const pushTools = () => {
+    const items = (opts.tools ?? "")
+      .split(/[,\n;]/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (items.length > 0) {
+      lines.push("HERRAMIENTAS Y TECNOLOGÍAS");
+      items.forEach((t) => lines.push(`- ${t}`));
       lines.push("");
     }
   };
@@ -895,6 +971,7 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
     }
   };
   const pushLanguages = () => {
+    if (opts.hideLanguages) return;
     lines.push("IDIOMAS");
     buildLanguagesList(opts).forEach((l) => lines.push(`- ${l}`));
   };
@@ -903,6 +980,8 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
     case "chronological":
       pushSummary();
       pushEvidenceFlat();
+      pushWorkHistory();
+      pushTools();
       pushEducation();
       pushCerts();
       pushSkills("HABILIDADES");
@@ -913,6 +992,8 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
       pushSummary();
       pushEvidenceGrouped();
       pushTraits();
+      pushWorkHistory();
+      pushTools();
       pushEducation();
       pushCerts();
       pushLanguages();
@@ -922,6 +1003,8 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
       pushSkills("COMPETENCIAS DESTACADAS");
       pushEvidenceGrouped();
       pushTraits();
+      pushWorkHistory();
+      pushTools();
       pushEducation();
       pushCerts();
       pushLanguages();
@@ -933,6 +1016,8 @@ export function renderPlainText(rawProfile: Profile, style: CvStyle, opts: CvOpt
       pushSkills();
       pushEvidenceFlat();
       pushTraits();
+      pushWorkHistory();
+      pushTools();
       pushEducation();
       pushCerts();
       pushLanguages();

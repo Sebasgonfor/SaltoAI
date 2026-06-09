@@ -37,8 +37,6 @@ export async function POST(req: NextRequest) {
     const profileSummary = {
       id: profile.id,
       name: profile.name,
-      age: profile.age,
-      gender: profile.gender,
     };
 
     const needs = (await getAllNeeds()).filter(isNeedOpen);
