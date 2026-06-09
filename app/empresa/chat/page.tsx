@@ -210,7 +210,6 @@ export default function ChatEmpresa() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   useEffect(() => {
@@ -1127,8 +1126,8 @@ export default function ChatEmpresa() {
           <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 flex gap-3">
             <Layers size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 leading-relaxed">
-              <strong className="font-semibold">Tip:</strong> describe el día real. "Atiende caja,
-              contesta WhatsApp y arma pedidos" es mucho mejor señal que "perfil multifuncional".
+              <strong className="font-semibold">Tip:</strong> describe el día real. &quot;Atiende caja,
+              contesta WhatsApp y arma pedidos&quot; es mucho mejor señal que &quot;perfil multifuncional&quot;.
             </p>
           </div>
         </aside>

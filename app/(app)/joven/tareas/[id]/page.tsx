@@ -275,7 +275,7 @@ function TareaDetalleJoven({ params }: { params: Promise<{ id: string }> }) {
           </div>
           {task.companyComment && (
             <blockquote className="text-slate-800 italic leading-relaxed border-l-2 border-emerald-300 pl-4">
-              "{task.companyComment}"
+              &quot;{task.companyComment}&quot;
             </blockquote>
           )}
           <div className="mt-5 pt-5 border-t border-emerald-200 text-xs text-emerald-900 leading-relaxed">

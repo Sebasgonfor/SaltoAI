@@ -576,7 +576,7 @@ export default function EmpresaDashboardPage() {
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
               Cuando entres a un match y propongas una tarea pagada para validar al candidato,
-              aparece aquí. Es lo que reemplaza la "entrevista clásica" — pagás por evidencia real,
+              aparece aquí. Es lo que reemplaza la &quot;entrevista clásica&quot; — pagás por evidencia real,
               no por una conversación.
             </p>
           </div>

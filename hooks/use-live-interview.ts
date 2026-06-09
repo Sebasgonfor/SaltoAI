@@ -176,7 +176,6 @@ export function useLiveInterview(options: {
         // de cierre POST mínimo, sí cierra.
         if (userTurnsRef.current < minUserTurnsBeforeCloseRef.current) {
           if (typeof window !== 'undefined') {
-            // eslint-disable-next-line no-console
             console.info(
               `[live] closing keyword detectado prematuro (userTurns=${userTurnsRef.current} < min=${minUserTurnsBeforeCloseRef.current}); ignorando, sigue la entrevista.`,
             );

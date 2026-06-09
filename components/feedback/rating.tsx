@@ -12,13 +12,14 @@
  *    el mismo browser para el mismo target).
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Star, Check } from 'lucide-react';
 import {
   emitSignal,
   hasEmittedExplicit,
   type EmitSignalInput,
 } from '@/lib/feedback';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 interface Props extends Omit<EmitSignalInput, 'rating' | 'binary' | 'kind'> {
   label?: string;
@@ -36,13 +37,13 @@ export function FeedbackRating({
   const [hover, setHover] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const hydrated = useHydrated();
 
-  useEffect(() => {
-    if (hasEmittedExplicit(input.touchpoint, input.targetId)) {
-      setSubmitted(0); // marcador, no nos importa el valor
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.touchpoint, input.targetId]);
+  // Ya votó antes (lectura client-only de localStorage, diferida hasta hidratar
+  // para no romper SSR) O acaba de votar en esta sesión.
+  const done =
+    submitted !== null ||
+    (hydrated && hasEmittedExplicit(input.touchpoint, input.targetId));
 
   const submit = async (value: number) => {
     if (submitting) return;
@@ -52,7 +53,7 @@ export function FeedbackRating({
     setSubmitting(false);
   };
 
-  if (submitted !== null) {
+  if (done) {
     return (
       <div
         className="inline-flex items-center gap-1.5 text-xs text-slate-500"

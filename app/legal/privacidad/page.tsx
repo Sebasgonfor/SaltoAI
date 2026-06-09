@@ -265,7 +265,7 @@ export default function PrivacidadPage() {
           <Callout variant="rights">
             <strong>La Ley 1581 de 2012</strong> te otorga los siguientes derechos sobre tus datos personales. Para ejercer cualquiera de ellos, escríbenos a{' '}
             <a href="mailto:legal@salto.app" className="font-semibold text-emerald-700 hover:underline">legal@salto.app</a>{' '}
-            con el asunto <strong>"Derechos ARCO"</strong> y respondemos en máximo <strong>10 días hábiles</strong>.
+            con el asunto <strong>&quot;Derechos ARCO&quot;</strong> y respondemos en máximo <strong>10 días hábiles</strong>.
           </Callout>
           <div className="border border-slate-200 rounded-xl overflow-hidden mb-5">
             <RightBadge>
@@ -278,7 +278,7 @@ export default function PrivacidadPage() {
               <strong className="text-slate-900">Rectificar:</strong> Pedir que corrijamos errores en tu información personal.
             </RightBadge>
             <RightBadge>
-              <strong className="text-slate-900">Suprimir:</strong> Solicitar la eliminación de tus datos ("derecho al olvido") cuando no exista una obligación legal de conservarlos.
+              <strong className="text-slate-900">Suprimir:</strong> Solicitar la eliminación de tus datos (&quot;derecho al olvido&quot;) cuando no exista una obligación legal de conservarlos.
             </RightBadge>
             <RightBadge>
               <strong className="text-slate-900">Revocar:</strong> Retirar el consentimiento que nos diste para el tratamiento de tus datos, sin que ello afecte lo ya realizado.
@@ -341,7 +341,7 @@ export default function PrivacidadPage() {
                 legal@salto.app
               </a>
             </div>
-            <div><strong className="text-slate-900">Asunto sugerido:</strong> "Derechos ARCO" / "Incidente de seguridad" / "Consulta de privacidad"</div>
+            <div><strong className="text-slate-900">Asunto sugerido:</strong> &quot;Derechos ARCO&quot; / &quot;Incidente de seguridad&quot; / &quot;Consulta de privacidad&quot;</div>
             <div><strong className="text-slate-900">Tiempo de respuesta:</strong> Máximo 10 días hábiles</div>
             <div><strong className="text-slate-900">Autoridad de protección de datos:</strong>{' '}
               <a href="https://www.sic.gov.co" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-medium hover:text-emerald-800 transition-colors">

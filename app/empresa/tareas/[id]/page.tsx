@@ -327,7 +327,7 @@ export default function TareaDetalleEmpresa({ params }: { params: Promise<{ id: 
           </div>
           {task.companyComment && (
             <blockquote className="text-slate-800 italic leading-relaxed border-l-2 border-amber-300 pl-4">
-              "{task.companyComment}"
+              &quot;{task.companyComment}&quot;
             </blockquote>
           )}
           <div className="mt-5 pt-5 border-t border-emerald-200 flex items-center justify-between gap-3">
