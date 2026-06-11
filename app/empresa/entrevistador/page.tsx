@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import {
+  AlertCircle,
   Check,
   Copy,
   ExternalLink,
@@ -94,12 +95,12 @@ const EMPTY_FORM: FormState = {
 
 // Preguntas guiadas del wizard "Tu estilo". Las respuestas se vuelven muestras
 // de voz (source: 'wizard') que alimentan la destilación del personaDescriptor.
+// Condensadas a 3 (lo esencial para capturar la voz): saludo+reconocimiento,
+// feedback, y el tono a evitar. Todas opcionales.
 const WIZARD_QUESTIONS = [
-  '¿Cómo saludas y rompes el hielo con alguien que entrevistas por primera vez?',
-  'Cuando alguien te cuenta un logro, ¿cómo se lo reconoces? Escríbelo como lo dirías tú.',
-  '¿Qué frase o muletilla usas seguido para animar o dar confianza?',
-  'Cuando das feedback para mejorar, ¿cómo lo dices sin desanimar? Da un ejemplo.',
-  '¿Qué tono evitas a toda costa (muy formal, frío, acartonado…)? Descríbelo.',
+  '¿Cómo saludas y reconoces un logro? Escríbelo como lo dirías tú.',
+  'Cuando das feedback para mejorar, ¿cómo lo dices sin desanimar? Un ejemplo.',
+  '¿Qué tono evitas a toda costa (muy formal, frío, acartonado…)?',
 ];
 
 function configToForm(c: RecruiterConfig): FormState {
@@ -124,20 +125,51 @@ function configToForm(c: RecruiterConfig): FormState {
 
 // ─── sub-componentes ────────────────────────────────────────────────────────
 
+function RequiredTag() {
+  return (
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-600">
+      Obligatorio
+    </span>
+  );
+}
+
+function OptionalTag() {
+  return (
+    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+      Opcional
+    </span>
+  );
+}
+
 function Field({
   label,
   hint,
+  required,
+  optional,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
+  required?: boolean;
+  optional?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-sm font-medium text-slate-800">{label}</label>
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-800">{label}</label>
+        {required && <RequiredTag />}
+        {optional && <OptionalTag />}
+      </div>
       {hint && <p className="text-xs text-slate-500 leading-snug">{hint}</p>}
       {children}
+      {error && (
+        <p className="text-xs text-rose-600 mt-1 flex items-center gap-1">
+          <AlertCircle size={12} className="flex-shrink-0" /> {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -145,16 +177,25 @@ function Field({
 function SectionCard({
   title,
   desc,
+  optional,
   children,
 }: {
   title: string;
   desc?: string;
+  optional?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-5">
       <div>
-        <h2 className="font-display font-bold text-lg text-slate-900 tracking-tight">{title}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-display font-bold text-lg text-slate-900 tracking-tight">{title}</h2>
+          {optional && (
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 border border-slate-200 rounded-full px-2 py-0.5">
+              Opcional
+            </span>
+          )}
+        </div>
         {desc && <p className="text-sm text-slate-500 mt-1 leading-relaxed">{desc}</p>}
       </div>
       {children}
@@ -175,6 +216,8 @@ export default function EntrevistadorConfigPage() {
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
   const [newQuestion, setNewQuestion] = useState('');
   const [copied, setCopied] = useState(false);
+  // Errores por campo obligatorio (se muestran inline bajo el campo al guardar).
+  const [fieldErrors, setFieldErrors] = useState<{ slug?: string; displayName?: string }>({});
 
   // Wizard "Tu estilo".
   const [wizardAnswers, setWizardAnswers] = useState<string[]>(() =>
@@ -187,6 +230,9 @@ export default function EntrevistadorConfigPage() {
   const set = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     setOkMsg(null);
+    if (key === 'slug' || key === 'displayName') {
+      setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+    }
   }, []);
 
   // Muestras visibles en la lista = pegadas + audio (las del wizard viven en
@@ -374,6 +420,25 @@ export default function EntrevistadorConfigPage() {
     if (!user?.uid) return;
     setError(null);
     setOkMsg(null);
+    // Validación de obligatorios ANTES de pegarle al backend, con feedback
+    // inline. Solo el link y el nombre a mostrar son obligatorios.
+    const errs: { slug?: string; displayName?: string } = {};
+    if (form.displayName.trim().length < 2) {
+      errs.displayName = 'Escribe un nombre a mostrar (mínimo 2 caracteres).';
+    }
+    if (!normalizedSlug) {
+      errs.slug = 'Elige el link de tu entrevista.';
+    } else if (slugStatus === 'taken') {
+      errs.slug = 'Ese link ya está en uso. Prueba otro.';
+    } else if (slugStatus === 'invalid') {
+      errs.slug = 'Ese link no es válido o está reservado.';
+    }
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setError('Faltan campos obligatorios. Revisa lo marcado en rojo.');
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setSaving(true);
     // Ensamblamos las muestras (incluye respuestas del wizard) al guardar, así
     // se persisten aunque no se haya pulsado "Generar mi estilo".
@@ -436,6 +501,12 @@ export default function EntrevistadorConfigPage() {
       ? 'text-rose-600'
       : 'text-slate-500';
 
+  // Obligatorios pendientes (en vivo) para el hint del botón Guardar.
+  const missingRequired = [
+    form.displayName.trim().length < 2 ? 'el nombre a mostrar' : null,
+    !normalizedSlug || slugStatus === 'taken' || slugStatus === 'invalid' ? 'el link' : null,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 w-full space-y-6">
       <header>
@@ -448,6 +519,12 @@ export default function EntrevistadorConfigPage() {
         <p className="text-slate-600 mt-2 max-w-2xl leading-relaxed">
           Define cómo se presenta, qué tono usa y qué preguntas no pueden faltar. Comparte tu link
           propio y cada candidato vive la entrevista como si fueras tú.
+        </p>
+        <p className="mt-3 text-xs text-slate-500 flex items-center gap-1.5">
+          <AlertCircle size={13} className="text-emerald-600 flex-shrink-0" />
+          Solo el <strong className="text-slate-700 font-semibold">link</strong> y el{' '}
+          <strong className="text-slate-700 font-semibold">nombre a mostrar</strong> son obligatorios.
+          Lo demás es opcional y mejora la personalización.
         </p>
       </header>
 
@@ -492,9 +569,17 @@ export default function EntrevistadorConfigPage() {
       >
         <Field
           label="Link de tu entrevista"
+          required
           hint="Solo letras, números y guiones. Es la parte final de tu URL pública."
+          error={!normalizedSlug ? fieldErrors.slug : undefined}
         >
-          <div className="flex items-center rounded-md border border-slate-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500">
+          <div
+            className={`flex items-center rounded-md border bg-white overflow-hidden focus-within:ring-2 ${
+              fieldErrors.slug
+                ? 'border-rose-300 focus-within:ring-rose-500'
+                : 'border-slate-200 focus-within:ring-emerald-500'
+            }`}
+          >
             <span className="px-3 text-sm text-slate-400 select-none border-r border-slate-200 bg-slate-50 h-11 flex items-center">
               /r/
             </span>
@@ -516,18 +601,26 @@ export default function EntrevistadorConfigPage() {
           )}
         </Field>
 
-        <Field label="Nombre a mostrar" hint="Tu marca o nombre, visible para el candidato.">
+        <Field
+          label="Nombre a mostrar"
+          required
+          hint="Tu marca o nombre, visible para el candidato."
+          error={fieldErrors.displayName}
+        >
           <Input
             value={form.displayName}
             onChange={(e) => set('displayName', e.target.value)}
             placeholder="Merlys · Empleabilidad LATAM"
             maxLength={60}
+            aria-invalid={!!fieldErrors.displayName}
+            className={fieldErrors.displayName ? 'border-rose-300 focus-visible:ring-rose-500' : ''}
           />
         </Field>
 
         <Field
           label="Nombre del entrevistador"
-          hint="Cómo se presenta el agente (opcional). Ej. «María»."
+          optional
+          hint="Cómo se presenta el agente. Ej. «María»."
         >
           <Input
             value={form.interviewerName}
@@ -539,7 +632,7 @@ export default function EntrevistadorConfigPage() {
       </SectionCard>
 
       {/* Voz e idioma */}
-      <SectionCard title="Tono e idioma" desc="El estilo base de la conversación.">
+      <SectionCard title="Tono e idioma" optional desc="El estilo base de la conversación. Si lo dejas tal cual, usamos un tono cálido por defecto en español.">
         <Field label="Personalidad base">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {(Object.keys(PERSONALITY_PRESETS) as PersonalityPreset[]).map((key) => {
@@ -612,7 +705,8 @@ export default function EntrevistadorConfigPage() {
       {/* Tu estilo — wizard de voz */}
       <SectionCard
         title="Tu estilo — voz como la tuya"
-        desc="Responde unas preguntas, pega ejemplos o graba tu voz. Con eso destilamos un descriptor editable que el entrevistador imita (tono, calidez, muletillas)."
+        optional
+        desc="Responde 3 preguntas, pega ejemplos o graba tu voz. Con eso destilamos un descriptor editable que el entrevistador imita (tono, calidez, muletillas). Puedes saltarte esto."
       >
         {/* Preguntas guiadas */}
         <div className="space-y-3">
@@ -750,6 +844,7 @@ export default function EntrevistadorConfigPage() {
       {/* Preguntas propias */}
       <SectionCard
         title="Preguntas propias"
+        optional
         desc={`Hasta ${MAX_CUSTOM_QUESTIONS}. El agente las teje en la conversación sin descuidar las señales.`}
       >
         <div className="flex gap-2">
@@ -801,6 +896,7 @@ export default function EntrevistadorConfigPage() {
       {/* Señales a priorizar */}
       <SectionCard
         title="Señales a priorizar"
+        optional
         desc="El agente preguntará primero por estas. Las 12 señales se siguen detectando igual."
       >
         <div className="flex flex-wrap gap-2">
@@ -826,8 +922,9 @@ export default function EntrevistadorConfigPage() {
       </SectionCard>
 
       {/* Marca */}
-      <SectionCard title="Marca" desc="Color, logo y mensajes de tu landing pública.">
-        <Field label="Logo (URL)" hint="Pega la URL de una imagen cuadrada. La carga de archivos llega pronto.">
+      <SectionCard title="Marca" optional desc="Logo y mensajes de tu landing pública.">
+        {/* El color se oculta por ahora (se conserva en el estado si ya existía). */}
+        <Field label="Logo (URL)" optional hint="Pega la URL de una imagen cuadrada. La carga de archivos llega pronto.">
           <Input
             value={form.logoUrl}
             onChange={(e) => set('logoUrl', e.target.value)}
@@ -836,35 +933,7 @@ export default function EntrevistadorConfigPage() {
           />
         </Field>
 
-        <Field label="Color principal">
-          <div className="flex items-center gap-3">
-            <input
-              type="color"
-              value={form.primaryColor || '#059669'}
-              onChange={(e) => set('primaryColor', e.target.value)}
-              className="h-11 w-14 rounded-md border border-slate-200 bg-white cursor-pointer p-1"
-              aria-label="Color principal"
-            />
-            <Input
-              value={form.primaryColor}
-              onChange={(e) => set('primaryColor', e.target.value)}
-              placeholder="#059669"
-              maxLength={7}
-              className="font-mono max-w-[140px]"
-            />
-            {form.primaryColor && (
-              <button
-                type="button"
-                onClick={() => set('primaryColor', '')}
-                className="text-xs text-slate-400 hover:text-slate-600"
-              >
-                Quitar
-              </button>
-            )}
-          </div>
-        </Field>
-
-        <Field label="Tagline" hint="Frase corta bajo tu nombre en la landing.">
+        <Field label="Tagline" optional hint="Frase corta bajo tu nombre en la landing.">
           <Input
             value={form.tagline}
             onChange={(e) => set('tagline', e.target.value)}
@@ -873,7 +942,7 @@ export default function EntrevistadorConfigPage() {
           />
         </Field>
 
-        <Field label="Mensaje de bienvenida" hint="Lo primero que lee el candidato en tu landing.">
+        <Field label="Mensaje de bienvenida" optional hint="Lo primero que lee el candidato en tu landing.">
           <Textarea
             value={form.welcomeMessage}
             onChange={(e) => set('welcomeMessage', e.target.value.slice(0, WELCOME_MAX))}
@@ -889,8 +958,20 @@ export default function EntrevistadorConfigPage() {
       {/* Guardar (sticky) */}
       <div className="sticky bottom-4 z-10">
         <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm">
-          <p className="text-xs text-slate-500 hidden sm:block pl-2">
-            {savedSlug ? 'Cambios sin guardar se pierden al salir.' : 'Guarda para obtener tu link.'}
+          <p
+            className={`text-xs hidden sm:flex items-center gap-1.5 pl-2 ${
+              missingRequired.length ? 'text-rose-600' : 'text-slate-500'
+            }`}
+          >
+            {missingRequired.length > 0 ? (
+              <>
+                <AlertCircle size={13} className="flex-shrink-0" /> Falta {missingRequired.join(' y ')}.
+              </>
+            ) : savedSlug ? (
+              'Cambios sin guardar se pierden al salir.'
+            ) : (
+              'Listo para guardar y obtener tu link.'
+            )}
           </p>
           <Button onClick={save} disabled={saving} className="gap-2 ml-auto">
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
