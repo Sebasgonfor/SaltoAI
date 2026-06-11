@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useVoiceInput } from '@/hooks/use-voice-input';
 import { Button } from '@/components/ui/button';
@@ -211,6 +212,9 @@ export default function EntrevistadorConfigPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
+  // Modal de éxito tras guardar — feedback inmediato con el link compartible
+  // (el botón Guardar vive al fondo; el banner de arriba quedaba fuera de vista).
+  const [showSavedModal, setShowSavedModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
@@ -483,12 +487,22 @@ export default function EntrevistadorConfigPage() {
       setForm(configToForm(saved));
       setSavedSlug(saved.slug);
       setOkMsg('Configuración guardada.');
+      setShowSavedModal(true);
     } catch {
       setError('Error de red al guardar. Revisa tu conexión.');
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!showSavedModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSavedModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showSavedModal]);
 
   if (loading || initialLoading) {
     return <LoadingSpinner variant="full" label="Cargando tu configuración…" />;
@@ -983,6 +997,78 @@ export default function EntrevistadorConfigPage() {
       <div className="flex items-center gap-2 text-xs text-slate-400 justify-center pb-4">
         <Sparkles size={13} /> Tus instrucciones y estilo son preferencias: nunca cambian las reglas de la entrevista.
       </div>
+
+      {/* Modal de éxito: feedback inmediato con el link compartible. */}
+      {showSavedModal &&
+        shareUrl &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in"
+              onClick={() => setShowSavedModal(false)}
+              aria-hidden
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="saved-modal-title"
+              className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scale-in"
+            >
+              <button
+                type="button"
+                onClick={() => setShowSavedModal(false)}
+                className="absolute right-4 top-4 text-slate-400 transition-colors hover:text-slate-600"
+                aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-pop">
+                <Check size={24} strokeWidth={2.5} />
+              </div>
+
+              <h2 id="saved-modal-title" className="font-display text-xl font-bold text-slate-900">
+                ¡Tu entrevistador está listo!
+              </h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                Comparte este link y cada candidato vivirá la entrevista con tu marca.
+              </p>
+
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700">
+                  {shareUrl}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyLink}
+                  className="flex-shrink-0 gap-1.5"
+                >
+                  {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  {copied ? 'Copiado' : 'Copiar'}
+                </Button>
+              </div>
+
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={() => setShowSavedModal(false)}>
+                  Listo
+                </Button>
+                <a
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="sm:w-auto"
+                >
+                  <Button className="w-full gap-1.5" autoFocus>
+                    <ExternalLink size={15} /> Abrir entrevista
+                  </Button>
+                </a>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
