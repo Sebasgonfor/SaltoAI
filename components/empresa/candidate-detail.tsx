@@ -74,10 +74,17 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
     };
   }, [profileId, needId]);
 
+  // Sin needId (abierto desde "Mis candidatos") mostramos el perfil igual; solo
+  // se ocultan los elementos atados a una necesidad.
+  const hasNeed = !!needId;
+  const backHref = hasNeed ? `/empresa/matches/${needId}` : '/empresa/candidatos';
+  const backLabel = hasNeed ? 'Volver a matches' : 'Volver a mis candidatos';
+
   const cvStyle = profile?.contact?.cvStyle ?? 'hybrid';
   const cvPreviewUrl = useMemo(
     () =>
-      `/api/cv?profileId=${encodeURIComponent(profileId)}&needId=${encodeURIComponent(needId)}&style=${cvStyle}`,
+      `/api/cv?profileId=${encodeURIComponent(profileId)}&style=${cvStyle}` +
+      (needId ? `&needId=${encodeURIComponent(needId)}` : ''),
     [profileId, needId, cvStyle]
   );
   const cvPrintUrl = `${cvPreviewUrl}&autoprint=1`;
@@ -89,9 +96,9 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
           <div className="sticky top-14 z-20 bg-white border border-slate-200 rounded-2xl p-4 shadow-md">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Link href={`/empresa/matches/${needId}`}>
+              <Link href={backHref}>
                 <Button variant="outline" size="sm" className="gap-1.5">
-                  <ArrowLeft size={14} /> Volver a matches
+                  <ArrowLeft size={14} /> {backLabel}
                 </Button>
               </Link>
               <Badge className="bg-emerald-600 text-white font-mono tabular-nums">
@@ -123,9 +130,9 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
         <p className="text-sm text-slate-600 mb-6">
           El perfil pudo haber sido eliminado o aún no está sincronizado.
         </p>
-        <Link href={`/empresa/matches/${needId}`}>
+        <Link href={backHref}>
           <Button className="gap-2">
-            <ArrowLeft size={14} /> Volver a matches
+            <ArrowLeft size={14} /> {backLabel}
           </Button>
         </Link>
       </div>
@@ -138,24 +145,28 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
       <div className="sticky top-14 z-20 bg-white border border-slate-200 rounded-2xl p-4 shadow-md space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href={`/empresa/matches/${needId}`}>
+            <Link href={backHref}>
               <Button variant="outline" size="sm" className="gap-1.5">
-                <ArrowLeft size={14} /> Volver a matches
+                <ArrowLeft size={14} /> {backLabel}
               </Button>
             </Link>
-            <Link href={`/empresa/probar/${profileId}?needId=${needId}`}>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                Proponer micro-tarea
-              </Button>
-            </Link>
+            {hasNeed && (
+              <Link href={`/empresa/probar/${profileId}?needId=${needId}`}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  Proponer micro-tarea
+                </Button>
+              </Link>
+            )}
           </div>
-                <MatchDecisionBar
-          needId={needId}
-          profileId={profileId}
-          companyId={companyId}
-          icsAtTime={match?.ics}
-          initialStatus={decision?.status}
-        />
+          {hasNeed && (
+            <MatchDecisionBar
+              needId={needId}
+              profileId={profileId}
+              companyId={companyId}
+              icsAtTime={match?.ics}
+              initialStatus={decision?.status}
+            />
+          )}
       </div>
 
       <header className="space-y-4">

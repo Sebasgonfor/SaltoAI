@@ -1,9 +1,7 @@
 'use client';
 
 import { Suspense, use, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { CandidateDetail } from '@/components/empresa/candidate-detail';
 import {
@@ -45,20 +43,9 @@ function CandidatoContent({ profileId }: { profileId: string }) {
     };
   }, [needId, profileId]);
 
-  if (!needId) {
-    return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center">
-        <h2 className="text-xl font-display font-medium mb-2">Falta la búsqueda</h2>
-        <p className="text-sm text-slate-600 mb-6">
-          Abre al candidato desde la lista de matches para ver el detalle completo.
-        </p>
-        <Link href="/empresa">
-          <Button>Ir a mis necesidades</Button>
-        </Link>
-      </div>
-    );
-  }
-
+  // Sin needId (ej. abierto desde "Mis candidatos") igual mostramos el perfil
+  // completo; solo se ocultan los elementos atados a una necesidad (score del
+  // match, barra de decisión, proponer micro-tarea).
   if (!user?.uid) {
     return (
       <div className="max-w-md mx-auto px-6 py-24 text-center text-slate-600 text-sm">
