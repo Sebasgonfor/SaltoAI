@@ -1,3 +1,6 @@
+// Server-only: todas las operaciones de Firestore pasan por el Admin SDK (vía
+// shim), que usa una service account y persiste SIEMPRE (no depende de las
+// reglas ni cae a memoria efímera). El SDK web quedó solo para auth en cliente.
 import {
   collection,
   doc,
@@ -6,14 +9,13 @@ import {
   setDoc,
   addDoc,
   deleteDoc,
-} from "firebase/firestore";
-import { db } from "./firebase";
-import {
+  db,
   query,
   where,
   orderBy,
   updateDoc,
-} from "firebase/firestore";
+} from "./firestore-admin-shim";
+import { adminConfigured } from "./firebase-admin";
 import type {
   Profile,
   CompanyNeed,
@@ -45,11 +47,11 @@ export function storageFromId(id: string): StorageMode {
   return id.startsWith("local_") ? "memory" : "firestore";
 }
 
+// "Firestore disponible" ahora = hay service account (Admin SDK). Sin ella,
+// todo cae a memoria (igual que antes), pero ya no se intenta el SDK web
+// server-side que las reglas denegaban.
 function isFirestoreConfigured(): boolean {
-  return (
-    !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== "dummy"
-  );
+  return adminConfigured();
 }
 
 // En Next dev cada route handler puede recibir su propia copia del módulo
