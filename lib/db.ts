@@ -47,11 +47,15 @@ export function storageFromId(id: string): StorageMode {
   return id.startsWith("local_") ? "memory" : "firestore";
 }
 
-// "Firestore disponible" ahora = hay service account (Admin SDK). Sin ella,
-// todo cae a memoria (igual que antes), pero ya no se intenta el SDK web
-// server-side que las reglas denegaban.
+// "Firestore disponible" = hay Admin SDK (service account) O el SDK web
+// (NEXT_PUBLIC_FIREBASE_PROJECT_ID). El shim despacha al que haya. Solo se cae a
+// memoria si NINGUNO existe — así nunca dejamos de leer lo que ya persiste.
 function isFirestoreConfigured(): boolean {
-  return adminConfigured();
+  return (
+    adminConfigured() ||
+    (!!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== "dummy")
+  );
 }
 
 // En Next dev cada route handler puede recibir su propia copia del módulo
