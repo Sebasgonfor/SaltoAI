@@ -132,13 +132,32 @@ function makeLocalId(): string {
 }
 
 /**
- * Firestore no acepta valores `undefined`. Stripamos antes de escribir
- * para que un campo opcional sin completar no rompa el addDoc/setDoc.
+ * Firestore no acepta valores `undefined` — y los rechaza también en objetos y
+ * arrays ANIDADOS, no solo en el nivel superior. Stripamos en PROFUNDIDAD antes
+ * de escribir para que un campo opcional sin completar no rompa el addDoc/setDoc.
+ *
+ * Por qué deep y no shallow: configs con sub-objetos (ej. recruiter_configs.brand
+ * con logoUrl/primaryColor/tagline/welcomeMessage sin llenar = undefined) hacían
+ * que setDoc lanzara, el error se tragaba en el fallback a memoria, y el doc nunca
+ * persistía → la personalización del entrevistador "no funcionaba".
+ *
+ * Solo recorre objetos planos y arrays; cualquier otro valor (string, number,
+ * boolean, null) pasa tal cual. Este codebase no escribe Timestamps/FieldValue.
  */
+function stripUndefinedDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripUndefinedDeep);
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v !== undefined) out[k] = stripUndefinedDeep(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v;
-  return out as T;
+  return stripUndefinedDeep(obj) as T;
 }
 
 export async function createProfile(
