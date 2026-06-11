@@ -1,18 +1,10 @@
-import { EmpresaHeader } from '@/components/empresa/empresa-header';
-import { AppFooter } from '@/components/layout/app-footer';
-import { RoleGate } from '@/components/auth/role-gate';
+import { EmpresaAppShell } from '@/components/empresa/empresa-app-shell';
 
+/**
+ * Layout de la app de la empresa: sidebar (escritorio) + barra inferior (móvil),
+ * mismo rediseño de navegación que el del joven. El EmpresaAppShell es rol-aware
+ * y conserva el RoleGate role="empresa" para proteger todas las rutas /empresa/*.
+ */
 export default function EmpresaLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-white flex flex-col overflow-x-hidden">
-      <EmpresaHeader />
-      <main className="flex-1 flex flex-col w-full min-w-0">
-        <RoleGate role="empresa">{children}</RoleGate>
-      </main>
-      <AppFooter
-        left="SaltoAI · Calidad, no volumen"
-        right="Barranqui-IA 2026 · Macondo Lab · GOyn · ACOPI"
-      />
-    </div>
-  );
+  return <EmpresaAppShell>{children}</EmpresaAppShell>;
 }

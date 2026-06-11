@@ -234,6 +234,9 @@ export interface OpportunityMatch {
   topSkills?: string[];
   /** Decisión de la empresa sobre este match (si existe). */
   companyStatus?: "interested" | "discarded" | null;
+  /** true si el ICS se calculó al vuelo (heurístico) porque el joven no estaba
+   * en el snapshot precalculado de la necesidad. Aún sin recálculo de la empresa. */
+  estimated?: boolean;
 }
 
 export type MatchDecisionStatus = "pending" | "interested" | "discarded";
