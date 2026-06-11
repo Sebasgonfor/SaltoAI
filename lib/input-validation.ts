@@ -5,6 +5,7 @@
  * detalle" en vez de inventar (mock genérico) o reventar con 500.
  */
 import type { ChatMessage } from "./types";
+import { detectSignals } from "./signals";
 
 export function countUserTurns(messages: ChatMessage[]): number {
   return messages.filter((m) => m.role === "user").length;
@@ -60,7 +61,7 @@ export function pickYesNoFollowup(seed = 0): string {
 
 export interface InterviewValidity {
   ok: boolean;
-  reason?: "no_user_turns" | "too_short" | "too_few_words";
+  reason?: "no_user_turns" | "too_short" | "too_few_words" | "no_signals";
   message?: string;
 }
 
@@ -94,6 +95,18 @@ export function validateForProfileExtraction(messages: ChatMessage[]): Interview
       reason: "too_short",
       message:
         "Tu última respuesta fue muy corta. Profundiza un poco — paso a paso, qué hiciste y cómo te diste cuenta de que funcionó.",
+    };
+  }
+  // Guard de evidencia: aunque haya palabras suficientes, si el detector no
+  // encuentra NINGUNA señal laboral (relatos vacíos / divagación), no armamos
+  // un perfil con el piso heurístico — sería un perfil sin sustancia. Pedimos
+  // un caso concreto. (El detector es el mismo del panel "Señales en vivo".)
+  if (detectSignals(messages).length === 0) {
+    return {
+      ok: false,
+      reason: "no_signals",
+      message:
+        "Todavía no detecto evidencia laboral en lo que contaste. Cuéntame UN caso concreto: algo que hiciste, cómo lo hiciste y qué resultado tuvo.",
     };
   }
   return { ok: true };
