@@ -417,7 +417,12 @@ export async function POST(req: NextRequest) {
         ...extracted,
         embedding,
         createdAt: existing?.createdAt ?? Date.now(),
-        latent: existing?.latent,
+        // NO preservamos `latent`: se deriva de la evidencia/skills, así que al
+        // re-extraer (entrevista nueva o re-procesada) el talento latente viejo
+        // queda STALE — puede hablar de otra persona/historia (bug real: un
+        // perfil heredó el latent de otro vía link y al re-entrevistar siguió
+        // mostrándolo). Al dejarlo fuera, /api/talento-latente lo regenera
+        // desde la evidencia actual en la próxima visita a Potencial.
         taskStats: existing?.taskStats,
         ...(mergedContact && { contact: mergedContact }),
         ...(interviewTranscript && { interviewTranscript }),
