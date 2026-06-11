@@ -438,6 +438,13 @@ async function rankBatchWithLLM(
       config: {
         responseMimeType: "application/json",
         responseSchema: batchSchema,
+        // gemini-2.5-flash trae "thinking" activado por defecto. Para un batch
+        // de hasta SHORTLIST_SIZE candidatos eso empuja la latencia por encima
+        // del timeout (GEMINI_TIMEOUT_MS) → caíamos SIEMPRE a heurístico
+        // (rankingMode "degraded"). El ranking aquí es clasificación estructurada,
+        // no requiere cadena de razonamiento, así que desactivamos thinking para
+        // responder en pocos segundos y obtener ICS reales del LLM.
+        thinkingConfig: { thinkingBudget: 0 },
       },
     }),
     GEMINI_TIMEOUT_MS,
