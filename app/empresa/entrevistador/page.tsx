@@ -587,7 +587,7 @@ export default function EntrevistadorConfigPage() {
               className="flex-1 h-11 px-3 text-sm outline-none"
               value={form.slug}
               onChange={(e) => set('slug', e.target.value)}
-              placeholder="merlys"
+              placeholder="mi-empresa"
               maxLength={40}
             />
           </div>
@@ -610,7 +610,7 @@ export default function EntrevistadorConfigPage() {
           <Input
             value={form.displayName}
             onChange={(e) => set('displayName', e.target.value)}
-            placeholder="Merlys · Empleabilidad LATAM"
+            placeholder="Mi empresa · Reclutamiento"
             maxLength={60}
             aria-invalid={!!fieldErrors.displayName}
             className={fieldErrors.displayName ? 'border-rose-300 focus-visible:ring-rose-500' : ''}
