@@ -1,9 +1,27 @@
 import { cosineSimilarity } from "@/lib/embeddings";
-import { getAllProfiles, getNeed, getNeedMatches, getProfile, saveNeedMatches } from "@/lib/db";
+import {
+  getAllProfiles,
+  getNeed,
+  getNeedMatches,
+  getProfile,
+  listProfilesBySourceRecruiter,
+  saveNeedMatches,
+} from "@/lib/db";
 import { scoreCandidates, SHORTLIST_SIZE } from "@/lib/ics";
 import { isDemoProfile } from "@/lib/profile-source";
 import { isNeedClosed } from "@/lib/need-status";
 import type { CompanyNeed, NeedMatchSnapshot } from "@/lib/types";
+
+/**
+ * Alcance del pool de candidatos para una necesidad:
+ *   - "all"  → pool GLOBAL (todos los jóvenes de la plataforma). Default; es el
+ *              marketplace y se cachea por needId (comportamiento histórico).
+ *   - "mine" → solo los candidatos del dueño de la necesidad (jóvenes que
+ *              entraron por SU link de marca, sourceRecruiterUid === ownerUid).
+ *              Pool pequeño → se computa EN VIVO y NO se persiste, para no
+ *              contaminar la caché global ni getAllNeedMatches (dashboard).
+ */
+export type MatchScope = "all" | "mine";
 
 function buildWarning(need: CompanyNeed, degradedReason?: string): string | undefined {
   const warnings: string[] = [];
@@ -18,10 +36,15 @@ function buildWarning(need: CompanyNeed, degradedReason?: string): string | unde
   return warnings.length > 0 ? warnings.join(" ") : undefined;
 }
 
-export async function computeMatchesForNeed(need: CompanyNeed): Promise<NeedMatchSnapshot> {
+export async function computeMatchesForNeed(
+  need: CompanyNeed,
+  scope: MatchScope = "all",
+): Promise<NeedMatchSnapshot> {
   if (!need.id) {
     throw new Error("need_id_required");
   }
+  // Solo el pool global se persiste; "mine" se devuelve sin cachear.
+  const persist = scope === "all";
 
   if (isNeedClosed(need)) {
     const cached = await getNeedMatches(need.id);
@@ -38,7 +61,12 @@ export async function computeMatchesForNeed(need: CompanyNeed): Promise<NeedMatc
     return empty;
   }
 
-  const profilesRaw = await getAllProfiles();
+  const profilesRaw =
+    scope === "mine"
+      ? need.ownerUid
+        ? await listProfilesBySourceRecruiter(need.ownerUid)
+        : []
+      : await getAllProfiles();
   const resolved = await Promise.all(
     profilesRaw.map(async (p) => (p.id && (await getProfile(p.id)) ? p : null))
   );
@@ -63,7 +91,7 @@ export async function computeMatchesForNeed(need: CompanyNeed): Promise<NeedMatc
       },
       computedAt: Date.now(),
     };
-    await saveNeedMatches(empty);
+    if (persist) await saveNeedMatches(empty);
     return empty;
   }
 
@@ -88,16 +116,22 @@ export async function computeMatchesForNeed(need: CompanyNeed): Promise<NeedMatc
     computedAt: Date.now(),
   };
 
-  await saveNeedMatches(snapshot);
+  if (persist) await saveNeedMatches(snapshot);
   return snapshot;
 }
 
 export async function getOrComputeMatchesForNeed(
   needId: string,
-  opts: { force?: boolean } = {}
+  opts: { force?: boolean; scope?: MatchScope } = {}
 ): Promise<{ need: CompanyNeed; snapshot: NeedMatchSnapshot } | null> {
   const need = await getNeed(needId);
   if (!need) return null;
+
+  // "mine" no usa la caché global: siempre se computa en vivo.
+  if (opts.scope === "mine") {
+    const snapshot = await computeMatchesForNeed(need, "mine");
+    return { need, snapshot };
+  }
 
   if (isNeedClosed(need)) {
     const cached = await getNeedMatches(needId);

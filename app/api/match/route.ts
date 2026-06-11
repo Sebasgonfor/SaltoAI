@@ -4,6 +4,7 @@ import {
   computeMatchesForNeed,
   getOrComputeMatchesForNeed,
   snapshotToMatchResponse,
+  type MatchScope,
 } from "@/lib/match-need";
 import { isNeedClosed } from "@/lib/need-status";
 import { startLog } from "@/lib/logger";
@@ -28,6 +29,25 @@ export async function GET(req: NextRequest) {
     if (!need) {
       log.end({ status: 404, extra: { needId } });
       return NextResponse.json({ error: "need not found" }, { status: 404 });
+    }
+
+    // scope=mine → pool propio del dueño, computado en vivo (sin caché global).
+    const scope: MatchScope =
+      req.nextUrl.searchParams.get("scope") === "mine" ? "mine" : "all";
+    if (scope === "mine") {
+      const computed = await getOrComputeMatchesForNeed(needId, { scope: "mine" });
+      if (!computed) {
+        log.end({ status: 404, extra: { needId } });
+        return NextResponse.json({ error: "need not found" }, { status: 404 });
+      }
+      log.end({
+        status: 200,
+        extra: { needId, scope, matchesReturned: computed.snapshot.matches.length },
+      });
+      return NextResponse.json({
+        ...snapshotToMatchResponse(computed.need, computed.snapshot),
+        cached: false,
+      });
     }
 
     const snapshot = await getNeedMatches(needId);
@@ -69,22 +89,24 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const log = startLog(req, "match");
   try {
-    const body = (await req.json()) as { needId?: string; force?: boolean };
+    const body = (await req.json()) as { needId?: string; force?: boolean; scope?: string };
     const needId = typeof body.needId === "string" ? body.needId.trim() : "";
     const force = body.force === true;
+    const scope: MatchScope = body.scope === "mine" ? "mine" : "all";
 
     if (!needId) {
       log.end({ status: 400, extra: { reason: "needId_required" } });
       return NextResponse.json({ error: "needId required" }, { status: 400 });
     }
 
-    if (force) {
+    // scope=mine siempre se computa en vivo (no hay caché que forzar).
+    if (force || scope === "mine") {
       const need = await getNeed(needId);
       if (!need) {
         log.end({ status: 404, extra: { needId } });
         return NextResponse.json({ error: "need not found" }, { status: 404 });
       }
-      if (isNeedClosed(need)) {
+      if (scope === "all" && isNeedClosed(need)) {
         log.end({ status: 400, extra: { needId, reason: "need_closed" } });
         return NextResponse.json(
           {
@@ -94,10 +116,10 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const snapshot = await computeMatchesForNeed(need);
+      const snapshot = await computeMatchesForNeed(need, scope);
       log.end({
         status: 200,
-        extra: { needId, force: true, matchesReturned: snapshot.matches.length },
+        extra: { needId, force, scope, matchesReturned: snapshot.matches.length },
       });
       return NextResponse.json({
         ...snapshotToMatchResponse(need, snapshot),
