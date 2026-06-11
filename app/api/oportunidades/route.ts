@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cosineSimilarity } from "@/lib/embeddings";
 import { getAllNeeds, getNeed, getNeedMatches, getProfile, listDecisionsForProfile } from "@/lib/db";
-import { RETURN_SIZE } from "@/lib/ics";
+import { RETURN_SIZE, checkHardConstraints, heuristicScore } from "@/lib/ics";
 import { isNeedOpen } from "@/lib/need-status";
 import { startLog } from "@/lib/logger";
 import type { OpportunityMatch } from "@/lib/types";
@@ -62,19 +62,36 @@ export async function POST(req: NextRequest) {
     let cachedCount = 0;
     let missingSnapshotCount = 0;
     let degradedCount = 0;
+    let estimatedCount = 0;
 
     for (const { n: need } of shortlistNeeds) {
       if (!need.id) continue;
       const snapshot = await getNeedMatches(need.id);
-      if (!snapshot) {
+      if (snapshot) {
+        cachedCount++;
+        if (snapshot.rankingMode === "degraded") degradedCount++;
+      } else {
         missingSnapshotCount++;
-        continue;
       }
-      cachedCount++;
-      if (snapshot.rankingMode === "degraded") degradedCount++;
 
-      const ours = snapshot.matches.find((m) => m.profileId === profileId);
-      if (!ours) continue;
+      // El joven puede no estar en el snapshot porque su perfil es nuevo (el
+      // snapshot se calculó antes de que existiera) o porque quedó fuera del
+      // top RETURN_SIZE. En ese caso calculamos su ICS contra ESTA necesidad
+      // al vuelo, con el scorer heurístico (sin llamada extra a Gemini) y
+      // respetando los hard constraints. Así un perfil siempre ve sus mejores
+      // oportunidades por similitud sin esperar a que la empresa recalcule.
+      let ours = snapshot?.matches.find((m) => m.profileId === profileId) ?? null;
+      let estimated = false;
+      if (!ours) {
+        if (!checkHardConstraints(need, profile).passes) continue;
+        ours = {
+          profileId,
+          profileName: profile.name,
+          ...heuristicScore(need, profile),
+        };
+        estimated = true;
+        estimatedCount++;
+      }
 
       opportunities.push({
         needId: need.id,
@@ -86,6 +103,7 @@ export async function POST(req: NextRequest) {
         redFlag: ours.redFlag,
         topSkills: ours.topSkills,
         companyStatus: statusByNeed.get(need.id) ?? null,
+        estimated,
       });
     }
 
@@ -126,15 +144,17 @@ export async function POST(req: NextRequest) {
         cachedCount,
         missingSnapshotCount,
         degradedCount,
+        estimatedCount,
       },
     });
 
+    const hasEstimated = top.some((o) => o.estimated);
     return NextResponse.json({
       profile: profileSummary,
       opportunities: top,
-      ...(degradedCount > 0 && {
+      ...((degradedCount > 0 || hasEstimated) && {
         warning:
-          "Algunas oportunidades se calcularon con scoring heurístico. La precisión puede ser menor.",
+          "Algunas oportunidades se calcularon con scoring heurístico estimado. Cuando la empresa revise candidatos, tu ICS se afina.",
       }),
     });
   } catch (err) {

@@ -71,6 +71,11 @@ interface ChatPersistedState {
   messages: ChatMessage[];
   input: string;
   interviewMode?: InterviewMode;
+  /** Slug de la reclutadora, atado a ESTA conversación. Se persiste para que
+   *  el entrevistador personalizado sobreviva salir y volver (la conversación
+   *  ya se persistía, pero el slug no, y al regresar quedaba genérico). Se
+   *  limpia junto con la conversación al construir el perfil o reiniciar. */
+  recruiterSlug?: string;
 }
 
 function storageKey(uid: string | null | undefined): string {
@@ -132,9 +137,10 @@ function ChatJoven() {
     // el mismo navegador. Sin `?r=` → experiencia genérica (emerald).
     const slug = normalizeSlug(searchParams?.get('r') || '');
     if (!slug) {
-      recruiterSlugRef.current = '';
-      setRecruiterSlug('');
-      setRecruiterBrand(null);
+      // Sin `?r=` en la URL NO limpiamos: puede haber un slug restaurado de la
+      // conversación en curso (persistido), que debe sobrevivir a salir y
+      // volver por el sidebar. El slug solo se limpia al reiniciar o al
+      // construir el perfil (clearPersisted).
       return;
     }
     recruiterSlugRef.current = slug;
@@ -181,6 +187,11 @@ function ChatJoven() {
   const [interviewMode, setInterviewMode] = useState<InterviewMode>('text');
   const [loading, setLoading] = useState(false);
   const [closing, setClosing] = useState(false);
+  // Modo recuperación: el perfil no se pudo construir por falta de evidencia
+  // (p. ej. el joven respondió en seco al límite de turnos). En vez de dejar el
+  // input bloqueado (callejón sin salida), re-habilitamos para que cuente un
+  // ejemplo y REINTENTAMOS construir el perfil con esa respuesta.
+  const [recovery, setRecovery] = useState(false);
   const [restored, setRestored] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef('');
@@ -335,6 +346,20 @@ function ChatJoven() {
         if (saved.interviewMode === 'voice' || saved.interviewMode === 'text') {
           setInterviewMode(saved.interviewMode);
         }
+        // Restaurar el entrevistador personalizado atado a esta conversación,
+        // salvo que la URL traiga un `?r=` (que tiene prioridad).
+        const urlSlug = normalizeSlug(searchParams?.get('r') || '');
+        const restoredSlug = saved.recruiterSlug ? normalizeSlug(saved.recruiterSlug) : '';
+        if (!urlSlug && restoredSlug) {
+          recruiterSlugRef.current = restoredSlug;
+          setRecruiterSlug(restoredSlug);
+          fetch(`/api/recruiter-config?slug=${encodeURIComponent(restoredSlug)}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (!cancelled && d?.brand?.slug) setRecruiterBrand(d.brand as RecruiterBrandPublic);
+            })
+            .catch(() => {});
+        }
       }
 
       let resolvedBasics = loadSavedJovenBasics(user?.uid);
@@ -387,6 +412,7 @@ function ChatJoven() {
       messages: interviewMode === 'voice' && liveActive ? liveMessages : messages,
       input,
       interviewMode,
+      recruiterSlug: recruiterSlugRef.current || undefined,
     };
     try {
       localStorage.setItem(storageKey(user?.uid), JSON.stringify(payload));
@@ -412,6 +438,10 @@ function ChatJoven() {
       : messages.filter((m) => m.role === 'user').length;
   const displayTurns = Math.min(userTurns, MAX_TURNS);
   const atTurnLimit = userTurns >= MAX_TURNS;
+  // El input se bloquea al llegar al límite de turnos, SALVO en modo
+  // recuperación (perfil no construido por falta de evidencia): ahí dejamos
+  // que el joven dé un ejemplo y reintentamos.
+  const inputLocked = atTurnLimit && !recovery;
 
   // En modo voz, `liveMessages` solo se popula cuando un TURNO se cierra
   // (el agente toma la palabra). Pero `liveUserText` se actualiza en cada
@@ -545,6 +575,7 @@ function ChatJoven() {
           // Paso opcional de cierre: ofrecer subir certificados antes de ir al
           // perfil. El render de InterviewDoneStep se ocupa; el redirect lo hace
           // el botón "Ver mi perfil".
+          setRecovery(false);
           setClosing(false);
           setDoneProfileId(closeData.id);
         } else {
@@ -553,10 +584,12 @@ function ChatJoven() {
           // devolvemos la conversación al usuario con el mensaje honesto.
           const fallback =
             closeData.error ||
-            'No pudimos construir tu perfil con lo que contaste. Profundiza un poco más con un ejemplo concreto.';
+            'No pudimos construir tu perfil con lo que contaste. Cuéntame un ejemplo concreto: algo que hayas hecho y qué resultado tuvo, y lo armo.';
           setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
           setClosing(false);
-          setFormError(closeData.error || 'No pudimos crear tu perfil. Intenta de nuevo.');
+          // Re-habilitar el input para que el joven dé más detalle y reintentar.
+          setRecovery(true);
+          setFormError(null);
         }
       } catch (err) {
         console.error(err);
@@ -595,6 +628,20 @@ function ChatJoven() {
     cancelRecording('reset-interview');
     const content = (textOverride ?? inputRef.current).trim();
     if (!content || loading || closing || !basics) return;
+
+    // En recuperación, el siguiente mensaje NO es un turno más de preguntas:
+    // es el detalle que faltaba → lo añadimos y REINTENTAMOS construir el
+    // perfil con la conversación enriquecida (rompe el callejón sin salida del
+    // límite de turnos).
+    if (recovery) {
+      const updated = [...messages, { role: 'user' as const, content }];
+      setMessages(updated);
+      setInput('');
+      setRecovery(false);
+      await finishInterview(updated);
+      return;
+    }
+
     if (userTurns >= MAX_TURNS) return;
 
     const userMsg: ChatMessage = { role: 'user', content };
@@ -1225,7 +1272,7 @@ function ChatJoven() {
                         isRecording ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' : ''
                       }`}
                       onClick={() => void toggleVoice()}
-                      disabled={loading || closing || atTurnLimit || isTranscribing}
+                      disabled={loading || closing || inputLocked || isTranscribing}
                       title={
                         isTranscribing
                           ? 'Transcribiendo tu respuesta…'
@@ -1260,9 +1307,11 @@ function ChatJoven() {
                         void sendUserMessage();
                       }
                     }}
-                    disabled={loading || closing || atTurnLimit || isRecording || isTranscribing}
+                    disabled={loading || closing || inputLocked || isRecording || isTranscribing}
                     placeholder={
-                      atTurnLimit
+                      recovery
+                        ? 'Cuéntame un ejemplo concreto…'
+                        : atTurnLimit
                         ? 'Generando perfil…'
                         : isTranscribing
                         ? 'Transcribiendo…'
@@ -1277,7 +1326,7 @@ function ChatJoven() {
                     className="h-11 sm:h-[64px] px-2.5 sm:px-5 gap-1.5 sm:gap-2 flex-shrink-0 self-end sm:self-auto text-white"
                     style={brandBtn}
                     onClick={() => void sendUserMessage()}
-                    disabled={loading || closing || atTurnLimit || isRecording || isTranscribing || !input.trim()}
+                    disabled={loading || closing || inputLocked || isRecording || isTranscribing || !input.trim()}
                   >
                     <span className="hidden sm:inline">Enviar</span>
                     <ArrowRight size={16} />

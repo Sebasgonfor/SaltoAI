@@ -78,6 +78,40 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // NEED_MATCHES — snapshots de ICS calculados al publicar/refrescar una
+    // necesidad (ver lib/match-need.ts + lib/db.ts NEED_MATCHES).
+    // DEMO MODE — el server (web SDK, sin auth) escribe el snapshot en
+    // saveNeedMatches y lo lee en /api/oportunidades + /api/match. Sin esta
+    // regla, el catch-all denegaba read/write → NUNCA se guardaban snapshots
+    // y el joven veía 0 oportunidades. El enforcement real vive en las API routes.
+    match /need_matches/{needId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // MATCH_DECISIONS — decisión de la empresa sobre un candidato (interested/
+    // discarded). El server escribe en /api/match/decision y lee en
+    // /api/oportunidades + dashboard. DEMO MODE — mismo motivo que arriba.
+    match /match_decisions/{decisionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // DOCUMENTS — documentos/CV del joven y skills verificadas por documento
+    // (enriquecen el scoring, ver enrichWithDocumentSkills). El server lee/escribe
+    // sin auth. DEMO MODE — mismo motivo que profiles.
+    match /documents/{documentId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // RECRUITER_CONFIGS — configuración del reclutador por empresa.
+    // El server lee/escribe en /api/recruiter-config. DEMO MODE.
+    match /recruiter_configs/{configId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Cualquier otra colección queda cerrada por defecto.
     match /{document=**} {
       allow read, write: if false;
