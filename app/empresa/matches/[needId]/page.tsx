@@ -191,19 +191,21 @@ function PipelineVisual({ totalProfiles, shortlistSize, returnSize }: { totalPro
 // localStorage persiste entre visitas; el botón "Recalcular" fuerza refresh.
 const MATCH_CACHE_TTL_MS = 15 * 60 * 1000;
 
+type MatchScope = 'all' | 'mine';
+
 interface CachedMatches {
   data: MatchResponse;
   timestamp: number;
 }
 
-function matchCacheKey(needId: string): string {
-  return `salto.matches.${needId}`;
+function matchCacheKey(needId: string, scope: MatchScope): string {
+  return `salto.matches.${needId}.${scope}`;
 }
 
-function readMatchCache(needId: string): CachedMatches | null {
+function readMatchCache(needId: string, scope: MatchScope): CachedMatches | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(matchCacheKey(needId));
+    const raw = localStorage.getItem(matchCacheKey(needId, scope));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedMatches;
     if (!parsed?.timestamp || Date.now() - parsed.timestamp > MATCH_CACHE_TTL_MS) {
@@ -215,11 +217,11 @@ function readMatchCache(needId: string): CachedMatches | null {
   }
 }
 
-function writeMatchCache(needId: string, data: MatchResponse) {
+function writeMatchCache(needId: string, scope: MatchScope, data: MatchResponse) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(
-      matchCacheKey(needId),
+      matchCacheKey(needId, scope),
       JSON.stringify({ data, timestamp: Date.now() }),
     );
   } catch {
@@ -227,10 +229,10 @@ function writeMatchCache(needId: string, data: MatchResponse) {
   }
 }
 
-function clearMatchCache(needId: string) {
+function clearMatchCache(needId: string, scope: MatchScope) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(matchCacheKey(needId));
+    localStorage.removeItem(matchCacheKey(needId, scope));
   } catch {
     /* ignore */
   }
@@ -246,6 +248,9 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   const [refreshing, setRefreshing] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Alcance del pool: "all" = todo el marketplace, "mine" = solo mis candidatos
+  // (jóvenes que entraron por mi link de marca).
+  const [scope, setScope] = useState<MatchScope>('all');
 
   const fetchDecisions = async () => {
     try {
@@ -259,9 +264,10 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
     }
   };
 
-  const fetchMatches = async (opts: { useCache: boolean; force?: boolean }) => {
+  const fetchMatches = async (opts: { useCache: boolean; force?: boolean; scope: MatchScope }) => {
+    const sc = opts.scope;
     if (opts.useCache && !opts.force) {
-      const cached = readMatchCache(needId);
+      const cached = readMatchCache(needId, sc);
       if (cached) {
         setData(cached.data);
         setFromCache(true);
@@ -271,14 +277,15 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       }
     }
     setRefreshing(true);
+    setError(null);
     try {
       const matchRes = opts.force
         ? await fetch('/api/match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ needId, force: true }),
+            body: JSON.stringify({ needId, force: true, scope: sc }),
           })
-        : await fetch(`/api/match?needId=${encodeURIComponent(needId)}`);
+        : await fetch(`/api/match?needId=${encodeURIComponent(needId)}&scope=${sc}`);
       const [json, decisionRes] = await Promise.all([
         matchRes.json(),
         fetch(`/api/match/decision?needId=${encodeURIComponent(needId)}`),
@@ -291,7 +298,7 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       setData(json);
       setDecisions(decisionJson.decisions ?? []);
       setFromCache(false);
-      writeMatchCache(needId, json);
+      writeMatchCache(needId, sc, json);
     } catch {
       setError('Error de red.');
     } finally {
@@ -301,9 +308,15 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
   };
 
   useEffect(() => {
-    void fetchMatches({ useCache: true });
+    void fetchMatches({ useCache: true, scope });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needId]);
+
+  const changeScope = (next: MatchScope) => {
+    if (next === scope || refreshing) return;
+    setScope(next);
+    void fetchMatches({ useCache: true, scope: next });
+  };
 
   const { activeMatches, discardedMatches } = useMemo(() => {
     if (!data?.matches) return { activeMatches: [], discardedMatches: [] };
@@ -348,8 +361,8 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
 
   const forceRefresh = () => {
     if (refreshing || (data?.need && isNeedClosed(data.need))) return;
-    clearMatchCache(needId);
-    void fetchMatches({ useCache: false, force: true });
+    clearMatchCache(needId, scope);
+    void fetchMatches({ useCache: false, force: true, scope });
   };
 
   const needClosed = data?.need ? isNeedClosed(data.need) : false;
@@ -417,6 +430,34 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs"
+              role="group"
+              aria-label="Alcance de candidatos"
+            >
+              <button
+                type="button"
+                onClick={() => changeScope('all')}
+                disabled={refreshing}
+                className={`px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-60 ${
+                  scope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Rankea contra todos los jóvenes de la plataforma"
+              >
+                Todo el pool
+              </button>
+              <button
+                type="button"
+                onClick={() => changeScope('mine')}
+                disabled={refreshing}
+                className={`px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-60 ${
+                  scope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Solo jóvenes que entraron por tu link de marca"
+              >
+                Solo mis candidatos
+              </button>
+            </div>
             {needClosed ? (
               <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 gap-1">
                 <Lock size={12} /> Vacante cerrada
@@ -559,10 +600,32 @@ export default function MatchesPorNecesidad({ params }: { params: Promise<{ need
       {activeMatches.length === 0 && discardedMatches.length === 0 && (
         <section className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-2xl p-12 text-center">
           <UserCheck size={32} className="text-slate-400 mx-auto mb-4" />
-          <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">Aún no hay perfiles en SaltoAI</h3>
-          <p className="text-sm text-slate-500 max-w-md mx-auto">
-            Pide a algún joven que haga su entrevista, o ejecuta el seed (`curl localhost:3000/api/seed`) para cargar perfiles de demo.
-          </p>
+          {scope === 'mine' ? (
+            <>
+              <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">
+                Aún no tienes candidatos propios para esta necesidad
+              </h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto">
+                Solo aparecen aquí los jóvenes que hicieron tu entrevista a través de tu link de
+                marca. Compártelo desde <strong>Mi entrevistador</strong>, o cambia a{' '}
+                <button
+                  type="button"
+                  onClick={() => changeScope('all')}
+                  className="text-emerald-700 underline hover:text-emerald-900"
+                >
+                  Todo el pool
+                </button>{' '}
+                para ver candidatos de toda la plataforma.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="font-display font-semibold text-xl text-slate-900 mb-2">Aún no hay perfiles en SaltoAI</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto">
+                Pide a algún joven que haga su entrevista, o ejecuta el seed (`curl localhost:3000/api/seed`) para cargar perfiles de demo.
+              </p>
+            </>
+          )}
         </section>
       )}
 
