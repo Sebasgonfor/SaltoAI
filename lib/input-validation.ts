@@ -73,6 +73,8 @@ export interface InterviewValidity {
 export function validateForProfileExtraction(messages: ChatMessage[]): InterviewValidity {
   const turns = countUserTurns(messages);
   const words = totalUserWords(messages);
+  const signals = detectSignals(messages).length;
+
   if (turns === 0) {
     return {
       ok: false,
@@ -81,6 +83,16 @@ export function validateForProfileExtraction(messages: ChatMessage[]): Interview
         "Aún no contaste nada. Para armar tu Perfil de Evidencia necesito al menos una historia con detalle.",
     };
   }
+
+  // Si la conversación YA tiene sustancia clara (varias señales reales o un
+  // relato extenso), CONSTRUIMOS el perfil — sin importar que la última
+  // respuesta haya sido corta (p. ej. "no" a la última pregunta). Antes esto
+  // bloqueaba perfiles ricos (392 palabras, 6 señales) solo por el último
+  // mensaje breve y disparaba el rescate de forma absurda.
+  if (signals >= 3 || (signals >= 1 && words >= 60)) {
+    return { ok: true };
+  }
+
   if (words < 15) {
     return {
       ok: false,
@@ -89,24 +101,23 @@ export function validateForProfileExtraction(messages: ChatMessage[]): Interview
         "Necesito más detalle para construir tu perfil. Cuéntame qué hiciste exactamente y qué resultado tuvo.",
     };
   }
+  // Sin señales reales (relatos vacíos / divagación): no armamos un perfil con
+  // el piso heurístico — sería sin sustancia. Pedimos un caso concreto.
+  if (signals === 0) {
+    return {
+      ok: false,
+      reason: "no_signals",
+      message:
+        "Todavía no detecto evidencia laboral en lo que contaste. Cuéntame UN caso concreto: algo que hiciste, cómo lo hiciste y qué resultado tuvo.",
+    };
+  }
+  // Caso borde (pocas señales y última respuesta muy corta): pedimos profundizar.
   if (isLastAnswerTooShort(messages, 3)) {
     return {
       ok: false,
       reason: "too_short",
       message:
         "Tu última respuesta fue muy corta. Profundiza un poco — paso a paso, qué hiciste y cómo te diste cuenta de que funcionó.",
-    };
-  }
-  // Guard de evidencia: aunque haya palabras suficientes, si el detector no
-  // encuentra NINGUNA señal laboral (relatos vacíos / divagación), no armamos
-  // un perfil con el piso heurístico — sería un perfil sin sustancia. Pedimos
-  // un caso concreto. (El detector es el mismo del panel "Señales en vivo".)
-  if (detectSignals(messages).length === 0) {
-    return {
-      ok: false,
-      reason: "no_signals",
-      message:
-        "Todavía no detecto evidencia laboral en lo que contaste. Cuéntame UN caso concreto: algo que hiciste, cómo lo hiciste y qué resultado tuvo.",
     };
   }
   return { ok: true };
