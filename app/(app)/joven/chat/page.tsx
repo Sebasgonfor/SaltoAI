@@ -29,6 +29,8 @@ import { normalizeSlug, type RecruiterBrandPublic } from '@/lib/recruiter-config
 
 const MIN_TURNS = MIN_USER_TURNS;
 const MAX_TURNS = MAX_USER_TURNS;
+// Intentos de rescate antes de la salida elegante (sin loop infinito).
+const MAX_RECOVERY_ATTEMPTS = 4;
 
 const CLOSING_AGENT_MSG = CLOSING_MESSAGE;
 
@@ -192,6 +194,9 @@ function ChatJoven() {
   // input bloqueado (callejón sin salida), re-habilitamos para que cuente un
   // ejemplo y REINTENTAMOS construir el perfil con esa respuesta.
   const [recovery, setRecovery] = useState(false);
+  // Tras varios intentos de rescate sin sustancia, salida elegante (no loop).
+  const [recoveryExhausted, setRecoveryExhausted] = useState(false);
+  const recoveryAttemptsRef = useRef(0);
   const [restored, setRestored] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef('');
@@ -493,6 +498,9 @@ function ChatJoven() {
     setFormError(null);
     setLoading(false);
     setClosing(false);
+    setRecovery(false);
+    setRecoveryExhausted(false);
+    recoveryAttemptsRef.current = 0;
     setInterviewMode('text');
     resumeProfileBuildRef.current = false;
     profileBuildInFlightRef.current = false;
@@ -576,18 +584,26 @@ function ChatJoven() {
           // perfil. El render de InterviewDoneStep se ocupa; el redirect lo hace
           // el botón "Ver mi perfil".
           setRecovery(false);
+          setRecoveryExhausted(false);
+          recoveryAttemptsRef.current = 0;
           setClosing(false);
           setDoneProfileId(closeData.id);
         } else {
           // Casos borde (PRD §8.5): el agente cree que terminó pero el
-          // extractor no encuentra evidencia suficiente. En vez de freezar,
-          // devolvemos la conversación al usuario con el mensaje honesto.
-          const fallback =
-            closeData.error ||
-            'No pudimos construir tu perfil con lo que contaste. Cuéntame un ejemplo concreto: algo que hayas hecho y qué resultado tuvo, y lo armo.';
-          setMessages((prev) => [...prev, { role: 'agent', content: fallback }]);
+          // extractor no encuentra evidencia suficiente. Entramos en MODO
+          // RESCATE: mensaje cálido con un ejemplo, y los siguientes turnos van
+          // a /api/entrevista (rescue) que engancha y pide algo concreto, en vez
+          // de re-validar a ciegas (loop del mismo mensaje).
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'agent',
+              content:
+                'Lo hacemos fácil: cuéntame UNA cosa real que hayas hecho — por ejemplo "ayudaba en el negocio de mi familia vendiendo arepas y llevaba las cuentas". ¿Qué hiciste tú y cómo te fue?',
+            },
+          ]);
           setClosing(false);
-          // Re-habilitar el input para que el joven dé más detalle y reintentar.
+          recoveryAttemptsRef.current = 0;
           setRecovery(true);
           setFormError(null);
         }
@@ -629,16 +645,53 @@ function ChatJoven() {
     const content = (textOverride ?? inputRef.current).trim();
     if (!content || loading || closing || !basics) return;
 
-    // En recuperación, el siguiente mensaje NO es un turno más de preguntas:
-    // es el detalle que faltaba → lo añadimos y REINTENTAMOS construir el
-    // perfil con la conversación enriquecida (rompe el callejón sin salida del
-    // límite de turnos).
-    if (recovery) {
+    // MODO RESCATE: el siguiente mensaje va a /api/entrevista (rescue) que
+    // engancha con lo que dijo y pide un ejemplo concreto. Cuando ya hay
+    // sustancia (done), construimos el perfil. Tras MAX_RECOVERY_ATTEMPTS sin
+    // lograrlo, salida elegante (sin loop infinito del mismo mensaje).
+    if (recovery && basics) {
       const updated = [...messages, { role: 'user' as const, content }];
       setMessages(updated);
       setInput('');
-      setRecovery(false);
-      await finishInterview(updated);
+      const attempt = recoveryAttemptsRef.current + 1;
+      recoveryAttemptsRef.current = attempt;
+      setLoading(true);
+      try {
+        const res = await fetch('/api/entrevista', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: updated,
+            firstName: firstNameFrom(basics.name),
+            rescue: true,
+            ...(recruiterSlugRef.current && { recruiterSlug: recruiterSlugRef.current }),
+          }),
+        });
+        const data = (await res.json()) as { nextQuestion?: string; done?: boolean };
+        setLoading(false);
+        if (res.ok && data.done) {
+          // Ya hay sustancia suficiente → construir el perfil.
+          setRecovery(false);
+          setMessages([...updated, { role: 'agent', content: CLOSING_AGENT_MSG }]);
+          await finishInterview(updated);
+          return;
+        }
+        const q =
+          (res.ok && data.nextQuestion) ||
+          'Cuéntame algo concreto que hayas hecho: qué hiciste y cómo te fue.';
+        setMessages([...updated, { role: 'agent', content: q }]);
+        if (attempt >= MAX_RECOVERY_ATTEMPTS) {
+          // Salida elegante: paramos el loop y ofrecemos opciones claras.
+          setRecovery(false);
+          setRecoveryExhausted(true);
+        }
+      } catch {
+        setLoading(false);
+        setMessages([
+          ...updated,
+          { role: 'agent', content: 'Tuvimos un problema de conexión. Intenta enviar de nuevo.' },
+        ]);
+      }
       return;
     }
 
@@ -1256,6 +1309,40 @@ function ChatJoven() {
                   </p>
                 </div>
               </>
+            ) : recoveryExhausted ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6 text-center space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                  <Sparkles size={20} />
+                </div>
+                <h3 className="font-display font-semibold text-base text-slate-900">
+                  ¿Seguimos en otro momento?
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed max-w-md mx-auto">
+                  Para armar tu Perfil de Evidencia necesito que me cuentes algo concreto que hayas
+                  hecho — un trabajo, ayudar en tu casa, un proyecto, algo que aprendiste — con qué
+                  hiciste y cómo te fue. Cuando lo tengas, retomamos en minutos. Tu avance queda
+                  guardado.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center pt-1">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      recoveryAttemptsRef.current = 0;
+                      setRecoveryExhausted(false);
+                      setRecovery(true);
+                      setFormError(null);
+                    }}
+                    className="gap-2"
+                  >
+                    <Sparkles size={15} /> Tengo un ejemplo, seguir
+                  </Button>
+                  <Link href="/dashboard">
+                    <Button type="button" variant="outline" className="w-full sm:w-auto">
+                      Volver al inicio
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             ) : (
               <>
                 {voiceError && (

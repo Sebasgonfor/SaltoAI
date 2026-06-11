@@ -5,6 +5,7 @@ import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/ap
 import {
   buildOpeningQuestionPrompt,
   buildPrematureCloseRetryNote,
+  buildRescuePrompt,
   buildRestInterviewSystemPrompt,
   buildShortAnswerFollowupPrompt,
   buildSimilarQuestionRetryNote,
@@ -15,6 +16,7 @@ import {
   orderPendingSignals,
   pickFallbackOpening,
   pickFallbackQuestion,
+  RESCUE_FALLBACK_QUESTION,
 } from "@/lib/interview-prompt";
 import {
   countUserTurns,
@@ -22,6 +24,7 @@ import {
   isYesNoQuestion,
   lastAgentMessage,
   validateChatMessage,
+  validateForProfileExtraction,
   CHAT_MESSAGE_MAX_CHARS,
 } from "@/lib/input-validation";
 import { detectSignals, SIGNAL_IDS } from "@/lib/signals";
@@ -234,9 +237,11 @@ export async function POST(req: NextRequest) {
       firstName?: string;
       opening?: boolean;
       recruiterSlug?: string;
+      rescue?: boolean;
     };
 
     const opening = body.opening === true;
+    const rescue = body.rescue === true;
     const firstName = typeof body.firstName === "string" ? body.firstName.trim().slice(0, 60) : "";
     const messages = Array.isArray(body.messages) ? body.messages : [];
     messagesSnapshot = messages;
@@ -324,6 +329,58 @@ export async function POST(req: NextRequest) {
 
     const userTurns = countUserTurns(messages);
     const heuristicCovered = detectSignals(messages);
+
+    // MODO RESCATE: el cierre falló por falta de evidencia y el cliente reintenta
+    // dando más detalle. En vez de re-validar a ciegas (loop del mismo mensaje),
+    // ENGANCHAMOS y pedimos un ejemplo concreto. Bypassa el cap de turnos. Cierra
+    // SOLO cuando la conversación ya alcanza para construir el perfil (misma
+    // condición que usa /api/perfil → sin desajustes).
+    if (rescue) {
+      if (validateForProfileExtraction(messages).ok) {
+        log.end({ status: 200, extra: { mode: "rescue_close", userTurns } });
+        return NextResponse.json({
+          nextQuestion: CLOSING_MESSAGE,
+          done: true,
+          targetedSignal: null,
+          signalsCovered: heuristicCovered,
+          rescue: true,
+        });
+      }
+      const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+      if (!hasGeminiKey()) {
+        log.end({ status: 200, extra: { mode: "rescue_no_key", userTurns } });
+        return NextResponse.json({
+          nextQuestion: RESCUE_FALLBACK_QUESTION,
+          done: false,
+          signalsCovered: heuristicCovered,
+          rescue: true,
+          degraded: true,
+        });
+      }
+      try {
+        const r = await generateInterviewTurn(
+          `${systemPrompt}\n\n${buildRescuePrompt(lastUser, promptCfg)}`
+        );
+        log.end({ status: 200, extra: { mode: "rescue_llm", userTurns } });
+        return NextResponse.json({
+          nextQuestion: r.nextQuestion || RESCUE_FALLBACK_QUESTION,
+          done: false,
+          signalsCovered: heuristicCovered,
+          rescue: true,
+        });
+      } catch (err) {
+        if (isRateLimitError(err)) throw err;
+        log.warn("rescue.fallback", { message: (err as Error)?.message });
+        log.end({ status: 200, extra: { mode: "rescue_fallback", userTurns } });
+        return NextResponse.json({
+          nextQuestion: RESCUE_FALLBACK_QUESTION,
+          done: false,
+          signalsCovered: heuristicCovered,
+          rescue: true,
+          degraded: true,
+        });
+      }
+    }
 
     if (userTurns >= MAX_USER_TURNS) {
       const resp = maxTurnsResponse(heuristicCovered);
