@@ -547,8 +547,10 @@ async function enrichWithDocumentSkills(profiles: Profile[]): Promise<Profile[]>
           if (d.extractionStatus !== "done") continue;
           if (!d.extractedSkills) continue;
           for (const s of d.extractedSkills) {
-            // Solo skills con cita textual y confianza alta (anti-alucinación).
-            if (s.skill && s.evidence && s.confidence >= 60) {
+            // Solo skills con CITA TEXTUAL y confianza alta (anti-alucinación).
+            // Las `derived` (competencias inferidas del programa, sin cita) NO
+            // entran como verifiedSkills: no pueden pesar como "evidencia citada".
+            if (s.skill && s.evidence && s.confidence >= 60 && !s.derived) {
               allSkills.push(s);
             }
           }

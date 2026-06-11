@@ -36,7 +36,8 @@ Tu trabajo:
 CRÍTICO — CARRERA/TÍTULO ≠ HABILIDAD:
 - El NOMBRE de una carrera, grado o título NO es una habilidad. Va en "programTitle", NUNCA en extractedSkills.
   Ej: un diploma de "Ingeniería Industrial" → programTitle="Ingeniería Industrial", y NO agregues "Ingeniería Industrial" como skill.
-- De un título/diploma, las skills SOLO salen de competencias, materias, énfasis o menciones CONCRETAS que el documento liste (ej. "énfasis en logística" → skill="Logística"). Si el documento solo dice el nombre del grado sin detalle, devolvé extractedSkills vacío (el grado ya queda en programTitle).
+- SKILLS CITADAS (derived=false): salen de competencias, materias, énfasis o menciones CONCRETAS que el documento liste (ej. "énfasis en logística" → skill="Logística", evidence="énfasis en logística", derived=false).
+- COMPETENCIAS DEL PROGRAMA (derived=true): si el documento NO lista materias pero SÍ otorga un PROGRAMA o TÍTULO RECONOCIDO y estandarizado (ej. "Técnico en Sistemas" del SENA, "Auxiliar Contable", "Técnico en Enfermería", "Tecnólogo en Logística"), agregá las competencias CANÓNICAS y ampliamente conocidas de ese programa. Para cada una: derived=true, evidence="Competencia del programa: <nombre del programa>", confidence 70-90 según cuán nuclear sea al programa. Máximo 6. Reglas: solo competencias que CUALQUIERA asociaría con ese programa (NO inventes nichos), y NUNCA el nombre del grado mismo. Si el programa es ambiguo, desconocido o demasiado genérico para tener competencias estándar, devolvé extractedSkills vacío.
 - Tampoco conviertas CARGOS/PUESTOS en skills (ej. "Coordinador de RRHH" es un rol, no una habilidad).
 
 CRÍTICO — ANTI-ALUCINACIÓN:
@@ -50,7 +51,7 @@ Devuelve JSON con:
   "institution": "nombre de la institución emisora o null",
   "programTitle": "título del programa/curso/grado o null",
   "issuedAt": "YYYY-MM o null si no se ve",
-  "extractedSkills": [{ "skill": "...", "evidence": "cita del documento", "confidence": 0-100 }],
+  "extractedSkills": [{ "skill": "...", "evidence": "cita del documento o 'Competencia del programa: ...'", "confidence": 0-100, "derived": boolean }],
   "validable": boolean (¿el documento es legible y tiene info suficiente?)
 }
 
@@ -71,8 +72,9 @@ const EXTRACT_DOCUMENT_SCHEMA = {
           skill: { type: Type.STRING },
           evidence: { type: Type.STRING },
           confidence: { type: Type.NUMBER },
+          derived: { type: Type.BOOLEAN },
         },
-        required: ["skill", "evidence", "confidence"],
+        required: ["skill", "evidence", "confidence", "derived"],
       },
     },
     validable: { type: Type.BOOLEAN },
@@ -296,13 +298,16 @@ export async function extractDocumentSkills(
   //    el programTitle de un título, también se descarta. El grado queda en
   //    `programTitle` (lo muestra Documentos y la sección de credenciales).
   const programTitleNorm = parsed.programTitle?.trim().toLowerCase() ?? "";
-  const skills = (parsed.extractedSkills ?? []).filter((s) => {
-    if (!s || !s.skill || !s.evidence) return false;
-    if (typeof s.confidence !== "number" || s.confidence < 60) return false;
-    if (isNotASkill(s.skill)) return false;
-    if (programTitleNorm && s.skill.trim().toLowerCase() === programTitleNorm) return false;
-    return true;
-  });
+  const skills = (parsed.extractedSkills ?? [])
+    .filter((s) => {
+      if (!s || !s.skill || !s.evidence) return false;
+      if (typeof s.confidence !== "number" || s.confidence < 60) return false;
+      if (isNotASkill(s.skill)) return false;
+      if (programTitleNorm && s.skill.trim().toLowerCase() === programTitleNorm) return false;
+      return true;
+    })
+    // Normalizamos `derived` (la IA a veces lo omite): solo true cuando viene true.
+    .map((s) => ({ ...s, derived: s.derived === true }));
 
   return {
     ok: true,

@@ -157,6 +157,13 @@ export function useVoiceInput(lang = 'es-CO') {
     setIsTranscribing(true);
     const controller = new AbortController();
     abortRef.current = controller;
+    // Red de seguridad: si la respuesta no llega en 25s, abortamos para que
+    // el estado "Transcribiendo…" no quede colgado indefinidamente.
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 25000);
 
     try {
       const audioBase64 = await blobToBase64(blob);
@@ -180,10 +187,16 @@ export function useVoiceInput(lang = 'es-CO') {
 
       return typeof data.text === 'string' ? data.text.trim() : '';
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return '';
+      if ((err as Error)?.name === 'AbortError') {
+        if (timedOut) {
+          setError('La transcripción tardó demasiado. Intentá de nuevo o escribí tu respuesta.');
+        }
+        return '';
+      }
       setError('Error de red al transcribir. Revisá tu conexión e intentá de nuevo.');
       return '';
     } finally {
+      clearTimeout(timeoutId);
       abortRef.current = null;
       setIsTranscribing(false);
     }

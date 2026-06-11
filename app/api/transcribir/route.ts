@@ -4,6 +4,11 @@ import { classifyProviderError, errorResponse, isRateLimitError } from "@/lib/ap
 import { startLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
+
+/** Si Gemini no responde en este tiempo, cortamos y devolvemos error en vez
+ * de dejar el "Transcribiendo…" colgado. */
+const TRANSCRIBE_TIMEOUT_MS = 20_000;
 
 const MAX_BASE64_CHARS = 4 * 1024 * 1024; // ~4 MB base64
 
@@ -83,18 +88,30 @@ export async function POST(req: NextRequest) {
     const langHint = body.lang?.trim() ? ` Idioma/región: ${body.lang.trim()}.` : "";
     const prompt = `${TRANSCRIBE_PROMPT}${langHint}`;
 
-    const response = await gemini().models.generateContent({
-      model: GEMINI_LITE_MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: normalizeMimeType(mimeType), data: audioBase64 } },
-            { text: prompt },
-          ],
+    const response = await Promise.race([
+      gemini().models.generateContent({
+        model: GEMINI_LITE_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType: normalizeMimeType(mimeType), data: audioBase64 } },
+              { text: prompt },
+            ],
+          },
+        ],
+        config: {
+          // La transcripción es texto plano; sin "thinking" responde en
+          // segundos en vez de tardar de más. Acotamos también la salida.
+          thinkingConfig: { thinkingBudget: 0 },
+          temperature: 0,
+          maxOutputTokens: 1024,
         },
-      ],
-    });
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout:transcribir")), TRANSCRIBE_TIMEOUT_MS)
+      ),
+    ]);
 
     const raw = (response.text || "").trim();
     const text = raw.replace(/^["']|["']$/g, "").trim();
@@ -102,6 +119,16 @@ export async function POST(req: NextRequest) {
     log.end({ status: 200, extra: { chars: text.length, mimeType: normalizeMimeType(mimeType) } });
     return NextResponse.json({ text });
   } catch (err) {
+    if ((err as Error)?.message === "timeout:transcribir") {
+      log.end({ status: 504, extra: { code: "timeout" } });
+      return NextResponse.json(
+        {
+          error: "La transcripción tardó demasiado. Intentá de nuevo o escribí tu respuesta.",
+          code: "timeout",
+        },
+        { status: 504 }
+      );
+    }
     if (isRateLimitError(err)) {
       const shape = classifyProviderError(err);
       log.warn("rate_limited", { message: (err as Error)?.message });

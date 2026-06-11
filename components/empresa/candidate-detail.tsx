@@ -87,7 +87,7 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
     if (match) {
       return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
-          <div className="sticky top-20 z-10 bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="sticky top-14 z-20 bg-white border border-slate-200 rounded-2xl p-4 shadow-md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Link href={`/empresa/matches/${needId}`}>
                 <Button variant="outline" size="sm" className="gap-1.5">
@@ -136,7 +136,7 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
-      <div className="sticky top-20 z-10 bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="sticky top-14 z-20 bg-white border border-slate-200 rounded-2xl p-4 shadow-md space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href={`/empresa/matches/${needId}`}>
               <Button variant="outline" size="sm" className="gap-1.5">
@@ -314,7 +314,9 @@ export function CandidateDetail({ profileId, needId, companyId, match }: Candida
                 const label = sk.skill.trim();
                 const key = label.toLowerCase();
                 // Carrera/título ≠ habilidad (filtra docs antiguos con el grado como skill).
-                if (key && !isNotASkill(label) && !verified.has(key)) {
+                // `derived` = competencia inferida del programa, NO citada: no se
+                // muestra como "Verificada por documento" al empleador.
+                if (key && !sk.derived && !isNotASkill(label) && !verified.has(key)) {
                   verified.set(key, { label, evidence: sk.evidence ?? '' });
                 }
               }

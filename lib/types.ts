@@ -23,6 +23,14 @@ export interface DocumentSkill {
   evidence: string;
   /** 0-100: cuán segura está la IA de que la skill aparece. */
   confidence: number;
+  /**
+   * true = la skill NO está citada literalmente en el documento, sino que es una
+   * competencia CANÓNICA de un programa/título reconocido (ej. "Redes" de un
+   * "Técnico en Sistemas"). `evidence` apunta al programa, no a una cita.
+   * Estas skills NO cuentan como "verificadas por cita" — se muestran como
+   * "del programa" y no pesan como verifiedSkills en el matching.
+   */
+  derived?: boolean;
 }
 
 export interface ProfileDocument {
