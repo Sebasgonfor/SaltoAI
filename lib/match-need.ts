@@ -1,6 +1,7 @@
 import { cosineSimilarity } from "@/lib/embeddings";
 import { getAllProfiles, getNeed, getNeedMatches, getProfile, saveNeedMatches } from "@/lib/db";
 import { scoreCandidates, SHORTLIST_SIZE } from "@/lib/ics";
+import { isDemoProfile } from "@/lib/profile-source";
 import { isNeedClosed } from "@/lib/need-status";
 import type { CompanyNeed, NeedMatchSnapshot } from "@/lib/types";
 
@@ -41,7 +42,12 @@ export async function computeMatchesForNeed(need: CompanyNeed): Promise<NeedMatc
   const resolved = await Promise.all(
     profilesRaw.map(async (p) => (p.id && (await getProfile(p.id)) ? p : null))
   );
-  const profiles = resolved.filter((p): p is NonNullable<typeof p> => p != null);
+  const allReal = resolved.filter((p): p is NonNullable<typeof p> => p != null);
+  // Opción 3: el matching NO mezcla perfiles demo/seed (Camila, Andrés, etc.)
+  // con candidatos reales. En producción solo entran perfiles reales; los demo
+  // se incluyen únicamente si SALTO_INCLUDE_DEMO=1 (para demos controladas).
+  const includeDemo = process.env.SALTO_INCLUDE_DEMO === "1";
+  const profiles = includeDemo ? allReal : allReal.filter((p) => !isDemoProfile(p.id));
 
   if (profiles.length === 0) {
     const empty: NeedMatchSnapshot = {
