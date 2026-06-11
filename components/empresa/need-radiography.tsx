@@ -511,37 +511,49 @@ function HistogramWidget({
       </h3>
       {total === 0 ? (
         <p className="text-sm text-slate-500 leading-relaxed">
-          Sin candidatos para distribuir. Volvé cuando haya shortlist.
+          Sin candidatos para distribuir. Vuelve cuando haya shortlist.
         </p>
       ) : (
-        <div className="flex items-end gap-2 h-32">
-          {buckets.map((count, i) => {
-            const pct = (count / max) * 100;
-            const isHigh = i >= 3;
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
-                <span className="text-[11px] tabular-nums text-slate-600 font-mono">
-                  {count}
-                </span>
-                <div className="w-full flex-1 bg-slate-50 rounded-t-lg relative overflow-hidden">
-                  <div
-                    className={`absolute bottom-0 left-0 right-0 rounded-t-lg transition-all ${
-                      isHigh
-                        ? 'bg-emerald-500'
-                        : i === 2
-                          ? 'bg-amber-400'
-                          : 'bg-slate-300'
-                    }`}
-                    style={{ height: `${pct}%` }}
-                  />
+        <>
+          <div className="flex items-stretch gap-2 sm:gap-3 h-40">
+            {buckets.map((count, i) => {
+              const pct = (count / max) * 100;
+              const tone =
+                i >= 3 ? 'bg-emerald-500' : i === 2 ? 'bg-amber-400' : 'bg-slate-300';
+              // Alto mínimo visible cuando hay al menos 1 candidato.
+              const barH = count > 0 ? Math.max(pct, 8) : 0;
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full">
+                  {/* zona de barra: ocupa todo el alto; la barra crece desde abajo */}
+                  <div className="relative w-full flex-1 rounded-md bg-slate-50/80">
+                    {count > 0 && (
+                      <div
+                        className={`absolute inset-x-0 bottom-0 ${tone} rounded-md transition-[height] duration-500`}
+                        style={{ height: `${barH}%` }}
+                      />
+                    )}
+                    <span
+                      className={`absolute inset-x-0 text-center text-[11px] tabular-nums font-semibold ${
+                        count > 0 ? 'text-slate-700' : 'text-slate-300'
+                      }`}
+                      style={count > 0 ? { bottom: `calc(${barH}% + 3px)` } : { bottom: '3px' }}
+                    >
+                      {count}
+                    </span>
+                  </div>
+                  <span className="mt-2 text-[10px] text-slate-500 font-medium">
+                    {labels[i]}
+                  </span>
                 </div>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {labels[i]}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          <p className="mt-4 text-[11px] text-slate-500 leading-relaxed">
+            Cantidad de candidatos del shortlist por rango de{' '}
+            <strong className="text-slate-700 font-semibold">compatibilidad (ICS)</strong>, de 0 a
+            100. Cuanto más a la derecha, mejor el encaje con tu necesidad.
+          </p>
+        </>
       )}
     </div>
   );

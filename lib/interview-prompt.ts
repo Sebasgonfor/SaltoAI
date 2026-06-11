@@ -297,6 +297,36 @@ ${openingLangLine}
 - done=false.${buildRecruiterBlock(cfg)}`;
 }
 
+/** Pregunta de rescate de respaldo (sin LLM): cálida, con ejemplo concreto. */
+export const RESCUE_FALLBACK_QUESTION =
+  'Lo hacemos fácil. Cuéntame UNA cosa real que hayas hecho — por ejemplo: ' +
+  '"ayudaba en el negocio de mi tía vendiendo arepas, organizaba los pedidos por ' +
+  'WhatsApp y llevaba las cuentas". ¿Qué hiciste tú y cómo te fue?';
+
+/**
+ * MODO RESCATE: el cierre falló por falta de evidencia y el candidato sigue
+ * dando respuestas muy cortas. En vez de repetir "cuéntame qué hiciste",
+ * enganchamos con lo último que dijo, damos UN ejemplo de buena respuesta y
+ * pedimos algo real. Se concatena DESPUÉS del system prompt (que define el JSON
+ * y las reglas), así que solo aporta la guía del turno.
+ */
+export function buildRescuePrompt(lastUser: string, cfg?: PromptConfig): string {
+  const enLine =
+    cfg?.language === "en"
+      ? "Write your message in natural English."
+      : "Escríbelo en español neutro, tuteo.";
+  return `MODO RESCATE: el candidato viene dando respuestas muy cortas o evasivas y todavía NO tenemos una sola historia con sustancia para armar su perfil. NO repitas "cuéntame qué hiciste" ni la pregunta anterior.
+
+Su última respuesta fue: "${lastUser}".
+
+Genera UN mensaje (nextQuestion) breve, cálido y muy concreto que:
+- Reaccione con calidez y se enganche con CUALQUIER cosa real que haya mencionado (un lugar, comida, trabajo, estudio, proyecto — p. ej. "arepas", "empresa"). Si mencionó algo, pregúntale por ESO en concreto.
+- Incluya UN ejemplo de buena respuesta en una frase, para que entienda qué buscamos. Ej: "Por ejemplo: 'Ayudaba en el negocio de mi tía vendiendo arepas, organizaba los pedidos por WhatsApp y un mes vendimos el doble.'"
+- Le pida que cuente algo REAL que haya hecho (trabajo informal, ayudar en casa, un proyecto, aprender algo por su cuenta): qué hizo y cómo le fue.
+- Máximo 3 frases, UNA sola pregunta. ${enLine}
+- done=false SIEMPRE.${buildRecruiterBlock(cfg)}`;
+}
+
 /** Seguimiento cuando el joven respondió muy breve. */
 export function buildShortAnswerFollowupPrompt(
   prevAgent: string,

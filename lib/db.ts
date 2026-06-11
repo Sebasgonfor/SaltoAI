@@ -25,6 +25,7 @@ import type {
   MatchDecision,
   MatchDecisionStatus,
   NeedMatchSnapshot,
+  YouthMatchSnapshot,
 } from "./types";
 import type { RecruiterConfig } from "./recruiter-config";
 
@@ -35,6 +36,7 @@ const MICROTASKS = "microtasks";
 const DOCUMENTS = "documents";
 const MATCH_DECISIONS = "match_decisions";
 const NEED_MATCHES = "need_matches";
+const YOUTH_MATCHES = "youth_matches";
 const RECRUITER_CONFIGS = "recruiter_configs";
 
 export type StorageMode = "firestore" | "memory";
@@ -64,6 +66,7 @@ type DbGlobals = {
   memDocuments: Map<string, ProfileDocument>;
   memMatchDecisions: Map<string, MatchDecision>;
   memNeedMatches: Map<string, NeedMatchSnapshot>;
+  memYouthMatches: Map<string, YouthMatchSnapshot>;
   memRecruiterConfigs: Map<string, RecruiterConfig>;
 };
 const g = globalThis as unknown as { __saltoDb?: DbGlobals };
@@ -76,6 +79,7 @@ if (!g.__saltoDb) {
     memDocuments: new Map(),
     memMatchDecisions: new Map(),
     memNeedMatches: new Map(),
+    memYouthMatches: new Map(),
     memRecruiterConfigs: new Map(),
   };
 }
@@ -84,6 +88,7 @@ if (!g.__saltoDb) {
 if (!g.__saltoDb.memDocuments) g.__saltoDb.memDocuments = new Map();
 if (!g.__saltoDb.memMatchDecisions) g.__saltoDb.memMatchDecisions = new Map();
 if (!g.__saltoDb.memNeedMatches) g.__saltoDb.memNeedMatches = new Map();
+if (!g.__saltoDb.memYouthMatches) g.__saltoDb.memYouthMatches = new Map();
 if (!g.__saltoDb.memRecruiterConfigs) g.__saltoDb.memRecruiterConfigs = new Map();
 const memProfiles = g.__saltoDb.memProfiles;
 const memNeeds = g.__saltoDb.memNeeds;
@@ -92,6 +97,7 @@ const memMicroTasks = g.__saltoDb.memMicroTasks;
 const memDocuments = g.__saltoDb.memDocuments;
 const memMatchDecisions = g.__saltoDb.memMatchDecisions;
 const memNeedMatches = g.__saltoDb.memNeedMatches;
+const memYouthMatches = g.__saltoDb.memYouthMatches;
 const memRecruiterConfigs = g.__saltoDb.memRecruiterConfigs;
 
 // Antes había un único flag global `firestoreDisabled` que se prendía con
@@ -894,6 +900,45 @@ export async function getAllNeedMatches(): Promise<NeedMatchSnapshot[]> {
     }
   }
   return Array.from(memNeedMatches.values());
+}
+
+// --- youth_matches: cache joven-céntrico de oportunidades ---
+// Degrada con gracia: si las rules no permiten esta colección, el read/write
+// se desactiva SOLO para ella y la página recalcula cada visita (sin cache,
+// pero sin romperse). Igual que need_matches.
+
+export async function getYouthMatches(profileId: string): Promise<YouthMatchSnapshot | null> {
+  if (firestoreEnabled(YOUTH_MATCHES)) {
+    try {
+      const snap = await getDoc(doc(db, YOUTH_MATCHES, profileId));
+      if (snap.exists()) {
+        const data = snap.data() as Omit<YouthMatchSnapshot, "profileId">;
+        const row: YouthMatchSnapshot = { profileId, ...data };
+        memYouthMatches.set(profileId, row);
+        return row;
+      }
+    } catch (e) {
+      disableFirestoreWithWarning(e, "getYouthMatches", YOUTH_MATCHES);
+    }
+  }
+  return memYouthMatches.get(profileId) ?? null;
+}
+
+export async function saveYouthMatches(snapshot: YouthMatchSnapshot): Promise<void> {
+  const id = snapshot.profileId;
+  if (firestoreEnabled(YOUTH_MATCHES)) {
+    try {
+      await setDoc(
+        doc(db, YOUTH_MATCHES, id),
+        stripUndefined(snapshot as unknown as Record<string, unknown>)
+      );
+      memYouthMatches.set(id, snapshot);
+      return;
+    } catch (e) {
+      disableFirestoreWithWarning(e, "saveYouthMatches", YOUTH_MATCHES);
+    }
+  }
+  memYouthMatches.set(id, snapshot);
 }
 
 export { isFirestoreConfigured };

@@ -194,7 +194,7 @@ function ConectarContent() {
 
   const fetchOpportunities = useMemo(
     () =>
-      async (pid: string, opts: { useCache: boolean }) => {
+      async (pid: string, opts: { useCache: boolean; force?: boolean }) => {
         // 1. Si hay cache fresco y nos lo permiten, lo usamos al instante.
         if (opts.useCache) {
           const cached = readCache(pid);
@@ -216,7 +216,7 @@ function ConectarContent() {
           const res = await fetch('/api/oportunidades', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId: pid }),
+            body: JSON.stringify({ profileId: pid, force: opts.force === true }),
           });
           const json = await res.json();
           if (!res.ok) {
@@ -256,7 +256,8 @@ function ConectarContent() {
   const forceRefresh = () => {
     if (!profileId || refreshing) return;
     clearCacheFor(profileId);
-    void fetchOpportunities(profileId, { useCache: false });
+    // force: salta también el cache servidor (youth_matches) → recálculo LLM.
+    void fetchOpportunities(profileId, { useCache: false, force: true });
   };
 
   const refreshDecisions = useCallback(

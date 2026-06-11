@@ -691,3 +691,256 @@ export async function scoreCandidates(
     },
   };
 }
+
+// --- Scoring joven-céntrico (UN joven contra N necesidades, en una llamada) ---
+//
+// El motor de arriba es empresa-céntrico: rankea candidatos PARA una necesidad
+// y guarda el top-10. La página del joven pregunta lo inverso ("¿qué
+// necesidades encajan conmigo?"). Antes reusábamos los snapshots empresa-
+// céntricos y caíamos a heurística para las necesidades donde el joven no
+// estaba en el top-10 → scores léxicamente deflactados. Esta función score al
+// joven contra sus necesidades más afines con el MISMO rubro LLM, en UNA sola
+// llamada, para que TODAS sus oportunidades tengan ICS real (no heurístico).
+
+const YOUTH_RANK_PROMPT = `Eres el motor de scoring ICS (Índice de Compatibilidad Salto), en modo JOVEN-CÉNTRICO.
+Recibes UN perfil de joven y N necesidades de empresa. Devuelves un objeto con un array "results" del MISMO largo y MISMO orden que la lista de necesidades: para CADA necesidad, qué tan bien encaja ESTE joven.
+
+El rubro es idéntico al scoring estándar — adapta la evaluación al "jobNature" de cada necesidad:
+  * "cuantitativa" (vendedor, growth, marketing con KPI): valora resultados medibles, autodidactismo, iniciativa. Sin métricas → skillsFit/learningSignal bajos.
+  * "cualitativa" (contador MIPYME, cajero, diseñador, archivista, operario): valora confiabilidad, detalle, orden, constancia. NO penalices la falta de métricas; behavioralFit es el más importante.
+  * "mixta": balance neutro.
+
+Para CADA necesidad devuelve:
+- needId: copia EXACTAMENTE el needId de esa posición. NO inventes IDs.
+- skillsFit (0-100): cuán bien las skills del joven cubren los requiredSkills SEMÁNTICAMENTE (no por keywords). "Desarrollo Web" cubre "Marketing Digital y Web"; "Atención al Cliente" cubre "manejo de clientes en local". El joven trae "skills" (auto-reportadas) y "verifiedSkills" (extraídas de documentos reales). Las verifiedSkills PESAN MÁS: si cubren un requiredSkill, +15-20 pts. Si TODOS los requiredSkills están cubiertos por verifiedSkills → 85-100.
+- behavioralFit (0-100): compatibilidad entre traits del joven y desiredTraits de la necesidad. Citas de evidencia conductual ("cuadré caja sin faltantes") → 80+.
+- learningSignal (0-100): cuantitativa → evidencia de aprendizaje autónomo (sin evidencia 20-40, caso concreto 70+). cualitativa → ejecución pulcra y constante, NO autodidactismo scrappy (60-80).
+- contextFit (0-100): qué tan bien los traits del joven encajan con el contexto operativo de la necesidad.
+- penalties (0-100): 0 sin hardConstraints incumplidos; 30-60 si uno está claramente incumplido; 100 si es bloqueante.
+- reason (1-2 frases): CITANDO evidencia concreta del joven respecto a ESA necesidad. Sin halagos genéricos.
+- redFlag (1 frase): qué falta o no tenemos evidencia. Si no hay nada, "Ninguna señal negativa visible."
+- topSkills: hasta 3 skills del joven más relevantes para ESA necesidad.
+
+CRÍTICO:
+- Compara las necesidades entre sí; NO infles todas al mismo nivel.
+- NO inventes datos: sin evidencia → score bajo + redFlag honesto.
+- El array results debe tener el MISMO orden que la lista recibida.`;
+
+const youthItemSchema = {
+  type: Type.OBJECT,
+  properties: {
+    needId: { type: Type.STRING },
+    skillsFit: { type: Type.NUMBER },
+    behavioralFit: { type: Type.NUMBER },
+    learningSignal: { type: Type.NUMBER },
+    contextFit: { type: Type.NUMBER },
+    penalties: { type: Type.NUMBER },
+    reason: { type: Type.STRING },
+    redFlag: { type: Type.STRING },
+    topSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
+  },
+  required: [
+    "needId",
+    "skillsFit",
+    "behavioralFit",
+    "learningSignal",
+    "contextFit",
+    "penalties",
+    "reason",
+    "redFlag",
+    "topSkills",
+  ],
+};
+
+const youthBatchSchema = {
+  type: Type.OBJECT,
+  properties: { results: { type: Type.ARRAY, items: youthItemSchema } },
+  required: ["results"],
+};
+
+interface YouthBatchItem {
+  needId?: string;
+  skillsFit: number;
+  behavioralFit: number;
+  learningSignal: number;
+  contextFit: number;
+  penalties: number;
+  reason: string;
+  redFlag: string;
+  topSkills: string[];
+}
+
+export interface YouthScoreEntry {
+  needId: string;
+  ics: number;
+  breakdown: ICSBreakdown;
+  reason: string;
+  redFlag?: string;
+  topSkills?: string[];
+}
+
+export interface YouthScoreResult {
+  /** ICS por needId. Solo incluye necesidades que pasan los hard constraints. */
+  scores: Map<string, YouthScoreEntry>;
+  rankingMode: "llm" | "degraded";
+  degradedReason?: string;
+  excluded: { needId: string; reason: string }[];
+}
+
+async function youthRankWithLLM(
+  profile: Profile,
+  needs: CompanyNeed[]
+): Promise<Map<string, Omit<YouthScoreEntry, "needId" | "ics">>> {
+  const profilePayload = {
+    name: profile.name,
+    summary: profile.summary,
+    skills: profile.skills,
+    traits: profile.traits,
+    evidence: profile.evidence,
+    verifiedSkills:
+      profile.documentSkills?.map((ds) => ({
+        skill: ds.skill,
+        evidence: ds.evidence,
+        confidence: ds.confidence,
+      })) ?? [],
+  };
+  const needsPayload = needs.map((n) => ({
+    needId: n.id,
+    role: n.role,
+    context: n.context,
+    requiredSkills: n.requiredSkills,
+    desiredTraits: n.desiredTraits,
+    hardConstraints: n.hardConstraints,
+    jobNature: n.jobNature ?? "mixta",
+    jobNatureReason: n.jobNatureReason,
+  }));
+
+  const response = await withTimeout(
+    gemini().models.generateContent({
+      model: GEMINI_MODEL,
+      contents: `${YOUTH_RANK_PROMPT}\n\nJOVEN:\n${JSON.stringify(profilePayload, null, 2)}\n\nNECESIDADES (en orden):\n${JSON.stringify(needsPayload, null, 2)}\n\nDevuelve { "results": [...] } con un objeto por necesidad, en el MISMO orden y con el MISMO needId.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: youthBatchSchema,
+        // Mismo motivo que scoreCandidates: thinking activado desbordaba el timeout.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    }),
+    GEMINI_TIMEOUT_MS,
+    "ics.youthRank"
+  );
+
+  const parsed = JSON.parse(response.text || "{}");
+  const items: YouthBatchItem[] = Array.isArray(parsed.results) ? parsed.results : [];
+  const map = new Map<string, Omit<YouthScoreEntry, "needId" | "ics">>();
+  items.forEach((it, idx) => {
+    // Validación posicional: el needId del LLM debe coincidir con la posición.
+    // Si no, descartamos ESE item (cae a heurística) y los demás siguen LLM.
+    const need = needs[idx];
+    if (!need?.id || (it.needId && it.needId !== need.id)) return;
+    const breakdown: ICSBreakdown = {
+      skillsFit: clamp(it.skillsFit),
+      behavioralFit: clamp(it.behavioralFit),
+      learningSignal: clamp(it.learningSignal),
+      contextFit: clamp(it.contextFit),
+      penalties: clamp(it.penalties),
+    };
+    map.set(need.id, {
+      breakdown,
+      reason: it.reason,
+      redFlag: it.redFlag,
+      topSkills: Array.isArray(it.topSkills) ? it.topSkills.slice(0, 3) : undefined,
+    });
+  });
+  return map;
+}
+
+/**
+ * Score un joven contra N necesidades en UNA llamada LLM (con fallback
+ * heurístico por necesidad). Aplica hard constraints: una necesidad que el
+ * joven claramente incumple queda en `excluded` y no se muestra.
+ */
+export async function scoreNeedsForProfile(
+  profile: Profile,
+  needs: CompanyNeed[]
+): Promise<YouthScoreResult> {
+  // Enriquecemos con skills verificadas por documento ANTES del scoring.
+  const [enriched] = await enrichWithDocumentSkills([profile]);
+  const enrichedProfile = enriched ?? profile;
+
+  const excluded: { needId: string; reason: string }[] = [];
+  const eligible: CompanyNeed[] = [];
+  for (const n of needs) {
+    if (!n.id) continue;
+    const check = checkHardConstraints(n, enrichedProfile);
+    if (!check.passes) {
+      excluded.push({ needId: n.id, reason: check.reason || "hardConstraint" });
+      continue;
+    }
+    eligible.push(n);
+  }
+
+  if (eligible.length === 0) {
+    return { scores: new Map(), rankingMode: "degraded", excluded };
+  }
+
+  let llm: Map<string, Omit<YouthScoreEntry, "needId" | "ics">> | null = null;
+  let degradedReason: string | undefined;
+  if (hasGeminiKey()) {
+    try {
+      llm = await youthRankWithLLM(enrichedProfile, eligible);
+    } catch (e) {
+      const msg = (e as Error)?.message || "";
+      if (isQuotaError(e)) {
+        degradedReason =
+          "Estamos sobre el límite de uso de la IA por minuto. Los scores siguen disponibles pero con menor precisión.";
+      } else if (msg.startsWith("timeout:")) {
+        degradedReason =
+          "La IA tardó más de lo normal. Los scores siguen disponibles pero con menor precisión.";
+      } else {
+        degradedReason =
+          "El ranking semántico falló. Los scores siguen disponibles pero con menor precisión.";
+      }
+      console.warn("[ics] youthRank failed, falling back to heuristic:", msg);
+    }
+  } else {
+    degradedReason =
+      "Modo demo sin clave de IA: los scores son heurísticos. Configura GEMINI_API_KEY para ranking real.";
+  }
+
+  let llmHits = 0;
+  let heuristicHits = 0;
+  const scores = new Map<string, YouthScoreEntry>();
+  for (const need of eligible) {
+    const r = llm?.get(need.id!);
+    if (r) {
+      llmHits++;
+      scores.set(need.id!, {
+        needId: need.id!,
+        ics: computeICS(r.breakdown, need),
+        breakdown: r.breakdown,
+        reason: r.reason,
+        redFlag: r.redFlag,
+        topSkills: r.topSkills,
+      });
+    } else {
+      heuristicHits++;
+      const h = heuristicScore(need, enrichedProfile);
+      scores.set(need.id!, {
+        needId: need.id!,
+        ics: h.ics,
+        breakdown: h.breakdown,
+        reason: h.reason,
+        redFlag: h.redFlag,
+        topSkills: h.topSkills,
+      });
+    }
+  }
+
+  return {
+    scores,
+    rankingMode: llmHits > 0 && heuristicHits === 0 ? "llm" : "degraded",
+    degradedReason: heuristicHits > 0 ? degradedReason : undefined,
+    excluded,
+  };
+}

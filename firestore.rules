@@ -112,6 +112,15 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // YOUTH_MATCHES — cache joven-céntrico de oportunidades (id = profileId).
+    // El server (web SDK sin auth) lee/escribe en /api/oportunidades para no
+    // recalcular el scoring LLM en cada visita. DEMO MODE — mismo motivo que
+    // need_matches. Degrada con gracia: sin esta regla, simplemente no cachea.
+    match /youth_matches/{profileId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Cualquier otra colección queda cerrada por defecto.
     match /{document=**} {
       allow read, write: if false;

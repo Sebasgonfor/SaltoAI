@@ -239,6 +239,26 @@ export interface OpportunityMatch {
   estimated?: boolean;
 }
 
+/**
+ * Snapshot de oportunidades joven-céntrico (colección `youth_matches`, id = profileId).
+ *
+ * A diferencia de `NeedMatchSnapshot` (empresa-céntrico: top candidatos POR
+ * necesidad), este cachea el ranking de necesidades PARA un joven, calculado
+ * con el LLM en una sola llamada por visita (no por cada page load gracias a
+ * este cache). Se invalida por TTL, por cambio en el número de necesidades
+ * abiertas, o con el botón "Recalcular" (force).
+ */
+export interface YouthMatchSnapshot {
+  profileId: string;
+  /** Oportunidades base (sin companyStatus — eso se superpone fresco en cada request). */
+  opportunities: OpportunityMatch[];
+  rankingMode: "llm" | "degraded";
+  /** Nº de necesidades abiertas consideradas al calcular — para invalidar si cambia. */
+  needsConsidered: number;
+  degradedReason?: string;
+  computedAt: number;
+}
+
 export type MatchDecisionStatus = "pending" | "interested" | "discarded";
 
 export interface MatchDecision {
