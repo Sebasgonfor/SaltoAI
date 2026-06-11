@@ -149,14 +149,9 @@ function loadFields(profileId: string): CvFields {
   }
 }
 
-function loadStyle(profileId: string): CvStyle {
-  if (typeof window === 'undefined') return DEFAULT_STYLE;
-  try {
-    const raw = window.localStorage.getItem(lsKeyStyle(profileId));
-    if (raw && STYLES.some((s) => s.id === raw)) return raw as CvStyle;
-  } catch {
-    /* ignore */
-  }
+function loadStyle(_profileId: string): CvStyle {
+  // Plantilla fija: siempre ATS minimalista (el formato más parseable). El
+  // selector de estilos quedó oculto, así que no leemos uno guardado distinto.
   return DEFAULT_STYLE;
 }
 
@@ -282,9 +277,7 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
         const serverContact = data.profile?.contact;
         if (serverContact && Object.keys(serverContact).length > 0) {
           setFields((prev) => ({ ...prev, ...fieldsFromContact(serverContact) }));
-          if (serverContact.cvStyle && STYLES.some((s) => s.id === serverContact.cvStyle)) {
-            setStyle(serverContact.cvStyle as CvStyle);
-          }
+          // Estilo fijo en ATS minimalista: ignoramos cualquier cvStyle guardado.
         } else if (hasLocalContact(local)) {
           await pushContactToServer(local, localStyle);
         }
@@ -371,72 +364,8 @@ export default function CvCustomizer({ profileId }: { profileId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* ---------- Picker de plantilla ---------- */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-            Plantilla de CV
-          </div>
-          <div className="text-xs text-slate-500">
-            Compatibilidad ATS: <AtsScore value={activeStyle.atsScore} />
-          </div>
-        </div>
-        <div
-          role="radiogroup"
-          aria-label="Elige el estilo de CV"
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
-        >
-          {STYLES.map((s) => {
-            const active = s.id === style;
-            return (
-              <button
-                key={s.id}
-                role="radio"
-                aria-checked={active}
-                type="button"
-                onClick={() => setStyle(s.id)}
-                className={`text-left p-3 rounded-xl border transition-all duration-200 relative will-change-transform hover:-translate-y-0.5 active:translate-y-0 ${
-                  active
-                    ? 'border-emerald-500 bg-emerald-50/70 shadow-md shadow-emerald-100/60 ring-1 ring-emerald-200'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 hover:shadow-sm'
-                }`}
-                title={`${s.description}\n\nIdeal para: ${s.bestFor}`}
-              >
-                {active && (
-                  <CheckCircle2
-                    size={16}
-                    className="absolute top-2 right-2 text-emerald-600 fill-white animate-pop"
-                  />
-                )}
-                <div className="text-[13px] font-semibold text-slate-900 leading-tight pr-5">
-                  {s.label}
-                </div>
-                <div className="text-[10.5px] text-slate-500 mt-0.5 leading-snug">{s.tagline}</div>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <AtsScore value={s.atsScore} />
-                  {s.atsScore <= 2 && (
-                    <AlertTriangle size={10} className="text-slate-600" aria-label="Riesgo ATS" />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-[11.5px] text-slate-600 leading-relaxed">
-          <strong className="text-slate-900">{activeStyle.label}.</strong> {activeStyle.description}{' '}
-          <span className="text-slate-500">Ideal para {activeStyle.bestFor}</span>
-        </p>
-        {isCreative && (
-          <p className="mt-2 text-[11.5px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 leading-relaxed flex gap-2 items-start">
-            <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-            <span>
-              <strong>Aviso de ATS:</strong> el formato creativo es de 2 columnas y algunos parsers
-              corporativos lo rompen. Para portales como Workday/Greenhouse, elige <em>ATS
-              minimalista</em> o <em>Híbrido</em>.
-            </span>
-          </p>
-        )}
-      </div>
+      {/* Selector de plantilla oculto: siempre usamos ATS minimalista (el
+          formato más parseable). El estilo queda fijo en 'minimalist'. */}
 
       {/* ---------- Datos del candidato (SIEMPRE VISIBLE, OBLIGATORIO) ----------
           Antes era colapsable y opcional → la mayoría imprimía CVs sin
