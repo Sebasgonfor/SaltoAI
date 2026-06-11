@@ -337,6 +337,10 @@ function DocumentRow({
     }
   };
 
+  const skills = doc.extractedSkills ?? [];
+  const citedCount = skills.filter((s) => !s.derived).length;
+  const derivedCount = skills.filter((s) => s.derived).length;
+
   return (
     <article className="border border-slate-200 rounded-xl overflow-hidden">
       <div className="flex items-start gap-3 p-4">
@@ -368,9 +372,14 @@ function DocumentRow({
                 <AlertCircle size={10} className="mr-1" /> Error de análisis
               </Badge>
             )}
-            {doc.extractionStatus === 'done' && (doc.extractedSkills?.length ?? 0) > 0 && (
+            {doc.extractionStatus === 'done' && citedCount > 0 && (
               <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800 text-[10px]">
-                <CheckCircle2 size={10} className="mr-1" /> {doc.extractedSkills?.length} skills verificadas
+                <CheckCircle2 size={10} className="mr-1" /> {citedCount} {citedCount === 1 ? 'skill verificada' : 'skills verificadas'}
+              </Badge>
+            )}
+            {doc.extractionStatus === 'done' && derivedCount > 0 && (
+              <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800 text-[10px]">
+                <Sparkles size={10} className="mr-1" /> {derivedCount} del programa
               </Badge>
             )}
           </div>
@@ -381,7 +390,7 @@ function DocumentRow({
             <span>· .{doc.format}</span>
           </div>
         </div>
-        <div className="flex gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {(doc.extractedSkills?.length ?? 0) > 0 && (
             <button
               type="button"
@@ -389,6 +398,18 @@ function DocumentRow({
               className="text-[11px] text-emerald-700 hover:text-emerald-900 underline px-2 py-1"
             >
               {expanded ? 'Ocultar' : 'Ver skills'}
+            </button>
+          )}
+          {doc.extractionStatus === 'done' && (
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              title="Volver a analizar el documento con la versión más reciente del extractor"
+              className="text-[11px] text-slate-500 hover:text-slate-800 underline px-2 py-1 disabled:opacity-50 inline-flex items-center gap-1"
+            >
+              {retrying ? <Loader2 size={11} className="animate-spin" /> : null}
+              {retrying ? 'Analizando…' : 'Re-analizar'}
             </button>
           )}
           <button
@@ -407,20 +428,37 @@ function DocumentRow({
         <Collapse open={expanded}>
         <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/40">
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-700 font-semibold mb-2 flex items-center gap-1.5">
-            <Sparkles size={11} /> Habilidades verificadas por este documento
+            <Sparkles size={11} /> Habilidades de este documento
           </div>
           <div className="space-y-2">
             {doc.extractedSkills?.map((s, i) => (
               <div key={i} className="text-sm bg-white border border-slate-100 rounded-lg p-3">
                 <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <span className="font-semibold text-slate-900">{s.skill}</span>
+                  <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+                    {s.skill}
+                    {s.derived ? (
+                      <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 text-[9px] font-medium">
+                        del programa
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[9px] font-medium">
+                        <CheckCircle2 size={9} className="mr-0.5" /> citada
+                      </Badge>
+                    )}
+                  </span>
                   <span className="text-[10px] text-slate-500 tabular-nums">
                     Confianza {s.confidence}%
                   </span>
                 </div>
-                <p className="text-xs text-slate-600 italic border-l-2 border-emerald-200 pl-2.5">
-                  &quot;{s.evidence}&quot;
-                </p>
+                {s.derived ? (
+                  <p className="text-xs text-slate-500 border-l-2 border-sky-200 pl-2.5">
+                    Competencia estándar del programa — no citada literalmente en el documento.
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-600 italic border-l-2 border-emerald-200 pl-2.5">
+                    &quot;{s.evidence}&quot;
+                  </p>
+                )}
               </div>
             ))}
           </div>
