@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Users, ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
 
 interface Candidate {
   id: string;
@@ -22,10 +23,6 @@ interface Candidate {
   summary: string;
   skills: string[];
   createdAt: number;
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function MisCandidatosPage() {

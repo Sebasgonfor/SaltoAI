@@ -15,7 +15,7 @@ export function EmpresaBottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-[#FAFAF7]/95 backdrop-blur-md"
+      className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-page/95 backdrop-blur-md"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Navegación principal"
     >

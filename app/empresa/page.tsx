@@ -41,25 +41,12 @@ import {
 } from 'lucide-react';
 import type { CompanyNeed, MicroTask } from '@/lib/types';
 import { isNeedClosed } from '@/lib/need-status';
+import { getGreeting, formatDate } from '@/lib/utils';
 import { LegalEditor } from '@/components/empresa/legal-editor';
 import { EmpresaWidgets } from '@/components/dashboard/empresa-widgets';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function getGreeting(name: string) {
-  const h = new Date().getHours();
-  const prefix = h < 12 ? 'Buenos días' : h < 18 ? 'Buenas tardes' : 'Buenas noches';
-  return `${prefix}, ${name}`;
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function formatCOP(n: number): string {
   return `$${n.toLocaleString('es-CO')}`;

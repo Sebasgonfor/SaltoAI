@@ -16,9 +16,7 @@ import { ArrowRight, Sparkles, ShieldCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { SaltoLogo } from '@/components/ui/salto-logo';
-import type { RecruiterBrandPublic } from '@/lib/recruiter-config';
-
-const DEFAULT_PRIMARY = '#059669'; // emerald-600
+import { DEFAULT_BRAND_PRIMARY, type RecruiterBrandPublic } from '@/lib/recruiter-config';
 
 export default function RecruiterLandingPage() {
   const params = useParams<{ slug: string }>();
@@ -57,7 +55,7 @@ export default function RecruiterLandingPage() {
   }, [slug]);
 
   const primary = useMemo(
-    () => brand?.brand?.primaryColor || DEFAULT_PRIMARY,
+    () => brand?.brand?.primaryColor || DEFAULT_BRAND_PRIMARY,
     [brand]
   );
 
@@ -67,7 +65,7 @@ export default function RecruiterLandingPage() {
 
   if (state === 'notfound' || !brand) {
     return (
-      <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center px-6 py-16">
+      <div className="min-h-screen bg-page flex items-center justify-center px-6 py-16">
         <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-8 md:p-10 text-center">
           <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mx-auto mb-5">
             <MessageCircle size={20} />
@@ -96,7 +94,7 @@ export default function RecruiterLandingPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#FAFAF7] flex flex-col"
+      className="min-h-screen bg-page flex flex-col"
       style={{ ['--brand-primary' as string]: primary }}
     >
       <main className="flex-1 flex items-center justify-center px-6 py-14 sm:py-20">

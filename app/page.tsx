@@ -22,9 +22,9 @@ export default function LandingPage() {
   const isEmpresa = account?.role === 'empresa';
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FAFAF7] text-slate-900">
+    <div className="flex flex-col min-h-screen bg-page text-slate-900">
       {/* NAV */}
-      <header className="px-6 h-20 flex items-center justify-between border-b border-slate-200/60 bg-[#FAFAF7]/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="px-6 h-20 flex items-center justify-between border-b border-slate-200/60 bg-page/80 backdrop-blur-md sticky top-0 z-50">
         <Link href="/" className="flex items-center shrink-0">
           <SaltoLogo variant="full" size={64} />
         </Link>
@@ -334,7 +334,7 @@ export default function LandingPage() {
         </section>
 
         {/* PARTNERS */}
-        <section className="bg-[#FAFAF7] border-b border-slate-200">
+        <section className="bg-page border-b border-slate-200">
           <div className="max-w-6xl mx-auto px-6 py-16">
             <p className="text-center text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold mb-8">
               Apoyado por el ecosistema que ya agrega a nuestros dos usuarios
@@ -387,7 +387,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="py-10 border-t border-slate-200 bg-[#FAFAF7]">
+      <footer className="py-10 border-t border-slate-200 bg-page">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row gap-4 justify-between items-center text-xs text-slate-500">
           <div className="flex items-center gap-3">
             <SaltoLogo variant="full" size={44} />

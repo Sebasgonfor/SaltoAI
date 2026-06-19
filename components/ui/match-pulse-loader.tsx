@@ -42,7 +42,7 @@ export function MatchPulseLoader({
         className={cn(
           'flex flex-col items-center justify-center z-50 pointer-events-auto',
           variant === 'fullscreen'
-            ? 'fixed inset-0 bg-[#FAFAF7]/85 backdrop-blur-sm'
+            ? 'fixed inset-0 bg-page/85 backdrop-blur-sm'
             : 'absolute inset-0 bg-white/75 backdrop-blur-[3px] rounded-2xl',
           className
         )}

@@ -10,6 +10,7 @@ import { useCachedResource } from '@/lib/hooks/use-cached-resource';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Profile, MicroTask } from '@/lib/types';
+import { getGreeting } from '@/lib/utils';
 import {
   User,
   Network,
@@ -23,19 +24,12 @@ import {
   Star,
   MessageSquareQuote,
   Layers,
-  TrendingUp,
   Zap,
 } from 'lucide-react';
 import { JovenWidgets, type DashboardJovenData } from '@/components/dashboard/joven-widgets';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function getGreeting(name: string) {
-  const h = new Date().getHours();
-  const prefix = h < 12 ? 'Buenos días' : h < 18 ? 'Buenas tardes' : 'Buenas noches';
-  return `${prefix}, ${name}`;
-}
 
 function FadeUp({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (

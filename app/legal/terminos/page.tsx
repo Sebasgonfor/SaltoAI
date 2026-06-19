@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Scale, ArrowRight } from 'lucide-react';
+import { P, UL } from '../legal-components';
 
 export const metadata: Metadata = {
   title: 'Términos y Condiciones — Salto',
@@ -28,23 +29,6 @@ function SectionHeader({ n, id, children }: { n: number; id: string; children: R
       </span>
       {children}
     </h2>
-  );
-}
-
-function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-slate-600 leading-relaxed mb-4">{children}</p>;
-}
-
-function UL({ items }: { items: (string | React.ReactNode)[] }) {
-  return (
-    <ul className="space-y-2 mb-5 ml-1">
-      {items.map((item, i) => (
-        <li key={i} className="flex items-start gap-2.5 text-slate-600 leading-relaxed">
-          <span className="mt-2 w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-          <span>{item}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
 

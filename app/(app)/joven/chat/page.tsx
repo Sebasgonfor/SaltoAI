@@ -26,6 +26,7 @@ import {
   saveJovenBasics,
 } from '@/lib/user-onboarding-storage';
 import { normalizeSlug, type RecruiterBrandPublic } from '@/lib/recruiter-config';
+import { storageKey, loadPersisted, clearPersisted } from '@/lib/chat-persist';
 
 const MIN_TURNS = MIN_USER_TURNS;
 const MAX_TURNS = MAX_USER_TURNS;
@@ -80,31 +81,7 @@ interface ChatPersistedState {
   recruiterSlug?: string;
 }
 
-function storageKey(uid: string | null | undefined): string {
-  return `salto_chat_state_${uid || 'anon'}`;
-}
-
-function loadPersisted(uid: string | null | undefined): ChatPersistedState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(storageKey(uid));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ChatPersistedState;
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function clearPersisted(uid: string | null | undefined): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(storageKey(uid));
-  } catch {
-    /* ignore */
-  }
-}
+const CHAT_PREFIX = "salto_chat_state";
 
 /**
  * Default export envuelve el componente real con RoleGate. Antes el gate
@@ -344,7 +321,7 @@ function ChatJoven() {
     let cancelled = false;
 
     async function restore() {
-      const saved = loadPersisted(user?.uid);
+      const saved = loadPersisted<ChatPersistedState>(storageKey(CHAT_PREFIX, user?.uid));
       if (saved) {
         if (Array.isArray(saved.messages)) setMessages(saved.messages);
         if (typeof saved.input === 'string') setInput(saved.input);
@@ -420,7 +397,7 @@ function ChatJoven() {
       recruiterSlug: recruiterSlugRef.current || undefined,
     };
     try {
-      localStorage.setItem(storageKey(user?.uid), JSON.stringify(payload));
+      localStorage.setItem(storageKey(CHAT_PREFIX, user?.uid), JSON.stringify(payload));
     } catch {
       /* localStorage puede fallar en modo privado; ignoramos. */
     }
@@ -491,7 +468,7 @@ function ChatJoven() {
     if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return;
     cancelRecording('reset-interview');
     disconnectLive();
-    clearPersisted(user?.uid);
+    clearPersisted(storageKey(CHAT_PREFIX, user?.uid));
     resetLiveMessages();
     setMessages([]);
     setInput('');
@@ -579,7 +556,7 @@ function ChatJoven() {
             /* ignore */
           }
           // Limpiamos la persistencia de la entrevista: ya cumplió su rol.
-          clearPersisted(user?.uid);
+          clearPersisted(storageKey(CHAT_PREFIX, user?.uid));
           // Paso opcional de cierre: ofrecer subir certificados antes de ir al
           // perfil. El render de InterviewDoneStep se ocupa; el redirect lo hace
           // el botón "Ver mi perfil".

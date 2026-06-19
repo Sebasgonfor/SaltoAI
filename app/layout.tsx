@@ -30,7 +30,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="font-sans bg-[#F9FAFB] text-slate-900 antialiased min-h-screen" suppressHydrationWarning>
+      <body className="font-sans bg-gray-50 text-slate-900 antialiased min-h-screen" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

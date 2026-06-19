@@ -31,8 +31,8 @@ export function EmpresaAppShell({ children }: { children: React.ReactNode }) {
   // El RoleGate se encarga de redirigir a su zona.
   if (account?.role !== 'empresa') {
     return (
-      <div className="min-h-screen bg-[#FAFAF7] flex flex-col overflow-x-hidden">
-        <header className="sticky top-0 z-40 h-14 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200/70 bg-[#FAFAF7]/90 backdrop-blur-md">
+      <div className="min-h-screen bg-page flex flex-col overflow-x-hidden">
+        <header className="sticky top-0 z-40 h-14 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200/70 bg-page/90 backdrop-blur-md">
           <Link href="/" className="flex items-center" aria-label="Inicio">
             <SaltoLogo variant="full" size={48} />
           </Link>
@@ -47,11 +47,11 @@ export function EmpresaAppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] overflow-x-hidden">
+    <div className="min-h-screen bg-page overflow-x-hidden">
       <EmpresaSidebar />
 
       {/* Top-bar móvil: logo + cuenta (la nav vive en la barra inferior). */}
-      <header className="md:hidden sticky top-0 z-30 h-14 px-4 flex items-center justify-between border-b border-slate-200/70 bg-[#FAFAF7]/90 backdrop-blur-md">
+      <header className="md:hidden sticky top-0 z-30 h-14 px-4 flex items-center justify-between border-b border-slate-200/70 bg-page/90 backdrop-blur-md">
         <Link href="/empresa" className="flex items-center" aria-label="Inicio">
           <SaltoLogo variant="full" size={44} />
         </Link>

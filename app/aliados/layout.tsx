@@ -3,7 +3,7 @@ import { AppFooter } from '@/components/layout/app-footer';
 
 export default function AliadosLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-page flex flex-col overflow-x-hidden">
       <AliadosHeader />
       <main className="flex-1 flex flex-col w-full min-w-0 px-4 sm:px-6">{children}</main>
       <AppFooter

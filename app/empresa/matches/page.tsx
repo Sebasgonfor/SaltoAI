@@ -29,14 +29,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import type { CompanyNeed } from '@/lib/types';
 import { isNeedClosed } from '@/lib/need-status';
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { formatDate } from '@/lib/utils';
 
 export default function MatchesIndex() {
   const { user, loading: authLoading } = useAuth();

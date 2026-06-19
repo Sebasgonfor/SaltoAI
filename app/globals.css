@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --color-page: #FAFAF7;
+  --color-sidebar: #F4F2EC;
+}
+
 html,
 body {
   overflow-x: hidden;

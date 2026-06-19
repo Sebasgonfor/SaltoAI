@@ -107,7 +107,7 @@ export function JovenSidebar({ resolveHref }: { resolveHref: (item: JovenNavItem
     });
 
   return (
-    <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-60 flex-col border-r border-slate-200/70 bg-[#F4F2EC]">
+    <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-60 flex-col border-r border-slate-200/70 bg-sidebar">
       <div className="h-16 flex items-center px-5 shrink-0">
         <Link href="/dashboard" className="flex items-center" aria-label="Inicio">
           <SaltoLogo variant="full" size={52} />

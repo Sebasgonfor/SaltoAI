@@ -153,6 +153,8 @@ export const SLUG_MAX = 32;
 /** Cuántas muestras se inyectan como few-shot en los prompts. */
 export const PROMPT_STYLE_SAMPLES = 4;
 
+export const DEFAULT_BRAND_PRIMARY = "#059669"; // emerald-600
+
 /** Slugs reservados (rutas del producto) que no se pueden reclamar. */
 export const RESERVED_SLUGS = new Set([
   "r",

@@ -45,3 +45,6 @@ firebase-debug.log
 # TS
 *.tsbuildinfo
 next-env.d.ts
+
+# Bun
+bun.lock

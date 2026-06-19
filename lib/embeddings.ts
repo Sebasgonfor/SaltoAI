@@ -32,12 +32,11 @@ function normalize(v: number[]): number[] {
 export async function embed(text: string): Promise<number[]> {
   if (!hasGeminiKey()) return mockEmbedding(text);
   try {
-    const res: any = await gemini().models.embedContent({
+    const res = await gemini().models.embedContent({
       model: EMBED_MODEL,
       contents: text,
     });
-    const values: number[] | undefined =
-      res?.embeddings?.[0]?.values ?? res?.embedding?.values;
+    const values: number[] | undefined = res?.embeddings?.[0]?.values;
     if (!values || !values.length) return mockEmbedding(text);
     return normalize(values);
   } catch (e) {

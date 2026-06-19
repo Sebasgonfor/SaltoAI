@@ -8,35 +8,7 @@ import { AuthForm } from '@/components/auth/auth-form';
 import { useAuth, type UserRole } from '@/lib/auth-context';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-
-function isSafeNext(value: string | null): string {
-  if (!value) return '/';
-  if (!value.startsWith('/') || value.startsWith('//')) return '/';
-  return value;
-}
-
-function defaultDestination(role: UserRole): string {
-  return role === 'joven' ? '/joven/chat' : '/empresa/chat';
-}
-
-/**
- * El `next` del query string se RESPETA solo si es coherente con el rol
- * resuelto. Si no, lo descartamos y vamos al default del rol. Sin esto,
- * un user que elige "joven" pero entró al onboarding con `?next=/empresa/chat`
- * (heredado de un flow anterior) termina chocando contra el RoleGate de
- * empresa, viendo "Tu cuenta está registrada como joven". El rol elegido
- * manda, no el query.
- */
-function resolveTarget(role: UserRole, next: string): string {
-  if (next === '/') return defaultDestination(role);
-  // Coherente: el next apunta al área del rol elegido.
-  if (role === 'joven' && (next === '/joven' || next.startsWith('/joven/'))) return next;
-  if (role === 'empresa' && (next === '/empresa' || next.startsWith('/empresa/'))) return next;
-  // Neutro (no /joven/* ni /empresa/*): respetamos.
-  if (!next.startsWith('/joven') && !next.startsWith('/empresa')) return next;
-  // Conflicto (next del rol opuesto): default del rol elegido.
-  return defaultDestination(role);
-}
+import { isSafeNext, resolveTarget } from '@/lib/auth-routing';
 
 function OnboardingRolInner() {
   const router = useRouter();
@@ -110,7 +82,7 @@ function OnboardingRolInner() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
+      <div className="min-h-screen bg-page flex flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-10 sm:py-16">
           <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 md:p-10 shadow-sm">
@@ -125,7 +97,7 @@ function OnboardingRolInner() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
+    <div className="min-h-screen bg-page flex flex-col">
       <Header />
       <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 lg:py-20">
         <div className="max-w-3xl w-full">

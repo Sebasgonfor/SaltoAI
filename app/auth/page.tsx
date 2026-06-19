@@ -8,30 +8,11 @@ import { AuthForm } from '@/components/auth/auth-form';
 import { SaltoLogo } from '@/components/ui/salto-logo';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useAuth, type UserRole } from '@/lib/auth-context';
-
-function isSafeNext(value: string | null): string {
-  if (!value) return '/';
-  if (!value.startsWith('/') || value.startsWith('//')) return '/';
-  return value;
-}
+import { isSafeNext, resolveTarget } from '@/lib/auth-routing';
 
 function parseRole(value: string | null): UserRole | undefined {
   if (value === 'joven' || value === 'empresa') return value;
   return undefined;
-}
-
-/**
- * Mismo workaround que en /onboarding/rol: el `next` se respeta solo si
- * es coherente con el rol resuelto. Sino, default del rol. Sin esto, un
- * user joven con `?next=/empresa/chat` (heredado de un flow anterior)
- * aterriza en el muro de RoleGate de empresa.
- */
-function resolveTarget(role: UserRole, next: string): string {
-  if (next === '/') return role === 'joven' ? '/joven/chat' : '/empresa/chat';
-  if (role === 'joven' && (next === '/joven' || next.startsWith('/joven/'))) return next;
-  if (role === 'empresa' && (next === '/empresa' || next.startsWith('/empresa/'))) return next;
-  if (!next.startsWith('/joven') && !next.startsWith('/empresa')) return next;
-  return role === 'joven' ? '/joven/chat' : '/empresa/chat';
 }
 
 function AuthPageInner() {
@@ -55,7 +36,7 @@ function AuthPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex flex-col">
+    <div className="min-h-screen bg-page flex flex-col">
       <header className="px-6 h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center sticky top-0 z-20">
         <Link href="/" className="flex items-center shrink-0">
           <SaltoLogo variant="full" size={56} />

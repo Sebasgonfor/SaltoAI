@@ -39,6 +39,7 @@ import {
   type DocType,
   DOC_TYPE_LABELS,
 } from '@/lib/input-validation';
+import { storageKey, loadPersisted, clearPersisted } from '@/lib/chat-persist';
 
 const MAX_TURNS = 6;
 
@@ -94,33 +95,7 @@ interface ChatPersistedState {
   input: string;
 }
 
-// Eliminar validaciones locales — ahora viven en lib/input-validation.ts
-
-function storageKey(uid: string | null | undefined): string {
-  return `salto_empresa_chat_${uid || 'anon'}`;
-}
-
-function loadPersisted(uid: string | null | undefined): ChatPersistedState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(storageKey(uid));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ChatPersistedState;
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function clearPersisted(uid: string | null | undefined): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(storageKey(uid));
-  } catch {
-    /* ignore */
-  }
-}
+const CHAT_PREFIX = "salto_empresa_chat";
 
 function legalToForm(legal: CompanyLegal): Omit<CompanyLegal, 'acceptedAt'> {
   return {
@@ -174,7 +149,7 @@ export default function ChatEmpresa() {
     let cancelled = false;
 
     async function restore() {
-      const saved = loadPersisted(user?.uid);
+      const saved = loadPersisted<ChatPersistedState>(storageKey(CHAT_PREFIX, user?.uid));
       if (saved) {
         if (Array.isArray(saved.messages)) setMessages(saved.messages);
         if (typeof saved.input === 'string') setInput(saved.input);
@@ -216,7 +191,7 @@ export default function ChatEmpresa() {
     if (!restored || typeof window === 'undefined') return;
     const payload: ChatPersistedState = { phase, legal, form, messages, input };
     try {
-      localStorage.setItem(storageKey(user?.uid), JSON.stringify(payload));
+      localStorage.setItem(storageKey(CHAT_PREFIX, user?.uid), JSON.stringify(payload));
     } catch {
       /* ignore */
     }
@@ -340,7 +315,7 @@ export default function ChatEmpresa() {
         setClosing(false);
         return;
       }
-      clearPersisted(user?.uid);
+      clearPersisted(storageKey(CHAT_PREFIX, user?.uid));
       if (legal) saveEmpresaLegal(user?.uid, legal);
       router.push(`/empresa/matches/${data.id}`);
     } catch {
