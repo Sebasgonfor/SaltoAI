@@ -284,8 +284,10 @@ function fallbackResponse(messages: ChatMessage[]) {
 
 export async function POST(req: NextRequest) {
   const log = startLog(req, "entrevista-empresa");
+  let messagesSnapshot: ChatMessage[] = [];
   try {
     const { messages } = (await req.json()) as { messages: ChatMessage[] };
+    messagesSnapshot = messages;
     if (!Array.isArray(messages) || messages.length === 0) {
       log.end({ status: 400, extra: { reason: "messages_required" } });
       return NextResponse.json({ error: "messages required" }, { status: 400 });
@@ -442,8 +444,8 @@ export async function POST(req: NextRequest) {
       });
     }
     log.error("entrevista-empresa.exception", { message: (err as Error)?.message });
-    const resp = fallbackResponse(messages);
-    log.end({ status: 200, extra: { mode: "exception_fallback", done: resp.done, userTurns } });
+    const resp = fallbackResponse(messagesSnapshot);
+    log.end({ status: 200, extra: { mode: "exception_fallback", done: resp.done, userTurns: countUserTurns(messagesSnapshot) } });
     return NextResponse.json({ ...resp, degraded: true, degradedReason: "exception" });
   }
 }
