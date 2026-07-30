@@ -120,7 +120,6 @@ async function generateInterviewTurnOnce(userPrompt: string): Promise<InterviewT
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        thinkingConfig: { thinkingBudget: 0 },
       },
     }),
     GEMINI_TIMEOUT_MS,
