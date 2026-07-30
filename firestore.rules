@@ -1,0 +1,129 @@
+rules_version = '2';
+
+// Salto — reglas Firestore.
+//
+// IMPORTANTE — modo "demo / hackatón":
+// El backend (Next.js API routes) usa el WEB SDK de Firebase, NO el Admin SDK.
+// El Web SDK del lado server NO manda credenciales de auth a Firestore, así
+// que cualquier regla que requiera `request.auth != null` deniega TODAS las
+// reads y writes del backend → /api/match, /api/perfil, /api/seed, etc.
+// caen al fallback de memoria.
+//
+// Workaround actual:
+//   - accounts → STRICT (datos sensibles del usuario, sin tráfico server).
+//   - profiles, needs, microtasks → read+write abierto.
+//   - feedback → write abierto, read cerrado (flywheel propietario).
+//
+// El ENFORCEMENT REAL (ownership, schema, validación) vive en las API routes
+// de Next: el server setea `doc.id == uid` en upsertProfileWithId, ata
+// `ownerUid` y `companyOwnerUid` desde el sesión activo. Cliente web NUNCA
+// debería escribir directo a Firestore — todo va por API.
+//
+// Roadmap: migrar el backend a `firebase-admin` con service account. Eso
+// permite cerrar todos los reads/writes auth-scoped sin sacrificar UX.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ACCOUNTS — el rol asignado al usuario. Sigue STRICT auth-scoped:
+    // contiene datos sensibles (rol asignado, no debe filtrarse).
+    match /accounts/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.role in ['joven', 'empresa'];
+      allow update, delete: if false;
+    }
+
+    // PROFILES — el doc id es el uid del joven (ver app/api/perfil con upsertProfileWithId).
+    //
+    // DEMO MODE: read + write abiertos.
+    // Razón: los writes los hace el server Next.js con el WEB SDK que NO manda
+    // auth, así que cualquier rule auth-scoped deniega → todo cae a memoria.
+    // Hasta migrar a firebase-admin con service account, las rules no pueden
+    // hacer ownership enforcement aquí. El control real vive en las API routes
+    // de Next: /api/perfil POST setea doc.id = uid (ver upsertProfileWithId).
+    match /profiles/{profileId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // NEEDS — necesidades publicadas por empresas.
+    // DEMO MODE — mismo motivo que profiles. El enforcement de ownerUid vive
+    // en /api/necesidad (server-side) hasta migrar a firebase-admin.
+    match /needs/{needId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // MICROTASKS (PRD §6.3) — tareas pagadas joven↔empresa.
+    // DEMO MODE — writes desde el server (proponer/entregar/evaluar). El
+    // enforcement de companyOwnerUid / profileId vive en las API routes.
+    match /microtasks/{taskId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // FEEDBACK (PRD §6.2.6, §8.6) — data flywheel propietario.
+    // DEMO MODE: read + write abiertos para que el server SDK (sin auth)
+    // pueda leer y escribir señales de feedback. Lo necesita:
+    //   - /api/feedback GET (smoke + dashboard del flywheel)
+    //   - /api/admin/flywheel (agregaciones por touchpoint)
+    //   - /api/admin/eval-summary (calibración ICS vs outcome)
+    //
+    // ANTES read=false (server SDK no podía leer; data propietaria a futuro).
+    // El control real vive en /api/admin/* (auth check del lado server)
+    // hasta migrar a firebase-admin con service account.
+    match /feedback/{feedbackId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // NEED_MATCHES — snapshots de ICS calculados al publicar/refrescar una
+    // necesidad (ver lib/match-need.ts + lib/db.ts NEED_MATCHES).
+    // DEMO MODE — el server (web SDK, sin auth) escribe el snapshot en
+    // saveNeedMatches y lo lee en /api/oportunidades + /api/match. Sin esta
+    // regla, el catch-all denegaba read/write → NUNCA se guardaban snapshots
+    // y el joven veía 0 oportunidades. El enforcement real vive en las API routes.
+    match /need_matches/{needId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // MATCH_DECISIONS — decisión de la empresa sobre un candidato (interested/
+    // discarded). El server escribe en /api/match/decision y lee en
+    // /api/oportunidades + dashboard. DEMO MODE — mismo motivo que arriba.
+    match /match_decisions/{decisionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // DOCUMENTS — documentos/CV del joven y skills verificadas por documento
+    // (enriquecen el scoring, ver enrichWithDocumentSkills). El server lee/escribe
+    // sin auth. DEMO MODE — mismo motivo que profiles.
+    match /documents/{documentId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // RECRUITER_CONFIGS — configuración del reclutador por empresa.
+    // El server lee/escribe en /api/recruiter-config. DEMO MODE.
+    match /recruiter_configs/{configId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // YOUTH_MATCHES — cache joven-céntrico de oportunidades (id = profileId).
+    // El server (web SDK sin auth) lee/escribe en /api/oportunidades para no
+    // recalcular el scoring LLM en cada visita. DEMO MODE — mismo motivo que
+    // need_matches. Degrada con gracia: sin esta regla, simplemente no cachea.
+    match /youth_matches/{profileId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Cualquier otra colección queda cerrada por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
