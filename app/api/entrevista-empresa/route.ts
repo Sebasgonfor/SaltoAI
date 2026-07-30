@@ -284,8 +284,9 @@ function fallbackResponse(messages: ChatMessage[]) {
 
 export async function POST(req: NextRequest) {
   const log = startLog(req, "entrevista-empresa");
+  let messages: ChatMessage[];
   try {
-    const { messages } = (await req.json()) as { messages: ChatMessage[] };
+    ({ messages } = (await req.json()) as { messages: ChatMessage[] });
     if (!Array.isArray(messages) || messages.length === 0) {
       log.end({ status: 400, extra: { reason: "messages_required" } });
       return NextResponse.json({ error: "messages required" }, { status: 400 });
