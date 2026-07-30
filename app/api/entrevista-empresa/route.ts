@@ -343,19 +343,18 @@ export async function POST(req: NextRequest) {
       `PREGUNTAS QUE YA HICISTE (NO las repitas, ni reformuladas):\n${askedSoFar || "(ninguna)"}\n\n` +
       `Devuelve la SIGUIENTE pregunta (única, dirigida a un slot pendiente, conectada a lo que el founder dijo), o marca done=true si ya hay 5+ slots cubiertos con detalle.`;
 
+    // thinkingBudget se deja en default (sin override). Con budget=0 Gemini
+    // opera en modo autocomplete y no procesa el prompt complejo de cobertura
+    // de slots, causando el loop de "Cuéntame más sobre eso…". Mismo fix que
+    // 9f93216 aplicado a la ruta joven.
     const callGemini = () =>
       withTimeout(
         gemini().models.generateContent({
-          // Lite es ~3-4x más rápido que flash para Q&A turn-by-turn y la
-          // tarea (elegir slot pendiente + redactar una pregunta) no necesita
-          // razonamiento profundo. thinkingBudget=0 desactiva el modo "thinking"
-          // que viene on por default en la familia 2.5 y agrega varios segundos.
           model: GEMINI_LITE_MODEL,
           contents: userPrompt,
           config: {
             responseMimeType: "application/json",
             responseSchema: schema,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
         GEMINI_TIMEOUT_MS,
@@ -372,7 +371,7 @@ export async function POST(req: NextRequest) {
         // 429 honesto con Retry-After.
         const msg = (firstErr as Error)?.message ?? "";
         const transient =
-          msg.startsWith("timeout:") || /5\d\d/.test(msg);
+          msg.startsWith("timeout:") || msg === "empty_next_question" || /5\d\d/.test(msg);
         if (!transient || isRateLimitError(firstErr)) throw firstErr;
         log.warn("gemini.retry", { message: msg, userTurns });
         await new Promise((r) => setTimeout(r, 400));
@@ -391,6 +390,14 @@ export async function POST(req: NextRequest) {
     }
 
     const parsed = JSON.parse(response.text || "{}");
+    const nextQuestion =
+      typeof parsed.nextQuestion === "string" && parsed.nextQuestion.trim()
+        ? parsed.nextQuestion.trim()
+        : "";
+    if (!nextQuestion) {
+      throw new Error("empty_next_question");
+    }
+
     let done = !!parsed.done;
     if (userTurns < MIN_USER_TURNS) done = false;
     if (userTurns >= MAX_USER_TURNS) done = true;
@@ -403,9 +410,7 @@ export async function POST(req: NextRequest) {
     }
 
     const out = {
-      nextQuestion:
-        parsed.nextQuestion ||
-        "Cuéntame un poco más, ¿puedes darme un ejemplo concreto?",
+      nextQuestion,
       done,
       targetedSlot: parsed.targetedSlot ?? null,
       slotsCovered: Array.isArray(parsed.slotsCovered)
@@ -437,12 +442,8 @@ export async function POST(req: NextRequest) {
       });
     }
     log.error("entrevista-empresa.exception", { message: (err as Error)?.message });
-    log.end({ status: 200, extra: { mode: "degraded" } });
-    return NextResponse.json({
-      nextQuestion: "Cuéntame más sobre eso, ¿puedes darme un ejemplo concreto?",
-      done: false,
-      targetedSlot: null,
-      slotsCovered: [],
-    });
+    const resp = fallbackResponse(messages);
+    log.end({ status: 200, extra: { mode: "exception_fallback", done: resp.done, userTurns } });
+    return NextResponse.json({ ...resp, degraded: true, degradedReason: "exception" });
   }
 }
