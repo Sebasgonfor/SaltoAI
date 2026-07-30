@@ -52,7 +52,7 @@ export function EmpresaSidebar() {
       </nav>
 
       <div className="border-t border-slate-200/70 p-3">
-        <UserButton className="w-full" />
+        <UserButton className="w-full" menuPlacement="top-left" />
       </div>
     </aside>
   );
