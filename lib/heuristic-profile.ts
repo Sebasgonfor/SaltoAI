@@ -176,8 +176,24 @@ export function heuristicExtraction(
     traitsSet.add("Proactividad");
   }
 
-  // Garantizar mínimos sensatos (2 skills, 2 traits, 2 evidencias).
+  // Garantizar mínimos sensatos: 3 skills, 2 traits, 2 evidencias.
+  // Sin este piso, perfiles con solo 1-2 skills genéricas producen ICS ≤ 44%
+  // incluso contra necesidades perfectamente alineadas.
   if (traitsSet.size < 2) traitsSet.add("Curiosidad Aplicada");
+  if (skillsSet.size < 3) {
+    const fallbackSkills = ["Disposición a Aprender", "Resolución de Problemas", "Comunicación", "Trabajo en Equipo"];
+    for (const fs of fallbackSkills) {
+      if (skillsSet.size >= 3) break;
+      skillsSet.add(fs);
+    }
+  }
+  if (evidence.length < 2) {
+    evidence.push({
+      skill: "Disposición a Aprender",
+      quote:
+        "Mostró interés en construir su perfil profesional y abrirse al primer empleo formal con apoyo de la plataforma.",
+    });
+  }
 
   const skills = Array.from(skillsSet).slice(0, 10);
   const traits = Array.from(traitsSet).slice(0, 6);

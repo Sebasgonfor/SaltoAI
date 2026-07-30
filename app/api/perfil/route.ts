@@ -381,6 +381,18 @@ export async function POST(req: NextRequest) {
       extractionMode = "heuristic_only";
     }
 
+    // Advertencia cuando el perfil queda por debajo del mínimo funcional para
+    // matching (<3 skills o <2 evidencia). Estos perfiles producen ICS < 50%
+    // incluso contra necesidades alineadas.
+    if (extracted.skills.length < 3 || extracted.evidence.length < 2) {
+      log.warn("edge.profile_extraction_floor", {
+        skills: extracted.skills.length,
+        evidence: extracted.evidence.length,
+        traits: extracted.traits.length,
+        extractionMode,
+      });
+    }
+
     const embedding = await embed(buildEmbeddingText(extracted));
 
     let id: string;

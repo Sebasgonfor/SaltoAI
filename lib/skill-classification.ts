@@ -67,6 +67,41 @@ const JOB_TITLE_PREFIXES = [
   "practicante",
 ];
 
+/**
+ * Términos que indican que una etiqueta describe una COMPETENCIA (skill) aunque
+ * empiece con un prefijo de cargo. Ej: "Asistente de marketing digital" empieza
+ * con "asistente de" pero contiene "marketing" y "digital" → es una skill, no
+ * un cargo puro.
+ */
+const COMPETENCY_TERMS = [
+  "gestion",
+  "manejo",
+  "atencion",
+  "ventas",
+  "diseño",
+  "diseno",
+  "desarrollo",
+  "contenido",
+  "marketing",
+  "campañas",
+  "campanas",
+  "clientes",
+  "logistica",
+  "operaciones",
+  "redes",
+  "sociales",
+  "digital",
+  "web",
+  "datos",
+  "proyectos",
+  "estrategia",
+  "comunicacion",
+  "publicidad",
+  "cobranza",
+  "inventario",
+  "produccion",
+];
+
 /** ¿La etiqueta es el nombre de una carrera/título académico (no una skill)? */
 export function isDegreeName(label: string): boolean {
   const n = normalize(label);
@@ -78,7 +113,18 @@ export function isDegreeName(label: string): boolean {
 export function isJobTitle(label: string): boolean {
   const n = normalize(label);
   if (!n) return false;
-  return JOB_TITLE_PREFIXES.some((t) => n === t || n.startsWith(t + " "));
+  for (const prefix of JOB_TITLE_PREFIXES) {
+    if (n === prefix || n.startsWith(prefix + " ")) {
+      // Si el resto de la etiqueta contiene términos de competencia,
+      // es una skill descrita como función, no un cargo puro.
+      const remainder = n.slice(prefix.length).trim();
+      if (remainder && COMPETENCY_TERMS.some((ct) => remainder.split(/\s+/).some((w) => w === ct))) {
+        continue; // Skill con prefijo de cargo → permitir
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

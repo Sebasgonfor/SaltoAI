@@ -93,7 +93,8 @@ ok "Seed OK ($SEED_COUNT perfiles)"
 step "POST /api/necesidad (Arepas Doña Lucha)"
 NEED_BODY='{
   "companyName": "Arepas Doña Lucha",
-  "rawDescription": "Abrimos nuestro primer local de arepas en Barranquilla. Somos 3 personas, sin protocolos definidos, ritmo rápido y atendemos al público directamente. Necesitamos a alguien que maneje las redes sociales (Instagram, TikTok), responda mensajes de clientes, atienda pedidos en vitrina y resuelva reclamos sin que tengamos que estar encima. Necesita aguantar caos, aprender solo y orientarse a resultados de ventas."
+  "rawDescription": "Abrimos nuestro primer local de arepas en Barranquilla. Somos 3 personas, sin protocolos definidos, ritmo rápido y atendemos al público directamente. Necesitamos a alguien que maneje las redes sociales (Instagram, TikTok), responda mensajes de clientes, atienda pedidos en vitrina y resuelva reclamos sin que tengamos que estar encima. Necesita aguantar caos, aprender solo y orientarse a resultados de ventas.",
+  "ownerUid": "smoke_test_uid"
 }'
 NEED_RES="$(curl -fsS -m 60 -X POST "$BASE_URL/api/necesidad" \
   -H 'Content-Type: application/json' \

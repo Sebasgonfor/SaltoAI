@@ -39,6 +39,15 @@ import {
 export const SHORTLIST_SIZE = 15;
 export const RETURN_SIZE = 10;
 
+/**
+ * Factor de amortiguación para penalizaciones en computeICS().
+ * Antes las penalizaciones restaban 1:1 del ICS (0-100). Una penalización de 30
+ * puntos bajaba el score de 85 a 55 — un solo hard constraint violado obliteraba
+ * el ranking. Con este factor, una penalización de 30 deduce 12 puntos efectivos
+ * (85 → 73), preservando la señal sin dominar el score final.
+ */
+const PENALTY_DAMPING_FACTOR = 0.4;
+
 const GEMINI_TIMEOUT_MS = 25_000;
 
 const RANK_BATCH_PROMPT = `Eres el motor de scoring ICS (Índice de Compatibilidad Salto).
@@ -157,7 +166,7 @@ export function computeICS(b: ICSBreakdown, need?: Pick<CompanyNeed, "jobNature"
     w.behavioralFit * b.behavioralFit +
     w.learningSignal * b.learningSignal +
     w.contextFit * b.contextFit -
-    b.penalties;
+    b.penalties * PENALTY_DAMPING_FACTOR;
   return Math.round(clamp(raw));
 }
 
@@ -221,16 +230,56 @@ function skillOverlap(required: string, candidate: string): number {
   return hits / reqTokens.length;
 }
 
+// --- Keywords de contexto operativo para contextFit dinámico ---
+// Mapea palabras que aparecen en el campo `context` de la necesidad a traits
+// deseables del candidato. Así contextFit mide alineamiento REAL con el entorno
+// de trabajo, no solo si el candidato tiene ALGÚN trait en común.
+interface ContextKeyword {
+  /** Palabras clave que buscar en need.context. */
+  triggers: string[];
+  /** Traits del candidato que indican buen fit para este contexto. */
+  desiredTraits: string[];
+}
+
+const CONTEXT_KEYWORDS: ContextKeyword[] = [
+  {
+    triggers: ["caos", "multitarea", "rápido", "ritmo", "improvisar", "sin protocolos", "sin procesos"],
+    desiredTraits: ["tolerancia al caos", "proactividad", "adaptabilidad", "calma bajo presión", "resiliencia"],
+  },
+  {
+    triggers: ["orden", "metódico", "organizado", "estructura", "documentar", "procesos claros"],
+    desiredTraits: ["detallista", "meticulosidad", "organización", "método", "disciplina"],
+  },
+  {
+    triggers: ["finanzas", "reportes", "números", "caja", "contable", "cuadre", "inventario"],
+    desiredTraits: ["responsable", "detallista", "meticulosidad", "método", "foco en resultados"],
+  },
+  {
+    triggers: ["clientes", "público", "atención", "trato directo", "vitrina", "local"],
+    desiredTraits: ["empatía operacional", "tolerancia al caos", "proactividad", "calma bajo presión"],
+  },
+  {
+    triggers: ["crecer", "escalar", "startup", "emprendimiento", "resultados", "kpi"],
+    desiredTraits: ["foco en resultados", "autodidacta", "proactividad", "resiliencia"],
+  },
+];
+
+/** Palabras que indican aprendizaje autónomo — para scoring de learningSignal. */
+const LEARNING_STRONG_TERMS = /\b(aprendi[óo]|autodidacta|tutorial|youtube|por su cuenta|de forma aut[óo]noma|sin que nadie|sin formaci[óo]n previa|prueba y error|investig[óo]|por s[íi] solo)\b/i;
+const LEARNING_WEAK_TERMS = /\b(mejor[óo]|optimiz[óo]|cre[óo]|dise[ñn][óo]|implement[óo]|gestion[óo])\b/i;
+const TOOL_NAMES = /\b(excel|power bi|canva|figma|photoshop|wordpress|html|css|javascript|python|notion|whatsapp business|tiktok|instagram)\b/i;
+
 export function heuristicScore(
   need: CompanyNeed,
   profile: Profile
 ): Omit<Match, "profileId" | "profileName"> {
   const norm = (s: string) => s.toLowerCase().trim();
   const traitSet = new Set(need.desiredTraits.map(norm));
+  const profileTraitsNorm = profile.traits.map(norm);
+  const profileSummaryNorm = norm(profile.summary);
+  const needContextNorm = norm(need.context || "");
 
   // Para cada required skill, buscamos la mejor candidate skill del joven.
-  // Si el overlap >= 0.5 (al menos la mitad de tokens significativos coinciden),
-  // contamos como "covered" total. Si está entre 0.25 y 0.5, "parcial" (cuenta como medio).
   let coveredCount = 0;
   let partialCount = 0;
   const skillMatches: string[] = [];
@@ -259,30 +308,91 @@ export function heuristicScore(
     return false;
   });
 
-  // skillsFit = (covered + 0.5 * partial) / total — el match parcial cuenta como medio.
+  // skillsFit = (covered + 0.5 * partial) / total
   const totalReq = Math.max(need.requiredSkills.length, 1);
-  const skillsFit = clamp(((coveredCount + partialCount * 0.5) / totalReq) * 100);
+  let skillsFit = clamp(((coveredCount + partialCount * 0.5) / totalReq) * 100);
   const behavioralFit = clamp(
     (traitMatches.length / Math.max(traitSet.size, 1)) * 100
   );
+
+  // ── learningSignal: gradiente multi-factor en vez de binario 70|40 ──────
   const evText = profile.evidence
     .map((e) => e.quote)
     .join(" ")
     .toLowerCase();
-  const learningSignal = clamp(
-    /(aprend|sol[oa]|autodidacta|sin que|por mi cuenta|nadie me|youtube|tutoriales?)/.test(
-      evText
-    )
-      ? 70
-      : 40
-  );
-  const contextFit = clamp(traitMatches.length > 0 ? 65 : 45);
+  const allProfileText = [profile.summary, ...profile.skills, ...profile.traits, evText].join(" ").toLowerCase();
+
+  let learningScore = 30; // piso base
+
+  if (LEARNING_STRONG_TERMS.test(allProfileText)) {
+    learningScore += 30; // evidencia fuerte de aprendizaje
+  } else if (LEARNING_WEAK_TERMS.test(allProfileText)) {
+    learningScore += 15; // evidencia débil/moderada
+  }
+
+  if (TOOL_NAMES.test(allProfileText)) {
+    learningScore += 15; // maneja herramientas concretas
+  }
+
+  // Adaptación por jobNature
+  const jobNature = need.jobNature ?? "mixta";
+  if (jobNature === "cuantitativa") {
+    // Cuantitativa: iniciativa + métricas → rango 25-95
+    learningScore = clamp(learningScore, 25, 95);
+    // Bonus por métricas concretas en la evidencia
+    if (/\d+/.test(evText)) learningScore += 10;
+  } else if (jobNature === "cualitativa") {
+    // Cualitativa: constancia + cuidado → rango 30-85, no penaliza falta de métricas
+    learningScore = clamp(learningScore, 30, 85);
+  } else {
+    learningScore = clamp(learningScore, 25, 90);
+  }
+
+  const learningSignal = clamp(learningScore);
+
+  // ── contextFit: keyword-based en vez de binario 65|45 ──────────────────
+  let contextScore = 40; // piso neutral
+
+  if (needContextNorm.length > 5) {
+    for (const kw of CONTEXT_KEYWORDS) {
+      const hasContextKeyword = kw.triggers.some((t) => needContextNorm.includes(t));
+      if (!hasContextKeyword) continue;
+
+      // Check if profile traits or summary align with the desired traits for this context
+      const matchingTraits = kw.desiredTraits.filter((dt) =>
+        profileTraitsNorm.some((pt) => pt.includes(dt) || dt.includes(pt))
+      );
+      const traitBonus = Math.min(matchingTraits.length * 12, 36);
+
+      // Check if summary also mentions context-relevant terms
+      const summaryBonus = kw.triggers.some((t) => profileSummaryNorm.includes(t)) ? 10 : 0;
+
+      contextScore += traitBonus + summaryBonus;
+      break; // Usamos el primer keyword group que matchea (el más específico)
+    }
+  } else {
+    // Sin contexto en la necesidad, usamos el conteo de trait matches como proxy
+    contextScore = traitMatches.length > 0 ? 55 : 40;
+  }
+
+  const contextFit = clamp(contextScore, 20, 100);
+
+  // ── jobNature awareness para skillsFit (task 1.5) ──────────────────────
+  if (jobNature === "cuantitativa") {
+    // Bonus si hay evidencia de métricas en perfil y el rol es cuantitativo
+    if (/\d+/.test(evText) && skillsFit > 40) {
+      skillsFit = clamp(skillsFit * 1.05);
+    }
+    if (learningSignal >= 70 && skillsFit > 40) {
+      skillsFit = clamp(skillsFit * 1.05);
+    }
+  }
 
   const breakdown: ICSBreakdown = {
-    skillsFit,
-    behavioralFit,
-    learningSignal,
-    contextFit,
+    skillsFit: Math.round(skillsFit),
+    behavioralFit: Math.round(behavioralFit),
+    learningSignal: Math.round(learningSignal),
+    contextFit: Math.round(contextFit),
     penalties: 0,
   };
 
